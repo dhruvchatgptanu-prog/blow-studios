@@ -327,7 +327,7 @@ async function stories() {
     <div class="panel"><h2>Used</h2><div class="stat">${s.used}</div><p class="small muted">${s.rejected} rejected</p></div>
     <div class="panel"><h2>Story source</h2><div class="stat">${esc(b.source === 'backlog' ? 'Backlog' : 'LLM API')}</div><p class="small muted">Setting: ${esc(b.setting)} (Settings → Production)</p></div></div>
     <div class="panel"><p class="small">${esc(b.note)}</p>
-      <form id="import"><label>Paste story plans (a JSON list of plans, or {"plans": [...]}); the format is the plan JSON in the Director’s editor<textarea name="json" class="tall" placeholder='[{"title": "…", "cast": […], "shots": […], …}]'></textarea></label>
+      <form id="import"><label>Paste story plans (a JSON list of plans, or {"plans": [...]}); the format is the plan JSON in the Director’s editor<textarea name="json" placeholder='[{"title": "…", "cast": […], "shots": […], …}]'></textarea></label>
       <div class="actions"><button class="primary">Validate and add</button></div></form><div id="import-out"></div></div>
     <div class="panel tablewrap">${b.stories.length ? `<table><tr><th>Story</th><th>Status</th><th>Source</th><th>Added</th><th>Notes</th><th></th></tr>${b.stories.map(x => `<tr><td><b>${esc(x.title)}</b><br><span class="small muted">${esc(x.logline)}</span></td>
       <td>${chip(x.status === 'ready' ? 'pass' : x.status === 'used' ? 'info' : 'fail', x.status)}${x.video_id ? `<br><a href="#" data-video="${esc(x.video_id)}" class="small">video</a>` : ''}</td><td class="small">${esc(x.source)}</td><td class="small">${when(x.created_at, {timeStyle: undefined})}</td>
