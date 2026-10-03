@@ -76,6 +76,9 @@ def validate(m, prefs=None, characters=None, measured=False):
     _continuity(r, m)
     _captions(r, m, prefs)
     _story(r, m)
+    _effects(r, m, min_expr)
+    if characters:
+        _silhouettes(r, m, characters)
     stats = {
         'duration_s': round(D / fps, 3), 'frames': D, 'shots': len(m['shots']), 'beats': len(m['beats']),
         'lines': len(m['lines']), 'words': sum(len(words(l['text'])) for l in m['lines']),
@@ -141,6 +144,8 @@ def _structure(r, m):
         if s.get('transition_in') not in S.TRANSITIONS:
             r.err('enum', f'Shot {s["id"]}: transition {s.get("transition_in")!r} unknown')
         _range(r, 'camera.shake', cam.get('shake', 0), 0, 1, s['id'])
+        if cam.get('move') == 'zoom_punch':
+            _zoom_punch(r, m, s)
     for cid, tr in m['tracks']['characters'].items():
         if cid not in cast_ids:
             r.err('track', f'Track for unknown character {cid}')
@@ -178,6 +183,15 @@ def _structure(r, m):
             r.err('enum', f'Line {ln["id"]}: pace {ln["pace"]!r} unknown')
         if ln['volume'] not in S.VOLUMES:
             r.err('enum', f'Line {ln["id"]}: volume {ln["volume"]!r} unknown')
+    st = m.get('style') or {}
+    if st.get('expression_snap', 'blend') not in S.EXPRESSION_SNAP:
+        r.err('enum', f'style.expression_snap {st.get("expression_snap")!r} unknown',
+              fix='Use one of: ' + ', '.join(S.EXPRESSION_SNAP))
+    for e in m.get('effects', []):
+        if e.get('type') not in S.EFFECTS:
+            r.err('unsupported_effect', f'Effect {e.get("type")!r} ({e.get("id")}) is not available',
+                  fix='Use one of: ' + ', '.join(S.EFFECTS))
+            r.unsupported.append({'kind': 'effect', 'value': e.get('type')})
     for x in m['sfx']:
         if x['cue'] not in S.SFX_CUES:
             r.err('unsupported_sfx', f'Sound cue {x["cue"]!r} is not in the sound library')
@@ -199,6 +213,9 @@ def _pose(r, p, where, prop_ids, cast_ids):
         r.err('out_of_range', f'{where}: position {pos} is outside the world')
     for (part, k), (lo, hi) in S.RANGES.items():
         _range(r, f'{part}.{k}', (p.get(part) or {}).get(k), lo, hi, where)
+    for (part, k), (lo, hi) in S.OPTIONAL_RANGES.items():
+        if k in (p.get(part) or {}):
+            _range(r, f'{part}.{k}', p[part][k], lo, hi, where)
     if p.get('expression') not in S.EXPRESSIONS:
         r.err('unsupported_expression', f'{where}: expression {p.get("expression")!r} has no preset',
               fix='Use one of: ' + ', '.join(S.EXPRESSIONS))
@@ -362,6 +379,74 @@ def _dialogue(r, m, measured):
                                frames=(ln['start_frame'], ln['est_end_frame']))
 
 
+def _zoom_punch(r, m, s):
+    """A zoom punch pushes in (framing_end tighter than framing_start) inside its shot."""
+    cam, fps = s['camera'], m['fps']
+    order = S.FRAMINGS
+    if cam['framing_start'] in order and cam['framing_end'] in order:
+        a, b = order.index(cam['framing_start']), order.index(cam['framing_end'])
+        if b <= a:
+            r.err('zoom_punch_framing', f'Shot {s["id"]}: a zoom punch needs framing_end tighter than framing_start '
+                                        f'({cam["framing_start"]} -> {cam["framing_end"]})',
+                  fix='Punch in, e.g. medium -> close_up')
+        elif b - a > 4:
+            r.warn('zoom_punch_long', f'Shot {s["id"]}: zoom punch {cam["framing_start"]} -> {cam["framing_end"]} is a very '
+                                      'long lens change; it will flatten the picture')
+    p0, n = cam.get('punch_frame', s['start_frame']), cam.get('punch_frames', S.ZOOM_PUNCH_MIN_FRAMES)
+    if not s['start_frame'] <= p0 or p0 + n > s['end_frame']:
+        r.err('zoom_punch_timing', f'Shot {s["id"]}: the zoom punch at {tc(p0, fps)} ({n} frames) does not fit inside '
+                                   f'the shot ({tc(s["start_frame"], fps)}-{tc(s["end_frame"], fps)})',
+              frames=(s['start_frame'], s['end_frame']), fix='Move punch_t inside the shot')
+
+
+def _effects(r, m, min_expr):
+    """Timeline effects stay inside the video and never hide what QA and the viewer must see: a freeze
+    holds the picture, so it may not cover dialogue (mouths would stop while the voice runs) or the first
+    readable frames of an expression change."""
+    fps, D = m['fps'], m['duration_frames']
+    effects = m.get('effects', [])
+    for e in effects:
+        typ, f0, n = e.get('type'), e['frame'], e['frames']
+        where = f'Effect {e["id"]} ({typ}) at {tc(f0, fps)}'
+        if not 0 <= f0 or f0 + n > D:
+            r.err('effect_timing', f'{where} runs outside the video', frames=(f0, f0 + n))
+            continue
+        lo, hi = S.EFFECT_MIN_FRAMES.get(typ, 1), S.EFFECT_MAX_FRAMES.get(typ, 60)
+        if not lo <= n <= hi:
+            r.err('out_of_range', f'{where}: {n} frames is outside {lo}..{hi}', where=e['id'])
+        if typ == 'shake':
+            _range(r, 'effects.strength', e.get('strength'), 0, 1, e['id'])
+        if typ != 'freeze':
+            continue
+        held = (f0 + 1, f0 + n)  # frames that repeat frame f0
+        for ln in m['lines']:
+            if ln['start_frame'] < held[1] and ln['est_end_frame'] > held[0]:
+                r.err('freeze_over_dialogue', f'{where} freezes the picture while line {ln["id"]} is spoken',
+                      frames=held, fix='Freeze in a pause between lines (a reaction beat)')
+        for cid, tr in m['tracks']['characters'].items():
+            keys = tr['keys']
+            for i, k in enumerate(keys):
+                if not i or k['pose'].get('expression') == keys[i - 1]['pose'].get('expression'):
+                    continue
+                blend = k.get('blend_frames') or min(10, k['frame'] - keys[i - 1]['frame'])
+                if k['frame'] - blend < held[1] and k['frame'] + min_expr > held[0]:
+                    r.err('freeze_hides_expression', f'{where} holds the picture while {cid} changes to '
+                                                     f'"{k["pose"].get("expression")}" at {tc(k["frame"], fps)}',
+                          frames=held, fix='Freeze after the new expression has been on screen for a moment')
+        for o in effects:
+            if o is not e and o.get('type') == 'freeze' and o['frame'] < f0 + n and o['frame'] + o['frames'] > f0 \
+                    and o['frame'] >= f0:
+                r.err('effect_overlap', f'{where} overlaps freeze {o["id"]}', frames=held)
+        cut = next((sh['start_frame'] for sh in m['shots'] if f0 < sh['start_frame'] < f0 + n), None)
+        if cut is not None:
+            r.err('freeze_across_cut', f'{where} runs over the cut at {tc(cut, fps)}', frames=held,
+                  fix='End the freeze before the next shot')
+    for d in m.get('music_dropouts', []):
+        if not 0 <= d['start_frame'] < d['end_frame'] <= D:
+            r.err('music_dropout', f'Music dropout {tc(d["start_frame"], fps)}-{tc(d["end_frame"], fps)} is outside '
+                                   'the video')
+
+
 def _ground_ok(m, pos):
     st = m['setting']
     if st.get('preset') in GROUND_PRESETS:
@@ -522,6 +607,20 @@ def _captions(r, m, prefs):
                   frames=(c['start_frame'], c['end_frame']), fix='Shorten the caption group')
         if c['end_frame'] - c['start_frame'] < int(0.3 * m['fps']):
             r.warn('caption_flash', f'Caption "{c["text"]}" is shown for under 0.3 s')
+
+
+def _silhouettes(r, m, characters):
+    """Cast members must be told apart at a glance: by hair, hat or eyewear (the silhouette), not by colour alone."""
+    seen = {}
+    for c in m['cast']:
+        b = characters.get(c.get('character_id')) or {}
+        cos = b.get('costume') or {}
+        key = (cos.get('hair') or 'bald', cos.get('hat'), cos.get('eyewear'))
+        if key in seen:
+            r.warn('same_silhouette', f'{seen[key]} and {c["id"]} share hair, hat and eyewear '
+                                      f'({", ".join(str(x) for x in key)}); give one of them a distinct silhouette item')
+        else:
+            seen[key] = c['id']
 
 
 def _story(r, m):

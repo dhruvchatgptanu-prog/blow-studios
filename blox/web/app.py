@@ -640,11 +640,12 @@ def create_app():
     # ------------------------------------------------------------ characters
     @app.get('/api/characters')
     def get_characters():
+        co = BL.R.COSTUME_OPTIONS
         return jsonify(characters=repo.characters(active_only=False),
-                       vocab={'palette_slots': ['skin', 'top', 'top_trim', 'pants', 'shoes', 'hair', 'eyes', 'brows',
-                                                'mouth', 'badge', 'hat'],
-                              'tops': ['hoodie', 'tee'], 'hair': ['messy_block', 'short_block', None],
-                              'hats': ['cap', None], 'badges': ['star', None]})
+                       vocab={'palette_slots': list(BL.R.PALETTE_SLOTS),
+                              'optional_palette_slots': sorted(BL.R.OPTIONAL_PALETTE_SLOTS),
+                              'tops': co['top'], 'hair': co['hair'], 'hats': co['hat'], 'eyewear': co['eyewear'],
+                              'badges': co['badge']})
 
     def _speaker(v):
         if v in (None, ''):
@@ -675,9 +676,13 @@ def create_app():
         scale = float(bible.get('scale', 1.0))
         if not 0.6 <= scale <= 1.2:
             raise ValueError('Scale must be between 0.6 and 1.2')
+        costume = {k: (bible.get('costume') or {}).get(k) for k in BL.R.COSTUME_KEYS}
+        costume['tie'] = bool(costume.get('tie'))
+        bad = BL.R.costume_problems(costume)
+        if bad:
+            raise ValueError('Costume: ' + '; '.join(bad))
         clean_bible = {'summary': str(bible.get('summary', ''))[:400], 'personality': str(bible.get('personality', ''))[:400],
-                       'scale': scale, 'palette': pal,
-                       'costume': {k: (bible.get('costume') or {}).get(k) for k in ('top', 'hair', 'hat', 'badge')},
+                       'scale': scale, 'palette': pal, 'costume': costume,
                        'visual_rules': [str(x)[:160] for x in (bible.get('visual_rules') or [])][:12]}
         clean_voice = {'openai_voice': str(voice.get('openai_voice', 'alloy'))[:20],
                        'openai_instructions': str(voice.get('openai_instructions', ''))[:600],

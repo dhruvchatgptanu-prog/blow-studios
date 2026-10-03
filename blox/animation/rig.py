@@ -76,6 +76,58 @@ PARTS = [
 # Parts every character must show in every frame (QA inventory: "missing limbs").
 REQUIRED_PARTS = [p[1] for p in PARTS]
 
+# Costume vocabulary of character bibles ('costume'), shared by the editor, the cast and the Blender builder.
+# None / False mean "not worn". A legacy hair value of None renders like 'bald'.
+COSTUME_OPTIONS = {
+    'hair': ['messy_block', 'short_block', 'bun', 'pigtails', 'spiky', 'long_block', 'bald'],
+    'hat': [None, 'cap', 'cap_backwards', 'crown', 'bow', 'beanie'],
+    'eyewear': [None, 'glasses', 'sunglasses'],
+    'top': ['hoodie', 'tee', 'jacket', 'vest', 'cardigan'],
+    'tie': [False, True],
+    'badge': [None, 'star', 'diamond'],
+}
+COSTUME_KEYS = tuple(COSTUME_OPTIONS)
+# Hats that cover the crown of the head: the hair's top block is left out under them (no poke-through);
+# a bun or spikes would not fit under them either, so those styles keep only their back and sides.
+COVERING_HATS = {'cap', 'cap_backwards', 'beanie'}
+# Tops worn as an outer layer over the base shirt (the body's 'top' colour): their colour is 'top2'.
+LAYER_TOPS = {'jacket', 'vest', 'cardigan'}
+# Costume pieces as telemetry reports them in 'parts_visible' next to the body parts. They are optional
+# (which ones a character has depends on its costume) but, once built, they stay visible in every frame.
+OPTIONAL_PARTS = ['hood', 'collar', 'jacket', 'vest', 'cardigan', 'hair', 'hat', 'eyewear', 'tie', 'badge']
+
+
+def costume_parts(costume):
+    """Costume piece names (OPTIONAL_PARTS) a costume builds, in OPTIONAL_PARTS order."""
+    c = costume or {}
+    have = set()
+    top = c.get('top')
+    have.add({'hoodie': 'hood', 'tee': 'collar'}.get(top, top if top in LAYER_TOPS else None))
+    if c.get('hair') not in (None, 'bald'):
+        have.add('hair')
+    for key in ('hat', 'eyewear', 'badge'):
+        if c.get(key):
+            have.add(key)
+    if c.get('tie'):
+        have.add('tie')
+    return [p for p in OPTIONAL_PARTS if p in have]
+
+
+def costume_problems(costume):
+    """Human-readable problems with a costume dict (unknown keys or values). Empty when it is valid."""
+    out = []
+    for k, v in (costume or {}).items():
+        if k not in COSTUME_OPTIONS:
+            out.append(f'unknown costume item {k!r}')
+        elif v is None:
+            continue  # not set: not worn (no hair renders bald, no top a plain shirt)
+        elif k == 'tie':
+            if v not in (True, False):
+                out.append(f'tie must be true or false, not {v!r}')
+        elif v not in COSTUME_OPTIONS[k]:
+            out.append(f'{k} {v!r} is not one of ' + ', '.join(str(x) for x in COSTUME_OPTIONS[k]))
+    return out
+
 # Face layout, local to the head joint (front surface at y = FACE_FRONT_Y).
 FACE = {
     'eye_x': 0.135, 'eye_z': 0.31, 'eye_w': 0.15, 'eye_h': 0.19,
@@ -98,6 +150,12 @@ MOUTH_SHAPES = {
     'smirk': (0.95, 0.012, 0.0, 2.0, 0.03),
     'pout': (0.5, -0.008, 0.02, 2.0, 0.0),
     'flat': (0.9, 0.0, 0.0, 2.0, 0.0),
+    # Extreme shapes for the big-reaction presets. The opening is split 32/68 above/below the mouth line, so
+    # 0.155 is about the most the face has room for between the chin and the (wide-open) eyes.
+    'scream': (1.25, -0.02, 0.155, 3.0, 0.0),
+    'wide_grin': (1.4, 0.05, 0.045, 3.2, 0.0),
+    'smirk_wide': (1.15, 0.03, 0.012, 2.0, 0.055),
+    'tiny': (0.45, 0.0, 0.012, 2.0, 0.0),
 }
 # Visemes (Preston Blair style groups) as mouth shapes.
 VISEMES = {
@@ -139,4 +197,7 @@ IK_TARGETS = {
     'cross': (-0.16, -0.30, 1.18),
 }
 
-PALETTE_SLOTS = ['skin', 'top', 'top_trim', 'pants', 'shoes', 'hair', 'eyes', 'brows', 'mouth', 'badge', 'hat']
+PALETTE_SLOTS = ['skin', 'top', 'top_trim', 'pants', 'shoes', 'hair', 'eyes', 'brows', 'mouth', 'badge', 'hat',
+                 'accessory', 'top2']
+# Slots a bible may leave out; the builder then derives them (see blender_scene.Character.slot).
+OPTIONAL_PALETTE_SLOTS = {'hat', 'accessory', 'top2'}

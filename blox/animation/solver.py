@@ -51,7 +51,8 @@ BODY_SPRINGS = {'pelvis': (0.3, 0.5), 'spine': (0.26, 0.5), 'chest': (0.22, 0.48
                 'head': (0.2, 0.45)}
 ARM_SPRING = (0.26, 0.5)
 # Breathing rate by expression (1 = calm).
-AROUSAL = {'excited': 1.5, 'startled': 1.6, 'scared': 1.6, 'angry': 1.4, 'laughing': 1.5, 'happy': 1.1, 'proud': 1.1,
+AROUSAL = {'screaming': 1.8, 'mischief': 1.2, 'frozen': 0.4,
+           'excited': 1.5, 'startled': 1.6, 'scared': 1.6, 'angry': 1.4, 'laughing': 1.5, 'happy': 1.1, 'proud': 1.1,
            'determined': 1.15, 'sad': 0.85, 'bored': 0.8, 'relieved': 0.9}
 LENS_BY_FRAMING = {'extreme_wide': 24, 'wide': 28, 'full': 35, 'medium_wide': 40, 'medium': 45,
                    'medium_close': 55, 'close_up': 70, 'extreme_close_up': 85}
@@ -1555,7 +1556,7 @@ class CharacterSolver:
                 inner += 0.3 * emph
                 outer += 0.3 * emph
             inner, outer = max(-1.0, min(1.0, inner)), max(-1.0, min(1.0, outer))
-        return {
+        out = {
             'brow_l': [round(inner, 3), round(outer, 3), round(brows.get('asym', 0), 3)],
             'brow_r': [round(inner, 3), round(outer, 3), round(-brows.get('asym', 0), 3)],
             'eye_open': round(float(eyes_open), 3),
@@ -1565,6 +1566,9 @@ class CharacterSolver:
             'mouth': mouth_shape_w,
             'speaking': bool(self.visemes and self.visemes[f]),
         }
+        if 'pupil' in pose['eyes']:
+            out['pupil_size'] = round(float(pose['eyes']['pupil']), 3)
+        return out
 
     def mouth_weights(self, f):
         """Expression shape weights blended across key transitions + visemes."""
@@ -1648,12 +1652,37 @@ def line_word_frames(m, ln, alignments):
 
 
 def shot_lens(shot):
+    """The shot's lens. A zoom punch starts on the opening framing's lens and zooms from there."""
     cam = shot['camera']
     if cam.get('lens_mm'):
         return float(cam['lens_mm'])
     order = S.FRAMINGS
+    if cam.get('move') == 'zoom_punch':
+        return float(LENS_BY_FRAMING[cam['framing_start']])
     tight = max(order.index(cam['framing_start']), order.index(cam['framing_end']))
     return float(LENS_BY_FRAMING[order[tight]])
+
+
+# Impact shake: the look-at point jolts by up to this fraction of the camera distance (an angle of about
+# 3.4 degrees at full strength) and the camera body by a quarter of that, dying away over the effect.
+SHAKE_LOOK = 0.06
+SHAKE_BODY = 0.25
+
+
+def shake_offset(effects, f):
+    """Unit-free (x, z) jolt of the impact shakes active at frame f (0, 0 when none)."""
+    ox = oz = 0.0
+    for e in effects or ():
+        if e.get('type') != 'shake':
+            continue
+        i = f - e['frame']
+        n = max(1, e['frames'])
+        if 0 <= i < n:
+            a = float(e.get('strength', 0.7)) * (1.0 - i / n) ** 2
+            ph = (zlib.crc32(str(e.get('id')).encode()) % 628) / 100.0
+            ox += a * math.sin(i * 2.1 + ph)
+            oz += a * math.cos(i * 2.6 + ph * 0.7)
+    return ox, oz
 
 
 def apply_shot_repairs(shot, params):
@@ -1810,6 +1839,7 @@ def solve_camera(m, chars, n, repair=None, set_layout=None):
     scenery_props = SETS.box_arrays(set_boxes)
     out = [None] * n
     aspect = m['height'] / m['width']
+    effects = m.get('effects') or []
     for shot in m['shots']:
         shot = apply_shot_repairs(shot, ((repair or {}).get('shots') or {}).get(shot['id']))
         cam = shot['camera']
@@ -1835,6 +1865,8 @@ def solve_camera(m, chars, n, repair=None, set_layout=None):
             return np.zeros(3), R.HEIGHT, 0.0
 
         base_target, height, facing0 = subject_xyz(f0)
+        zoom = cam['move'] == 'zoom_punch'
+        visible0 = S.FRAMING_HEIGHT.get(cam['framing_start'], 0.72) * height
         az0 = wrap(facing0 + CAMERA_SIDE_DEG.get(cam['side'], 0))
         follow = Spring(0.15 if (((repair or {}).get('shots') or {}).get(shot['id']) or {}).get('camera_smooth') else 0.3, 0.6)
         follow.reset(base_target)
@@ -1852,16 +1884,28 @@ def solve_camera(m, chars, n, repair=None, set_layout=None):
         def frame_at(f, az_offset):
             st = camera_state(shot, f)
             visible = st['visible_height_ratio'] * height
-            dist = (visible / 2) / math.tan(vfov / 2)
-            if subj in chars and visible < height:
+            lens_f = lens
+            framed = visible
+            if zoom:
+                # Optical snap zoom: the camera stays where the opening framing puts it; the lens narrows
+                # so the face plane shows `visible` instead of the opening height.
+                lens_f = round(lens * visible0 / visible, 3)
+                framed = visible0
+            dist = (framed / 2) / math.tan(vfov / 2)
+            if subj in chars and framed < height:
                 # Measure tight framings to the face plane, not the body axis.
                 dist += R.HEAD_HALF_DEPTH * chars[subj].scale
             # Composition: keep 12% headroom above the head; very tight shots
             # centre on the face; wide shots keep the feet in frame.
-            aim_z = height - 0.38 * visible
-            if visible < 0.8 * height and subj in chars:
-                aim_z = min(aim_z, face_z + 0.06)
-            aim_z = max(aim_z, min(height * 0.5, visible * 0.32))
+            def aim_for(v):
+                a = height - 0.38 * v
+                if v < 0.8 * height and subj in chars:
+                    a = min(a, face_z + 0.06)
+                return max(a, min(height * 0.5, v * 0.32))
+            aim_z = aim_for(visible)
+            # The camera body stays where the framing it was placed for puts it: a zoom punch tilts to
+            # recompose on the face but does not rise with it (zero for every other move).
+            body_dz = aim_for(framed) - aim_z
             if cam['move'] == 'follow':
                 cur, _, _ = subject_xyz(f)
                 target = follow.step(cur)
@@ -1880,7 +1924,8 @@ def solve_camera(m, chars, n, repair=None, set_layout=None):
                 pitch -= 14 * u
             dx, dy = direction(az)
             horiz = dist * math.cos(pitch * D2R)
-            loc = np.array([target[0] + dx * horiz, target[1] + dy * horiz, aim_z + dist * math.sin(pitch * D2R)])
+            loc = np.array([target[0] + dx * horiz, target[1] + dy * horiz,
+                            aim_z + body_dz + dist * math.sin(pitch * D2R)])
             look = np.array([target[0], target[1], aim_z])
             if cam['move'] in ('truck_left', 'truck_right', 'pan_left', 'pan_right'):
                 rxv, ryv = -dy, dx
@@ -1892,8 +1937,14 @@ def solve_camera(m, chars, n, repair=None, set_layout=None):
             if cam['shake'] > 0:
                 k = cam['shake'] * 0.015 * dist
                 look = look + np.array([k * math.sin(f * 0.9 + rnd * 7), 0.0, k * math.sin(f * 1.3 + rnd * 3)])
+            jx, jz = shake_offset(effects, f)
+            if jx or jz:
+                rxv, ryv = -dy, dx  # screen-right on the ground plane
+                jolt = np.array([rxv * jx, ryv * jx, jz]) * SHAKE_LOOK * dist
+                look = look + jolt
+                loc = loc + jolt * SHAKE_BODY
             return {'shot': shot['id'], 'location': [round(float(v), 4) for v in loc],
-                    'look_at': [round(float(v), 4) for v in look], 'lens': lens,
+                    'look_at': [round(float(v), 4) for v in look], 'lens': lens_f,
                     'sensor_width': SENSOR_W, 'framing': st['framing']}
 
         # Another character or a piece of scenery between the camera and the subject would hide the

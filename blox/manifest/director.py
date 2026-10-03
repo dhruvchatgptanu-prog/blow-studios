@@ -170,6 +170,18 @@ def beat_text(m, beat, names):
             pause = f' Pause {ln["pause_after_ms"]} ms after.' if ln['pause_after_ms'] else ''
             out.append(f'  {spk} ({ln["emotion"]}, {ln["pace"]}, {ln["volume"]}{note}) at {tc(ln["start_frame"], fps)}: '
                        f'"{ln["text"]}"{pause}')
+    for e in m.get('effects', []):
+        if beat['start_frame'] <= e['frame'] < beat['end_frame']:
+            what = 'freeze frame' if e['type'] == 'freeze' else f'impact shake (strength {e.get("strength", 0.7):g})'
+            out.append(f'  Effect: {what} at {tc(e["frame"], fps)} for {e["frames"]} frames.')
+    shot = next((s for s in m['shots'] if s['id'] == beat.get('shot')), None)
+    if shot and shot['camera'].get('move') == 'zoom_punch' and \
+            beat['start_frame'] <= shot['camera'].get('punch_frame', -1) < beat['end_frame']:
+        out.append(f'  Zoom punch at {tc(shot["camera"]["punch_frame"], fps)} over {shot["camera"]["punch_frames"]} '
+                   'frames (lens snap, camera still).')
+    for d in m.get('music_dropouts', []):
+        if beat['start_frame'] <= d['start_frame'] < beat['end_frame']:
+            out.append(f'  Music drops out {tc(d["start_frame"], fps)}-{tc(d["end_frame"], fps)} before the punchline.')
     sfx = {x['id']: x for x in m['sfx']}
     if beat['sfx']:
         out.append('  SFX: ' + ', '.join(f'{sfx[i]["cue"]} at {tc(sfx[i]["frame"], fps)}' for i in beat['sfx']))

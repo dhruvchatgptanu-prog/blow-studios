@@ -168,6 +168,40 @@ def star(name, r_out, r_in, mat=None, depth=0.01):
     return ob
 
 
+def flat_badge(name, pts, mat=None, depth=0.01):
+    """A convex flat badge (points in the XZ plane, facing -Y), thickened like the star."""
+    me = bpy.data.meshes.new(name)
+    n = len(pts)
+    me.from_pydata([(x, 0.0, z) for x, z in pts] + [(0, 0, 0)], [], [(i, (i + 1) % n, n) for i in range(n)])
+    me.update()
+    ob = link(bpy.data.objects.new(name, me))
+    if mat:
+        ob.data.materials.append(mat)
+    sol = ob.modifiers.new('thick', 'SOLIDIFY')
+    sol.thickness = depth
+    return ob
+
+
+def pyramid(name, base, h, mat=None):
+    """Square pyramid, base centred at the origin (axis-aligned), apex at +z: block-style spikes and crown points."""
+    me = bpy.data.meshes.new(name)
+    b = base / 2.0
+    verts = [(-b, -b, 0), (b, -b, 0), (b, b, 0), (-b, b, 0), (0, 0, h)]
+    me.from_pydata(verts, [], [(3, 2, 1, 0), (0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4)])
+    me.update()
+    ob = link(bpy.data.objects.new(name, me))
+    if mat:
+        ob.data.materials.append(mat)
+    return ob
+
+
+def shade(rgb, k):
+    """A darker (k < 1) or lighter (k > 1) version of a linear colour."""
+    if k <= 1:
+        return tuple(c * k for c in rgb)
+    return tuple(c + (1 - c) * (k - 1) for c in rgb)
+
+
 def empty(name, parent=None, loc=(0, 0, 0)):
     ob = link(bpy.data.objects.new(name, None))
     ob.empty_display_size = 0.05
@@ -679,6 +713,17 @@ def build_prop(p):
 
 
 # ------------------------------------------------------------------ characters
+# Costume rules (the same sets as animation/rig.py; this script cannot import the package).
+LAYER_TOPS = {'jacket', 'vest', 'cardigan'}
+COVERING_HATS = {'cap', 'cap_backwards', 'beanie'}
+OPTIONAL_SLOTS = {'hat', 'accessory', 'top2'}
+# Top of each hair style (head-local z) where a crown or a bow sits.
+HAIR_TOP = {'messy_block': 0.695, 'short_block': 0.60, 'bun': 0.67, 'pigtails': 0.67, 'spiky': 0.665,
+            'long_block': 0.685, 'bald': 0.60}
+# Accessory colour when the palette has no 'accessory' slot, by the item that uses it.
+ACCESSORY_DEFAULT = {'crown': '#F5C242', 'bow': '#FF6FA5', 'glasses': '#2A2A33', 'sunglasses': '#1A1A1F'}
+
+
 def mouth_curves(params, base_w, K=13, thick=0.0085):
     wf, corner, opening, q, asym = params
     up, lo = [], []
@@ -726,7 +771,17 @@ class Character:
         self.pal = pal
         self.scale = float(spec.get('scale', 1.0))
         cid = self.id
-        self.mats = {k: material(f'{cid}:{k}', hex_rgb(pal.get(k, '#CCCCCC')), 0.5) for k in rig['palette_slots']}
+        costume = spec.get('costume') or {}
+        self.costume = costume
+        self.mats = {k: material(f'{cid}:{k}', hex_rgb(pal.get(k, '#CCCCCC')), 0.5) for k in rig['palette_slots']
+                     if k in pal or k not in OPTIONAL_SLOTS}
+        top = hex_rgb(pal.get('top', '#CCCCCC'))
+        # Derived colours for slots a bible may leave out: a hat in the top colour, an outer layer a darker
+        # shade of the shirt, accessories in a colour that suits the item.
+        self.mats.setdefault('hat', self.mats['top'])
+        self.mats.setdefault('top2', material(f'{cid}:top2', shade(top, 0.55), 0.5))
+        acc = ACCESSORY_DEFAULT.get(costume.get('hat')) or ACCESSORY_DEFAULT.get(costume.get('eyewear')) or '#2A2A33'
+        self.mats.setdefault('accessory', material(f'{cid}:accessory', hex_rgb(acc), 0.4))
         self.mats['white'] = material('eyewhite', (0.97, 0.97, 0.97), 0.3)
         self.mats['shine'] = material('eyeshine', (1.0, 1.0, 1.0), 0.2, emission=1.5)
         self.joints = {}
@@ -737,55 +792,271 @@ class Character:
             self.joints[name] = j
         self.joints['root'].scale = (self.scale,) * 3
         self.parts = {}
+        # An outer layer with sleeves (jacket, cardigan) colours the arms; a vest leaves the shirt sleeves.
+        sleeves = costume.get('top') in ('jacket', 'cardigan')
         for joint, pname, size, center, slot, bevel in rig['parts']:
+            if sleeves and slot == 'top' and pname.startswith(('upper_arm', 'forearm')):
+                slot = 'top2'
             ob = child(box(f'{cid}:part:{pname}', size, self.mats.get(slot, self.mats['skin']), bevel),
                        self.joints[joint], center)
             ob['blox_char'] = cid
             ob['blox_part'] = pname
             self.parts[pname] = ob
         # Joint fillers so bent knees and elbows read as solid blocks.
-        for j, s, slot in (('knee_l', 0.27, 'pants'), ('knee_r', 0.27, 'pants'), ('elbow_l', 0.22, 'top'),
-                           ('elbow_r', 0.22, 'top')):
+        arm = 'top2' if sleeves else 'top'
+        for j, s, slot in (('knee_l', 0.27, 'pants'), ('knee_r', 0.27, 'pants'), ('elbow_l', 0.22, arm),
+                           ('elbow_r', 0.22, arm)):
             ob = child(sphere(f'{cid}:fill:{j}', s / 2, self.mats[slot], 16, 10), self.joints[j], (0, 0, 0))
             ob['blox_char'] = cid
-        self.build_costume(spec.get('costume') or {})
+        self.costume_parts = {}
+        self.build_costume(costume)
         self.build_face()
 
+    def piece(self, part, ob, parent, loc=(0, 0, 0), rot=(0, 0, 0)):
+        """Attach one costume object, registered under its telemetry part name (rig.OPTIONAL_PARTS)."""
+        child(ob, parent, loc, tuple(r * D2R for r in rot))
+        ob['blox_char'] = self.id
+        ob['blox_costume'] = part
+        self.costume_parts.setdefault(part, []).append(ob)
+        return ob
+
     def build_costume(self, costume):
+        """Block-style costume pieces from the bible's costume (rig.COSTUME_OPTIONS).
+
+        Head pieces are local to the head joint (head box 0.62 x 0.58 x 0.60, top at z 0.60, face at
+        y -0.29); body layers hang off the chest and spine joints so they follow lean and twist.
+        """
         cid, J, M = self.id, self.joints, self.mats
-        if costume.get('top') == 'hoodie':
-            child(box(f'{cid}:hood', (0.56, 0.17, 0.24), M['top'], 0.06), J['chest'], (0, 0.24, 0.30))
+        P = self.piece
+        top = costume.get('top')
+        layer = top if top in LAYER_TOPS else None
+        if top == 'hoodie':
+            P('hood', box(f'{cid}:hood', (0.56, 0.17, 0.24), M['top'], 0.06), J['chest'], (0, 0.24, 0.30))
             for x in (-0.075, 0.075):
-                child(box(f'{cid}:string{x}', (0.026, 0.02, 0.17), M['top_trim'], 0.008), J['chest'], (x, -0.198, 0.15))
-            child(box(f'{cid}:pocket', (0.42, 0.012, 0.13), M['top_trim'], 0.02), J['spine'], (0, -0.186, 0.08))
-        elif costume.get('top') == 'tee':
-            child(box(f'{cid}:collar', (0.32, 0.12, 0.035), M['top_trim'], 0.01), J['chest'], (0, -0.13, 0.295))
-        if costume.get('badge') == 'star':
-            child(star(f'{cid}:badge', 0.075, 0.032, M['badge']), J['chest'], (0.2, -0.196, 0.18))
-        hair = costume.get('hair')
-        H = J['head']
-        if hair == 'messy_block':
-            child(box(f'{cid}:hair_top', (0.66, 0.62, 0.13), M['hair'], 0.04), H, (0, 0.01, 0.63))
-            child(box(f'{cid}:hair_back', (0.66, 0.15, 0.42), M['hair'], 0.04), H, (0, 0.27, 0.42))
-            child(box(f'{cid}:fringe1', (0.24, 0.07, 0.10), M['hair'], 0.02), H, (-0.15, -0.29, 0.60), (0, 10 * D2R, 0))
-            child(box(f'{cid}:fringe2', (0.2, 0.07, 0.08), M['hair'], 0.02), H, (0.12, -0.29, 0.61), (0, -7 * D2R, 0))
-            for x in (-0.32, 0.32):
-                child(box(f'{cid}:side{x}', (0.06, 0.40, 0.2), M['hair'], 0.02), H, (x, 0.06, 0.50))
-        elif hair == 'short_block':
-            child(box(f'{cid}:hair_back', (0.64, 0.12, 0.34), M['hair'], 0.03), H, (0, 0.27, 0.44))
-            for x in (-0.315, 0.315):
-                child(box(f'{cid}:side{x}', (0.05, 0.36, 0.16), M['hair'], 0.02), H, (x, 0.06, 0.50))
-        if costume.get('hat') == 'cap':
-            hat = M.get('hat') or M['top']
-            child(box(f'{cid}:cap', (0.65, 0.61, 0.14), hat, 0.06), H, (0, 0.01, 0.655))
-            child(box(f'{cid}:brim', (0.42, 0.22, 0.03), hat, 0.012), H, (0, -0.38, 0.605))
+                P('hood', box(f'{cid}:string{x}', (0.026, 0.02, 0.17), M['top_trim'], 0.008), J['chest'],
+                  (x, -0.198, 0.15))
+            P('hood', box(f'{cid}:pocket', (0.42, 0.012, 0.13), M['top_trim'], 0.02), J['spine'], (0, -0.186, 0.08))
+        elif top == 'tee':
+            P('collar', box(f'{cid}:collar', (0.32, 0.12, 0.035), M['top_trim'], 0.01), J['chest'], (0, -0.13, 0.295))
+        elif layer:
+            self.build_layer(layer)
+        if costume.get('tie'):
+            # In the open front of a jacket or cardigan; over a closed vest it sits on the vest.
+            y = -0.226 if layer == 'vest' else -0.2
+            tie = M['top_trim']
+            P('tie', box(f'{cid}:tie_knot', (0.075, 0.03, 0.06), tie, 0.012), J['chest'], (0, y - 0.004, 0.262))
+            P('tie', box(f'{cid}:tie_blade', (0.066, 0.022, 0.22), tie, 0.008), J['chest'], (0, y, 0.125))
+            P('tie', box(f'{cid}:tie_tip', (0.047, 0.022, 0.047), tie, 0.006), J['chest'], (0, y, 0.015), (0, 45, 0))
+        badge = costume.get('badge')
+        if badge in ('star', 'diamond'):
+            y = -0.218 if layer else -0.196
+            if badge == 'star':
+                ob = star(f'{cid}:badge', 0.075, 0.032, M['badge'])
+            else:
+                ob = flat_badge(f'{cid}:badge', [(0, 0.085), (0.06, 0.0), (0, -0.085), (-0.06, 0.0)], M['badge'], 0.012)
+            P('badge', ob, J['chest'], (0.2, y, 0.18))
+        self.build_hair(costume.get('hair'), costume.get('hat'))
+        self.build_hat(costume.get('hat'), costume.get('hair'))
+        self.build_eyewear(costume.get('eyewear'))
         for ob in bpy.data.objects:
             if ob.name.startswith(cid + ':') and 'blox_char' not in ob:
                 ob['blox_char'] = cid
 
+    def build_layer(self, kind):
+        """An outer top (jacket, vest, cardigan) over the base shirt: two front panels per torso block with
+        an opening down the middle (the shirt and a tie show through), a back panel, and trims."""
+        cid, J, M, P = self.id, self.joints, self.mats, self.piece
+        c2 = M['top2']
+        dark = material(f'{cid}:top2_dark', shade(tuple(c2.diffuse_color[:3]), 0.7), 0.55)
+        if kind == 'vest':
+            inner, chest_z, belly_z = 0.02, (-0.04, 0.27), (-0.06, 0.27)
+        elif kind == 'cardigan':
+            inner, chest_z, belly_z = 0.075, (-0.04, 0.30), (-0.17, 0.27)
+        else:
+            inner, chest_z, belly_z = 0.08, (-0.04, 0.30), (-0.09, 0.27)
+        bev = 0.05 if kind == 'cardigan' else 0.035
+        for joint, half_w, depth, (z0, z1) in (('chest', 0.39, 0.42, chest_z), ('spine', 0.375, 0.40, belly_z)):
+            w, h = half_w - inner, z1 - z0
+            for sx in (-1, 1):
+                P(kind, box(f'{cid}:{kind}_{joint}{sx}', (w, depth, h), c2, bev), J[joint],
+                  (sx * (inner + w / 2), 0, (z0 + z1) / 2))
+            P(kind, box(f'{cid}:{kind}_{joint}_back', (2 * inner + 0.04, 0.03, h), c2, 0.01), J[joint],
+              (0, depth / 2 - 0.014, (z0 + z1) / 2))
+        if kind == 'jacket':
+            for sx in (-1, 1):
+                # Lapels folded back at the neckline, and pocket flaps.
+                P(kind, box(f'{cid}:lapel{sx}', (0.1, 0.03, 0.17), dark, 0.012), J['chest'],
+                  (sx * 0.125, -0.218, 0.215), (0, sx * 24, 0))
+                P(kind, box(f'{cid}:flap{sx}', (0.15, 0.03, 0.035), dark, 0.01), J['spine'],
+                  (sx * 0.225, -0.205, 0.1))
+            P(kind, box(f'{cid}:jacket_collar', (0.56, 0.1, 0.08), c2, 0.03), J['chest'], (0, 0.15, 0.32))
+        elif kind == 'cardigan':
+            trim = M['top_trim']
+            for sx in (-1, 1):
+                P(kind, box(f'{cid}:band_c{sx}', (0.036, 0.016, 0.34), trim, 0.006), J['chest'],
+                  (sx * (inner + 0.018), -0.214, 0.13))
+                P(kind, box(f'{cid}:band_b{sx}', (0.036, 0.016, 0.44), trim, 0.006), J['spine'],
+                  (sx * (inner + 0.018), -0.204, 0.05))
+            for joint, z in (('chest', 0.21), ('chest', 0.06), ('spine', 0.16), ('spine', 0.01)):
+                P(kind, box(f'{cid}:button{joint}{z}', (0.032, 0.014, 0.032), dark, 0.008), J[joint],
+                  (inner + 0.018, -0.226 if joint == 'chest' else -0.216, z))
+        else:  # vest: two reflective stripes (top_trim) across the front and the back
+            trim = M['top_trim']
+            for joint, z, y in (('chest', 0.06, 0.212), ('spine', 0.12, 0.202)):
+                for sx in (-1, 1):
+                    P(kind, box(f'{cid}:stripe_{joint}{sx}', (0.35, 0.012, 0.04), trim, 0.004), J[joint],
+                      (sx * (inner + 0.175), -y, z))
+                P(kind, box(f'{cid}:stripe_{joint}_back', (0.76, 0.012, 0.04), trim, 0.004), J[joint], (0, y, z))
+
+    def hair_top(self, hair):
+        """Top of the hair (head-local z), where a crown or a bow sits."""
+        return HAIR_TOP.get(hair, 0.60)
+
+    def build_hair(self, hair, hat):
+        cid, H, M, P = self.id, self.joints['head'], self.mats, self.piece
+        hm = M['hair']
+        covered = hat in COVERING_HATS
+
+        def fringe():
+            if hat == 'beanie':  # the cuff sits on the brows; a fringe would poke through it
+                return
+            P('hair', box(f'{cid}:fringe1', (0.24, 0.07, 0.10), hm, 0.02), H, (-0.15, -0.29, 0.60), (0, 10, 0))
+            P('hair', box(f'{cid}:fringe2', (0.2, 0.07, 0.08), hm, 0.02), H, (0.12, -0.29, 0.61), (0, -7, 0))
+
+        def cap_top(h=0.11, z=0.62):
+            if not covered:
+                P('hair', box(f'{cid}:hair_top', (0.66, 0.62, h), hm, 0.04), H, (0, 0.01, z))
+
+        def back(h=0.38, z=0.44, d=0.14):
+            P('hair', box(f'{cid}:hair_back', (0.66, d, h), hm, 0.04), H, (0, 0.27, z))
+
+        def sides(h=0.18, d=0.38, x=0.32):
+            for sx in (-x, x):
+                P('hair', box(f'{cid}:side{sx}', (0.06, d, h), hm, 0.02), H, (sx, 0.06, 0.50))
+        if hair == 'messy_block':
+            cap_top(0.13, 0.63)
+            back(0.42, 0.42, 0.15)
+            fringe()
+            sides(0.2, 0.40)
+        elif hair == 'short_block':
+            P('hair', box(f'{cid}:hair_back', (0.64, 0.12, 0.34), hm, 0.03), H, (0, 0.27, 0.44))
+            for x in (-0.315, 0.315):
+                P('hair', box(f'{cid}:side{x}', (0.05, 0.36, 0.16), hm, 0.02), H, (x, 0.06, 0.50))
+        elif hair == 'bun':
+            cap_top(0.10, 0.62)
+            back(0.40, 0.43)
+            sides(0.18, 0.36, 0.315)
+            if not covered:
+                P('hair', box(f'{cid}:bun', (0.36, 0.33, 0.29), hm, 0.11), H, (0, 0.06, 0.82))
+                P('hair', box(f'{cid}:bun_band', (0.33, 0.30, 0.05), M['accessory'], 0.015), H, (0, 0.06, 0.69))
+        elif hair == 'pigtails':
+            cap_top(0.10, 0.62)
+            back(0.36, 0.45)
+            if hat != 'beanie':
+                P('hair', box(f'{cid}:fringe', (0.6, 0.07, 0.09), hm, 0.025), H, (0, -0.29, 0.585))
+            for sx in (-1, 1):
+                # Bunches stick out sideways at temple height: the silhouette reads from the front and the back.
+                P('hair', box(f'{cid}:tail_tie{sx}', (0.1, 0.12, 0.11), M['accessory'], 0.03), H,
+                  (sx * 0.36, 0.05, 0.5))
+                P('hair', box(f'{cid}:tail{sx}', (0.2, 0.19, 0.42), hm, 0.07), H, (sx * 0.5, 0.05, 0.36),
+                  (0, -sx * 32, 0))
+        elif hair == 'spiky':
+            cap_top(0.10, 0.615)
+            back(0.36, 0.45)
+            sides(0.16, 0.36, 0.315)
+            P('hair', box(f'{cid}:fringe', (0.56, 0.06, 0.07), hm, 0.02), H, (0, -0.29, 0.595))
+            if not covered:
+                # (x, y, tilt forward(+)/back(-), tilt left(+)/right(-), height)
+                for i, (x, y, rx, ry, h) in enumerate(((-0.19, -0.17, 28, -18, 0.24), (0.0, -0.2, 32, 0, 0.27),
+                                                       (0.19, -0.17, 28, 18, 0.24), (-0.16, 0.08, -14, -26, 0.25),
+                                                       (0.16, 0.08, -14, 26, 0.25), (0.0, 0.02, 6, 0, 0.32),
+                                                       (0.0, 0.2, -32, 0, 0.24))):
+                    P('hair', pyramid(f'{cid}:spike{i}', 0.17, h, hm), H, (x, y, 0.645), (rx, ry, 0))
+        elif hair == 'long_block':
+            cap_top(0.12, 0.625)
+            P('hair', box(f'{cid}:hair_back', (0.68, 0.16, 0.70), hm, 0.05), H, (0, 0.27, 0.31))
+            fringe()
+            for sx in (-1, 1):
+                P('hair', box(f'{cid}:lock{sx}', (0.08, 0.30, 0.56), hm, 0.03), H, (sx * 0.34, 0.02, 0.36))
+        # 'bald' (or no hair) builds nothing.
+
+    def build_hat(self, hat, hair):
+        cid, H, M, P = self.id, self.joints['head'], self.mats, self.piece
+        if not hat:
+            return
+        if hat in ('cap', 'cap_backwards'):
+            hm = M['hat']
+            P('hat', box(f'{cid}:cap', (0.65, 0.61, 0.14), hm, 0.06), H, (0, 0.01, 0.655))
+            sy = -1 if hat == 'cap' else 1
+            P('hat', box(f'{cid}:brim', (0.42, 0.22, 0.03), hm, 0.012), H, (0, sy * 0.38, 0.605))
+            if hat == 'cap_backwards':
+                # The strap opening shows at the forehead when the brim points back.
+                P('hat', box(f'{cid}:cap_strap', (0.16, 0.02, 0.05), M['top_trim'], 0.008), H, (0, -0.306, 0.62))
+        elif hat == 'beanie':
+            hm = M['hat']
+            cuff = material(f'{cid}:hat_cuff', shade(tuple(hm.diffuse_color[:3]), 0.72), 0.7)
+            P('hat', box(f'{cid}:beanie', (0.68, 0.64, 0.22), hm, 0.08), H, (0, 0.01, 0.62))
+            P('hat', box(f'{cid}:beanie_cuff', (0.70, 0.66, 0.08), cuff, 0.03), H, (0, 0.01, 0.505))
+            P('hat', box(f'{cid}:pompom', (0.15, 0.15, 0.13), cuff, 0.055), H, (0, 0.01, 0.775))
+        elif hat == 'crown':
+            gold = material(f'{cid}:crown', tuple(M['accessory'].diffuse_color[:3]), 0.32, metallic=0.45)
+            zc = self.hair_top(hair) + 0.045
+            w, d, t, h = 0.46, 0.42, 0.05, 0.11
+            P('hat', box(f'{cid}:crown_f', (w, t, h), gold, 0.012), H, (0, -(d - t) / 2, zc))
+            P('hat', box(f'{cid}:crown_b', (w, t, h), gold, 0.012), H, (0, (d - t) / 2, zc))
+            for sx in (-1, 1):
+                P('hat', box(f'{cid}:crown_s{sx}', (t, d, h), gold, 0.012), H, (sx * (w - t) / 2, 0, zc))
+            for i, (x, y) in enumerate(((-0.205, -0.185), (0.0, -0.185), (0.205, -0.185), (-0.205, 0.185),
+                                        (0.0, 0.185), (0.205, 0.185))):
+                P('hat', pyramid(f'{cid}:crown_pt{i}', 0.08, 0.12, gold), H, (x, y, zc + h / 2))
+            P('hat', box(f'{cid}:crown_gem', (0.06, 0.02, 0.06), M['badge'], 0.01), H, (0, -d / 2 - 0.006, zc),
+              (0, 45, 0))
+        elif hat == 'bow':
+            bm = M['accessory']
+            z = self.hair_top(hair) + 0.04
+            P('hat', box(f'{cid}:bow_knot', (0.1, 0.09, 0.1), bm, 0.03), H, (0.16, -0.13, z + 0.01))
+            for sx in (-1, 1):
+                P('hat', box(f'{cid}:bow_loop{sx}', (0.22, 0.08, 0.19), bm, 0.05), H,
+                  (0.16 + sx * 0.14, -0.13, z + 0.03), (0, -sx * 20, 0))
+
+    def build_eyewear(self, kind):
+        """Glasses keep the eyes readable (thin open frames; brows sit in front of them). Sunglasses hide the
+        eyes entirely, so brows (in front of the frame) and the mouth carry the expression."""
+        if not kind:
+            return
+        cid, H, M, P = self.id, self.joints['head'], self.mats, self.piece
+        F, fy = self.rig['face'], self.rig['face_front_y']
+        frame = M['accessory']
+        ez, y = F['eye_z'], fy - 0.022
+        for sx in (-1, 1):
+            ex = sx * F['eye_x']
+            if kind == 'glasses':
+                iw, ih, t = 0.2, 0.215, 0.024
+                for nm, size, loc in (('t', (iw + 2 * t, 0.02, t), (ex, y, ez + ih / 2 + t / 2)),
+                                      ('b', (iw + 2 * t, 0.02, t), (ex, y, ez - ih / 2 - t / 2)),
+                                      ('i', (t, 0.02, ih), (ex - sx * (iw / 2 + t / 2), y, ez)),
+                                      ('o', (t, 0.02, ih), (ex + sx * (iw / 2 + t / 2), y, ez))):
+                    P('eyewear', box(f'{cid}:glasses_{nm}{sx}', size, frame, 0.006), H, loc)
+                outer = abs(ex) + iw / 2 + t
+            else:
+                lens = material('sunglass_lens', (0.012, 0.012, 0.018), 0.12, metallic=0.3)
+                P('eyewear', box(f'{cid}:lens{sx}', (0.215, 0.02, 0.2), lens, 0.035), H, (ex, y, ez + 0.005))
+                glint = material('sunglass_glint', (1.0, 1.0, 1.0), 0.2, emission=1.2)
+                P('eyewear', box(f'{cid}:glint{sx}', (0.05, 0.004, 0.014), glint, 0.0), H,
+                  (ex - 0.04, y - 0.012, ez + 0.05), (0, 35, 0))
+                outer = abs(ex) + 0.1075
+            P('eyewear', box(f'{cid}:hinge{sx}', (0.33 - outer, 0.02, 0.022), frame, 0.004), H,
+              (sx * (outer + 0.33) / 2, fy - 0.012, ez + 0.05))
+            P('eyewear', box(f'{cid}:temple{sx}', (0.02, 0.30, 0.022), frame, 0.004), H, (sx * 0.322, fy + 0.15, ez + 0.05))
+        # No brow bar on the shades: a strip of skin between the lenses and the brows keeps the brows readable.
+        P('eyewear', box(f'{cid}:bridge', (0.05, 0.02, 0.022), frame, 0.004), H, (0, y, ez + 0.02))
+
     def build_face(self):
         cid, F, H, M = self.id, self.rig['face'], self.joints['head'], self.mats
         fy = self.rig['face_front_y']
+        eyewear = (self.costume or {}).get('eyewear')
+        # Brows sit in front of any eyewear frame so they always read.
+        brow_y = fy - (0.05 if eyewear else 0.016)
         self.face = {}
         for side, sx in (('l', 1), ('r', -1)):
             ex = sx * F['eye_x']
@@ -797,10 +1068,15 @@ class Character:
             low = child(disc(f'{cid}:lowlid_{side}', F['eye_w'] / 2 * 1.12, F['eye_h'] / 2 * 1.08, M['skin'], bottom_pivot=True),
                         H, (ex, fy - 0.012, F['eye_z'] - F['eye_h'] / 2 * 1.06))
             brow = child(box(f'{cid}:brow_{side}', (F['brow_w'], 0.022, F['brow_h']), M['brows'], 0.012), H,
-                         (ex, fy - 0.016, F['brow_z']))
+                         (ex, brow_y, F['brow_z']))
             for ob in (white, pupil, shine, lid, low, brow):
                 ob['blox_char'] = cid
                 ob['blox_face'] = True
+            if eyewear == 'sunglasses':
+                # Dark lenses hide the eyes: nothing may peek out above or below them on a wide-eyed take.
+                for ob in (white, pupil, shine, lid, low):
+                    ob.hide_render = True
+                    ob.hide_viewport = True
             self.face[side] = {'white': white, 'pupil': pupil, 'lid': lid, 'low': low, 'brow': brow, 'x': ex}
         mouth = child(build_mouth(f'{cid}:mouth', self.rig, M['mouth']), H, (0, fy - 0.006, F['mouth_z']))
         mouth['blox_char'] = cid
@@ -829,7 +1105,8 @@ class Character:
         for side in ('l', 'r'):
             f = self.face[side]
             f['white'].scale = (1.0 + wide * 0.25, 1.0, 1.0 + wide * 0.9)
-            f['pupil'].scale = (1.0 - wide * 0.2, 1.0, 1.0 - wide * 0.2)
+            ps = (1.0 - wide * 0.2) * fc.get('pupil_size', 1.0)
+            f['pupil'].scale = (ps, 1.0, ps)
             px, pz = fc['pupil']
             f['pupil'].location.x = f['x'] + px * F['pupil_range_x']
             f['pupil'].location.z = F['eye_z'] + pz * F['pupil_range_z']
@@ -1003,6 +1280,10 @@ def telemetry(scene, cam, chars, props, rig, subjects=()):
                 zs.append(p[2])
         rec['bbox2d'] = [round(min(xs), 4), round(min(ys), 4), round(max(xs), 4), round(max(ys), 4)]
         rec['in_front_of_camera'] = min(zs) > 0
+        # Costume pieces count as visible parts when every object of the piece renders.
+        for pname, obs in ch.costume_parts.items():
+            if all(not ob.hide_render for ob in obs):
+                visible_parts.append(pname)
         rec['parts_visible'] = sorted(visible_parts)
         rec['object_count'] = sum(1 for ob in scene.objects if ob.get('blox_char') == cid)
         keys = ch.mouth.data.shape_keys.key_blocks
