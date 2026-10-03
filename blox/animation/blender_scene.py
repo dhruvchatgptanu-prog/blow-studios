@@ -671,6 +671,10 @@ def telemetry(scene, cam, chars, props, rig):
         fwd = (hm.to_3x3() @ Vector((0, -1, 0))).normalized()
         to_cam = (cam_pos - face_c).normalized()
         rec['face'] = [round(v, 4) for v in face_c]
+        if 'chin_point' in rig:
+            # The head part's origin is the head centre, so offset the joint-local chin point.
+            cp, hc = rig['chin_point'], rig['head_center']
+            rec['chin'] = [round(v, 4) for v in hm @ Vector((cp[0] - hc[0], cp[1] - hc[1], cp[2] - hc[2]))]
         rec['face2d'] = project(scene, cam, face_c)
         rec['mouth2d'] = project(scene, cam, mouth)
         mw = rig['face']['mouth_w'] / 2.0

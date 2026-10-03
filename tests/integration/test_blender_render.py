@@ -36,3 +36,10 @@ def test_blender_renders_frames_and_telemetry(tmp_path):
     # Evaluated scene agrees with the host-side solver within a few millimetres.
     import numpy as np
     assert np.linalg.norm(np.array(hero['root'][:2]) - np.array(solved['characters']['hero'][f0]['root'][:2])) < 0.005
+    # The chin point QA uses for "think" matches the solver's chin target (the hand's IK goal).
+    from blox.animation import rig as R
+    sc = solved['scales']['hero']
+    fr = solved['characters']['hero'][f0]
+    k = SV.fk({'root': fr['root'], 'yaw': fr['yaw'], 'rot': fr['rot'], 'loc': fr['loc']}, sc)
+    chin = SV.local_point(k, 'head', R.CHIN_POINT, sc)
+    assert np.linalg.norm(np.array(hero['chin']) - chin) < 0.01

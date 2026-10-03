@@ -617,7 +617,7 @@ class CharacterSolver:
         if label == 'cover_mouth':
             return local_point(fkres, 'head', (0.0, -0.40, 0.17), sc)
         if label == 'chin':
-            return local_point(fkres, 'head', (0.0, -0.38, 0.06), sc)
+            return local_point(fkres, 'head', R.CHIN_POINT, sc)
         if label == 'facepalm':
             return local_point(fkres, 'head', (0.05 * mirror, -0.36, 0.42), sc)
         if label == 'head_scratch':
@@ -911,22 +911,25 @@ class CharacterSolver:
             if shape != 'neutral' and amt > 0:
                 w['shape:' + shape] = round(w.get('shape:' + shape, 0) + amt, 3)
         opening = lerp(a['open'], b['open'], u)
-        vis = self.visemes[f] if self.visemes else {}
+        # QA lip-sync repairs: sample the mouth timing earlier/later within a line and open it wider.
+        shift, boost = (getattr(self, 'mouth_repair', None) or {}).get(f, (0, 1.0))
+        fv = min(max(f - shift, 0), self.n - 1)
+        vis = self.visemes[fv] if self.visemes else {}
         env = getattr(self, 'env', None)
-        e = float(env[f]) if env is not None and f < len(env) else None
+        e = float(env[fv]) if env is not None and fv < len(env) else None
         in_line = bool(getattr(self, 'line_frames', None)) and f in self.line_frames
         if vis or in_line or (e is not None and e > 0.12):
             # While speaking, the jaw follows the real audio amplitude; text
             # visemes choose the mouth shape; expressions keep only a hint of the
             # corners (a strong smile/frown shape would hold the mouth closed).
             for k in list(w):
-                w[k] = round(w[k] * 0.3, 3)
+                w[k] = round(w[k] * 0.3 / boost, 3)
             gain = 1.0 if e is None else (0.08 + 0.92 * e)
             for v, amt in vis.items():
                 if v != 'rest':
-                    w['vis:' + v] = round(min(1.0, amt * gain), 3)
+                    w['vis:' + v] = round(min(1.0, amt * gain * boost), 3)
             if e is not None and e > 0.12 and not any(k.startswith('vis:') and v > 0.2 for k, v in w.items()):
-                w['vis:AI'] = round(min(1.0, 0.7 * e), 3)
+                w['vis:AI'] = round(min(1.0, 0.7 * e * boost), 3)
         elif opening > 0.05:
             w['vis:AI'] = round(min(1.0, opening * 0.6), 3)
         return w
@@ -1082,7 +1085,8 @@ def solve(m, bibles, alignments=None, repair=None, envelopes=None):
     """Solve the whole timeline. bibles: cast id -> character bible dict.
 
     repair: {'shots': {shot_id: {...camera knobs}},
-             'characters': {cast_id: {'ranges': [{'start': f0, 'end': f1, 'pelvis_drop_extra': m}]}}}
+             'characters': {cast_id: {'ranges': [{'start': f0, 'end': f1, 'pelvis_drop_extra': m}]}},
+             'lines': {line_id: {'mouth_shift_frames': k, 'mouth_gain': g}}}
     Character repairs are limited to the repaired shot's frames so other,
     already-rendered shots stay consistent.
     """
@@ -1100,9 +1104,16 @@ def solve(m, bibles, alignments=None, repair=None, envelopes=None):
         cs.visemes, viseme_kinds[cid] = build_visemes(m, cid, n, alignments)
         cs.env = (envelopes or {}).get(cid)
         cs.line_frames = set()
+        cs.mouth_repair = {}
         for ln in m['lines']:
             if ln['speaker'] == cid:
                 cs.line_frames.update(range(ln['start_frame'], ln['est_end_frame']))
+                lr = ((repair or {}).get('lines') or {}).get(ln['id'])
+                if lr:
+                    shift = max(-6, min(6, int(lr.get('mouth_shift_frames', 0))))
+                    boost = max(1.0, min(2.0, float(lr.get('mouth_gain', 1.0))))
+                    for f in range(ln['start_frame'], min(n, ln['est_end_frame'] + 3)):
+                        cs.mouth_repair[f] = (shift, boost)
         if cs.env is not None:
             viseme_kinds[cid] = viseme_kinds[cid] + ['amplitude_from_audio']
     frames = {cid: cs.solve(lambda f: camera[f]['location']) for cid, cs in chars.items()}

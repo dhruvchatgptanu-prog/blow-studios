@@ -33,6 +33,7 @@ def rig_spec():
         'joints': [[n, p, list(o)] for n, p, o in R.JOINTS],
         'parts': [[j, n, list(s), list(c), slot, b] for j, n, s, c, slot, b in R.PARTS],
         'face': R.FACE, 'face_front_y': R.FACE_FRONT_Y,
+        'chin_point': list(R.CHIN_POINT), 'head_center': list(R.HEAD_CENTER),
         'mouth_shapes': {k: list(v) for k, v in R.MOUTH_SHAPES.items()},
         'visemes': {k: list(v) for k, v in R.VISEMES.items()},
         'palette_slots': R.PALETTE_SLOTS,

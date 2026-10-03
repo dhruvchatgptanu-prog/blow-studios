@@ -422,11 +422,12 @@ def rewrite_lines(m, too_long, p, vid, attempt):
 def solved_for(vid, mid, m, d):
     """Solve motion once per manifest timing + alignment + repair params; cached on disk."""
     results = repo.line_results(mid, d)
-    repair = {'shots': {}, 'characters': {}}
+    repair = {'shots': {}, 'characters': {}, 'lines': {}}
     for sh in repo.shots(mid, d):
         rp = (sh['detail'] or {}).get('repair_params') or {}
         if rp:
             repair['shots'][sh['shot_key']] = rp
+            repair['lines'].update(rp.get('lines') or {})
             if rp.get('pelvis_drop_extra') and rp.get('character'):
                 s = next(x for x in m['shots'] if x['id'] == sh['shot_key'])
                 repair['characters'].setdefault(rp['character'], {'ranges': []})['ranges'].append(
@@ -437,7 +438,7 @@ def solved_for(vid, mid, m, d):
         with open(path) as f:
             return json.load(f), path
     cast = _cast(m, d)
-    if repair['shots'] or repair['characters']:
+    if repair['shots'] or repair['characters'] or repair['lines']:
         from .animation import solver as SV
         solved = SV.solve(m, {cid: c['bible'] for cid, c in cast.items()}, production.alignments(results), repair,
                           envelopes=production.envelopes(m, results))
@@ -579,7 +580,7 @@ def repair(ctx):
         return {'blocked': 'repair rounds'}
     videos.merge_metadata(vid, {'repair_rounds': rounds}, d)
     fails = [c for c in q['checks'] if c['status'] == 'fail' and c.get('repair')]
-    shots_to_render, lines_to_voice, reassemble = {}, set(), False
+    shots_to_render, lines_to_voice, reassemble, retry_only = {}, set(), False, set()
     limit = p['qa']['max_repairs_per_target']
     for c in fails:
         rp = c['repair']
@@ -594,13 +595,13 @@ def repair(ctx):
             if sh['repair_attempts'] >= limit:
                 videos.hold(vid, 'blocked', f'Shot {rp["shot"]} still fails "{c["name"]}" after {limit} repairs', d=d)
                 return {'blocked': rp['shot']}
-            params = dict((sh['detail'] or {}).get('repair_params') or {})
-            for k, val in (rp.get('params') or {}).items():
-                if k == 'pelvis_drop_extra':
-                    params[k] = round(params.get(k, 0) + val, 3)
-                else:
-                    params[k] = val
-            shots_to_render[rp['shot']] = (sh, params, c)
+            # Several checks can ask for the same shot; their adjustments are combined.
+            prev = shots_to_render.get(rp['shot'])
+            params = prev[1] if prev else json.loads(json.dumps((sh['detail'] or {}).get('repair_params') or {}))
+            merge_repair_params(params, rp.get('params') or {})
+            if not rp.get('params'):
+                retry_only.add(rp['shot'])  # a plain retry (render glitch), not a settings change
+            shots_to_render[rp['shot']] = (sh, params, prev[2] if prev else c)
         elif act == 'revoice_line' and rp.get('line'):
             lines_to_voice.add(rp['line'])
         elif act in ('remix', 'rebuild_captions', 're_assemble', 're_encode'):
@@ -612,6 +613,17 @@ def repair(ctx):
             videos.hold(vid, 'blocked', f'Line {lid} still fails after {limit} re-voicing attempts', d=d)
             return {'blocked': lid}
         voice_rows[lid] = row
+    # The renderer is deterministic: a settings repair that leaves a shot's settings as they were would
+    # reproduce the same frames, so it is skipped and the video goes to the owner instead. Plain retries
+    # (black frames, missing telemetry) stay allowed up to the per-shot limit.
+    unchanged = [k for k, (sh, params, c) in shots_to_render.items()
+                 if k not in retry_only and params == ((sh['detail'] or {}).get('repair_params') or {})]
+    if unchanged and not voice_rows and len(unchanged) == len(shots_to_render):
+        videos.hold(vid, 'needs_review', 'QA failures remain that an automatic re-render cannot change (shot ' +
+                    ', '.join(unchanged) + '): ' + ', '.join(c['name'] for c in fails[:5]), d=d)
+        return {'held': 'repair would not change the output'}
+    for k in unchanged:
+        shots_to_render.pop(k)
     if not (shots_to_render or voice_rows or reassemble):
         videos.hold(vid, 'needs_review', 'QA asked for a repair that Blox cannot perform automatically: ' +
                     ', '.join(c['name'] for c in fails[:5]), d=d)
@@ -638,6 +650,24 @@ def repair(ctx):
         jobs.enqueue('video.assemble', {'manifest_id': mid}, video_id=vid, idempotency_key=f'assemble:{mid}:repair{rounds}',
                      d=d)
     return {'round': rounds}
+
+
+def merge_repair_params(params, new):
+    """Combine a QA repair request into a shot's accumulated repair settings (in place)."""
+    for k, val in new.items():
+        if k == 'pelvis_drop_extra':
+            params[k] = round(params.get(k, 0) + val, 3)
+        elif k == 'lines':
+            lines = params.setdefault('lines', {})
+            for lid, fix in val.items():
+                cur = lines.setdefault(lid, {})
+                if 'mouth_shift_frames' in fix:  # QA measures the remaining lag after earlier shifts
+                    cur['mouth_shift_frames'] = max(-6, min(6, cur.get('mouth_shift_frames', 0) + fix['mouth_shift_frames']))
+                if 'mouth_gain' in fix:
+                    cur['mouth_gain'] = round(min(2.0, cur.get('mouth_gain', 1.0) * fix['mouth_gain']), 3)
+        else:
+            params[k] = val
+    return params
 
 
 def _record_repair(d, vid, qid, target, action, attempt, detail):

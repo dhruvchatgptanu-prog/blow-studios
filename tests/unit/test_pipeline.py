@@ -191,3 +191,40 @@ def test_legacy_database_upgrade_is_non_destructive(tmp_path):
         assert d.scalar('SELECT COUNT(*) AS n FROM videos') == 2
     finally:
         dbmod.reset()
+
+
+def test_repairs_on_one_shot_are_combined(db):
+    vid, mid = _video_with_shots(db)
+    qid = _qa(db, vid, [item('fail', 'major', {'action': 're_render_shot', 'shot': 's2',
+                                               'params': {'camera_wider': True}}, cid='a'),
+                        item('fail', 'major', {'action': 're_render_shot', 'shot': 's2',
+                                               'params': {'lines': {'l2': {'mouth_shift_frames': -3}}}}, cid='b')])
+    _repair(db, vid, mid, qid)
+    sh = next(s for s in repo.shots(mid, db) if s['shot_key'] == 's2')
+    assert sh['detail']['repair_params'] == {'camera_wider': True, 'lines': {'l2': {'mouth_shift_frames': -3}}}
+
+
+def test_lipsync_repair_accumulates_the_measured_lag():
+    from blox.pipeline import merge_repair_params
+    p = merge_repair_params({}, {'lines': {'l1': {'mouth_shift_frames': -3, 'mouth_gain': 1.3}}})
+    merge_repair_params(p, {'lines': {'l1': {'mouth_shift_frames': 1, 'mouth_gain': 1.3}}})
+    assert p == {'lines': {'l1': {'mouth_shift_frames': -2, 'mouth_gain': 1.69}}}
+
+
+def test_settings_repair_that_changes_nothing_is_held_not_rerendered(db):
+    vid, mid = _video_with_shots(db)
+    repo.upsert_shot(vid, mid, 's2', 'blender', db, repair_attempts=1, detail={'repair_params': {'camera_wider': True}})
+    qid = _qa(db, vid, [item('fail', 'major', {'action': 're_render_shot', 'shot': 's2',
+                                               'params': {'camera_wider': True}})])
+    _repair(db, vid, mid, qid)
+    v = videos.get(vid, db)
+    assert v['status'] == 'needs_review' and 'cannot change' in v['status_reason']
+    assert not db.query("SELECT id FROM tasks WHERE kind='shot.render' AND status='queued'")
+
+
+def test_plain_retry_after_a_render_glitch_is_still_allowed(db):
+    vid, mid = _video_with_shots(db)
+    repo.upsert_shot(vid, mid, 's2', 'blender', db, repair_attempts=1)
+    qid = _qa(db, vid, [item('fail', 'critical', {'action': 're_render_shot', 'shot': 's2'})])
+    _repair(db, vid, mid, qid)
+    assert videos.get(vid, db)['status'] == 'generating'

@@ -145,3 +145,20 @@ def test_camera_frames_the_subject_face(solved):
     cosang = float(fwd @ to_head / np.linalg.norm(to_head))
     assert cosang > math.cos(math.radians(20)), 'head should be near the optical axis'
     assert G.CAMERA_SIDE_DEG['front'] == 0
+
+
+def test_lipsync_repair_shifts_and_widens_only_that_line(solved):
+    m, base = solved
+    ln = m['lines'][0]
+    bibles = {c['id']: next(ch['bible'] for ch in demo.CHARACTERS if ch['id'] == c['character_id']) for c in m['cast']}
+    rep = SV.solve(m, bibles, repair={'lines': {ln['id']: {'mouth_shift_frames': -2, 'mouth_gain': 1.5}}})
+    a, b = ln['start_frame'], ln['est_end_frame']
+    who = ln['speaker']
+    vis = lambda s, f: sum(v for k, v in s['characters'][who][f]['face']['mouth'].items() if k.startswith('vis:'))
+    # Shifted: the repaired mouth at f shows what the original showed two frames later (scaled up).
+    hits = [f for f in range(a, b - 2) if vis(base, f + 2) > 0.05]
+    assert hits and all(vis(rep, f) >= vis(base, f + 2) - 1e-3 for f in hits)
+    assert sum(vis(rep, f) for f in hits) > 1.2 * sum(vis(base, f + 2) for f in hits)
+    other = next(x for x in m['lines'] if x['speaker'] == who and x['id'] != ln['id'])
+    f0 = other['start_frame'] + 5
+    assert base['characters'][who][f0]['face']['mouth'] == rep['characters'][who][f0]['face']['mouth']

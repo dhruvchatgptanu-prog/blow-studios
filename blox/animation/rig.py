@@ -51,6 +51,7 @@ FACE_CENTER_Z = 1.73  # between eyes and mouth, standing
 HEAD_HALF_DEPTH = 0.29
 HEAD_CENTER = (0.0, 0.0, 0.30)     # from head joint
 FACE_FRONT_Y = -0.29               # head front surface (local to head joint)
+CHIN_POINT = (0.0, -0.38, 0.06)    # in front of the chin (local to head joint); the 'think' hand target
 
 # Rigid parts: joint, part name, size (w, d, h), centre offset, colour slot, bevel
 PARTS = [

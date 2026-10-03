@@ -150,6 +150,13 @@ def _feet(ck, m, cid, recs, plan, q, scale):
                    'params': {'pelvis_drop_extra': 0.03, 'character': cid}} if first is not None else None)
 
 
+def _chin(rec, scale):
+    if 'chin' in rec:
+        return rec['chin']
+    x, y, z = rec['face']
+    return [x, y, z - 0.24 * scale]
+
+
 def _actions(ck, m, cid, recs, plan, tele, scale):
     props = {p['id']: p for p in m['setting'].get('props', [])}
     for a in m['tracks']['actions']:
@@ -218,9 +225,19 @@ def _actions(ck, m, cid, recs, plan, tele, scale):
             else:
                 ok, conf = None, 0.3
         elif t in ('facepalm', 'think'):
+            # facepalm: the palm covers the face; think: the hand rests at the chin, which is about
+            # 0.26 m from the face centre, so it is measured against the chin point.
             side = 'l' if a['params'].get('hand') == 'left' else 'r'
-            ds = [math.dist(recs[f]['palm_' + side], recs[f]['face']) for f in range(a2, a4) if recs.get(f)]
-            ev = {'min_palm_to_face_m': round(min(ds), 3) if ds else None}
+            frames = [f for f in range(a2, a4) if recs.get(f)]
+            if t == 'facepalm':
+                ds = [math.dist(recs[f]['palm_' + side], recs[f]['face']) for f in frames]
+                ev = {'min_palm_to_face_m': round(min(ds), 3) if ds else None}
+            else:
+                ds = [math.dist(recs[f]['palm_' + side], _chin(recs[f], scale)) for f in frames]
+                ev = {'min_palm_to_chin_m': round(min(ds), 3) if ds else None}
+                if frames and 'chin' not in recs[frames[0]]:
+                    ev['chin'] = 'estimated from the face centre (older telemetry)'
+                    conf = 0.6
             ok = bool(ds) and min(ds) <= 0.2 * scale
         elif t in ('crouch', 'cower', 'fall_down'):
             z0 = r0.get('face_z', r0['face'][2])
@@ -413,10 +430,20 @@ def _lipsync(ck, m, cid, recs, gray, dialog_by_line):
         else:
             ok = corr >= 0.3 and abs(lag) <= 2 and (pix_corr is None or pix_corr >= 0.25)
             status, conf = ('pass' if ok else 'fail'), 0.8 if pix_corr is not None else 0.6
+        repair = None
+        if status == 'fail' and shot:
+            # The repair changes the solved mouth for this line: shift it by the measured lag (the mouth
+            # trailed the voice by `lag` frames when lag > 0) and/or open it wider when the rendered mouth
+            # barely followed the voice. Repeating a re-render with unchanged inputs cannot help.
+            fix = {}
+            if abs(lag) > 2:
+                fix['mouth_shift_frames'] = -lag
+            if corr < 0.3 or (pix_corr is not None and pix_corr < 0.25):
+                fix['mouth_gain'] = 1.3
+            repair = {'action': 're_render_shot', 'shot': shot['id'], 'params': {'lines': {ln['id']: fix}}}
         ck.add(f'lipsync:{ln["id"]}', f'Lip sync for line {ln["id"]} ({cid})', 'visual', status, 'major', ev, conf,
                'telemetry+pixel+audio', frames=(a, b), target={'kind': 'shot', 'id': shot['id'] if shot else None},
-               repair={'action': 're_render_shot', 'shot': shot['id'], 'params': {'realign_line': ln['id']}}
-               if status == 'fail' and shot else None)
+               repair=repair)
 
 
 def _camera(ck, m, tele):
