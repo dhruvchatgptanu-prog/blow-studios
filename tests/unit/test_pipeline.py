@@ -228,3 +228,19 @@ def test_plain_retry_after_a_render_glitch_is_still_allowed(db):
     qid = _qa(db, vid, [item('fail', 'critical', {'action': 're_render_shot', 'shot': 's2'})])
     _repair(db, vid, mid, qid)
     assert videos.get(vid, db)['status'] == 'generating'
+
+
+def test_solved_motion_cache_is_invalidated_by_a_motion_code_change(db, monkeypatch):
+    from blox import pipeline
+    from blox.animation import solver as SV
+    vid, mid = _video_with_shots(db)
+    m = repo.manifest(mid, db)['body']
+    calls = []
+    real = pipeline.production.solve
+    monkeypatch.setattr(pipeline.production, 'solve', lambda *a, **k: calls.append(1) or real(*a, **k))
+    _, p1 = pipeline.solved_for(vid, mid, m, db)
+    _, p2 = pipeline.solved_for(vid, mid, m, db)
+    assert p1 == p2 and len(calls) == 1          # cached for identical inputs and code
+    monkeypatch.setattr(SV, '_CODE_VERSION', 'upgraded')
+    _, p3 = pipeline.solved_for(vid, mid, m, db)
+    assert p3 != p1 and len(calls) == 2          # an upgrade of the motion code re-solves

@@ -432,14 +432,15 @@ def solved_for(vid, mid, m, d):
                 s = next(x for x in m['shots'] if x['id'] == sh['shot_key'])
                 repair['characters'].setdefault(rp['character'], {'ranges': []})['ranges'].append(
                     {'start': s['start_frame'], 'end': s['end_frame'], 'pelvis_drop_extra': rp['pelvis_drop_extra']})
-    key = stable_hash([m['lines'], m['tracks'], m['shots'], [(k, r['words']) for k, r in sorted(results.items())], repair])
+    from .animation import solver as SV
+    key = stable_hash([m['lines'], m['tracks'], m['shots'], [(k, r['words']) for k, r in sorted(results.items())], repair,
+                       SV.code_version()])
     path = os.path.join(work_dir(vid, mid), f'solved_{key}.json')
     if os.path.exists(path):
         with open(path) as f:
             return json.load(f), path
     cast = _cast(m, d)
     if repair['shots'] or repair['characters'] or repair['lines']:
-        from .animation import solver as SV
         solved = SV.solve(m, {cid: c['bible'] for cid, c in cast.items()}, production.alignments(results), repair,
                           envelopes=production.envelopes(m, results))
     else:

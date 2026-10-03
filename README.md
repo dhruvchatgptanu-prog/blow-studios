@@ -197,7 +197,7 @@ Verified here means exercised end to end in this environment with real tools, no
 | Deterministic animation | joint-hierarchy rig, analytic + iterative IK, footstep planning, springs, expressions, visemes, amplitude-driven jaw, camera solver, Blender scene build with telemetry | Real Blender renders; solver tests (planted feet, facepalm contact, jump landing, determinism); full demo rendered through the queued pipeline |
 | Voices | free offline Piper voices (default), OpenAI TTS with direction, ElevenLabs with timestamps, local test voice, alignment, pronunciation overrides, gentle fitting | Piper run for real (checksum-verified install, CLI, inside the Docker image, in the pipeline); OpenAI/ElevenLabs request code **not run live** |
 | Assembly | captions in the safe area (face-aware placement), ducking, loudness normalisation, transitions, cover and thumbnails | Real FFmpeg tests; full demo assembly |
-| QA and repairs | technical, motion, lip-sync (scene and rendered-pixel evidence, hand occlusion), caption, story, optional vision checks; verdicts; bounded repair loop | Real QA on the rendered demo: it blocks the robotic test voice as designed, and its lip-sync findings were checked frame by frame; repair-limit tests |
+| QA and repairs | technical, motion, sight lines, lip-sync (scene and rendered-pixel evidence, hand occlusion), caption, story, optional vision checks; verdicts; bounded repair loop whose repairs must change the shot | Real QA on two complete rendered videos, findings checked frame by frame. Those reviews found defects QA had missed or misjudged (camera inside a character, no-op repairs, a miscalibrated gesture check); all fixed with regression tests ([docs/AUDIT.md](docs/AUDIT.md#defects-in-this-rebuild-found-by-its-own-end-to-end-runs)) |
 | Scheduling and autopilot | slots, DST, rolling cap, buffer, skips, pause, emergency stop | Unit tests including Adelaide DST dates |
 | YouTube publishing | OAuth (PKCE, state, encrypted tokens), resumable upload with resume and reconciliation, scheduled private uploads, processing/scheduled/published verification, restriction detection | Tests against a simulated YouTube; **no upload to a real channel was performed** |
 | Analytics learning | YouTube Analytics reports, retention, findings with bootstrap intervals labelled finding vs hypothesis | Unit-level only; needs your channel |
@@ -242,6 +242,9 @@ Verified here means exercised end to end in this environment with real tools, no
   measured alignment, timing is estimated and labelled so, and QA checks the result.
 * Contacts (feet, hand-to-face, props) are solved with IK and checked in the evaluated Blender scene to
   centimetre tolerances; collisions between characters are only checked at positions, not full meshes.
+* **Occlusion**: cameras are kept out of other characters and QA checks the sight line to each shot's
+  subject, with bodies approximated as cylinders. Set pieces (houses, trees, walls) are not checked
+  for occlusion; that relies on the optional vision review or your own review.
 * **Generative shots** (Runway) do not follow second-by-second directions exactly; identity and costume
   continuity are reviewed, and uncertain results are held rather than published. Upscaled generative
   output is labelled as upscaled.

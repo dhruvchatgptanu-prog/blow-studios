@@ -17,7 +17,9 @@ so it is deterministic and unit-testable without Blender:
 The Blender script only applies these transforms and renders, then reports
 what the evaluated scene actually did (telemetry) so QA can compare.
 """
+import hashlib
 import math
+import os
 import zlib
 
 import numpy as np
@@ -989,6 +991,23 @@ def apply_shot_repairs(shot, params):
         cam['shake'] = 0.0
         cam['ease'] = 'in_out'
     return s
+
+
+_CODE_VERSION = None
+
+
+def code_version():
+    """Fingerprint of the motion code; part of the solved-motion cache key, so an upgrade re-solves."""
+    global _CODE_VERSION
+    if _CODE_VERSION is None:
+        h = hashlib.sha256()
+        here = os.path.dirname(os.path.abspath(__file__))
+        for name in (os.path.join(here, 'solver.py'), os.path.join(here, 'rig.py'), os.path.join(here, 'visemes.py'),
+                     os.path.join(here, '..', 'manifest', 'compile.py'), os.path.join(here, '..', 'manifest', 'geometry.py')):
+            with open(name, 'rb') as f:
+                h.update(f.read())
+        _CODE_VERSION = h.hexdigest()[:16]
+    return _CODE_VERSION
 
 
 def _blocked_frames(frames, chars, subj, f0):

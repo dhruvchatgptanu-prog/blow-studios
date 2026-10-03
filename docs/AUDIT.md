@@ -52,7 +52,27 @@ Migrations are forward-only and run at start-up (`python -m blox.cli migrate` ru
   and *verified* before anything is called published; unfinished legacy jobs are cancelled (not
   resumed, to avoid paying twice) with their provider task ids copied into the video; legacy budget
   reservations become estimated ledger entries. Legacy rows are kept.
+* `0004_story_backlog` - the story backlog table (stories for producing without an LLM API).
 * Legacy preferences (audience, synthetic disclosure, timezone, budget caps, mode) are imported once.
   Autopilot is **not** re-enabled after an upgrade.
 
 The upgrade is covered by `tests/unit/test_pipeline.py::test_legacy_database_upgrade_is_non_destructive`.
+
+## Defects in this rebuild found by its own end-to-end runs
+
+Real renders of complete videos, reviewed frame by frame, exposed problems that the unit tests had not.
+Each was fixed and covered by a regression test:
+
+* **Camera inside a character.** A `front` camera on a character facing another character was placed
+  inside the other character's body; three shots showed only the inside of a head while every QA check
+  passed. The camera solver now swings around the subject to a clear angle, and QA has a per-shot
+  sight-line check (`sightline:<shot>`, critical). Every story in `stories/` is tested for it.
+* **Repairs that changed nothing.** The lip-sync repair asked for a parameter nothing read, so the
+  deterministic renderer reproduced the same frames each round; several failing checks on one shot
+  also overwrote each other's repair settings. Repairs now carry the measured lag and mouth gain,
+  are merged per shot, and a settings repair that would not change the shot holds the video for review.
+* **"Think" gesture measured at the wrong point.** QA compared the hand with the face centre, 0.26 m
+  from the chin the hand is meant to touch; telemetry now exports the chin point.
+* **Lip-sync false positives** (earlier run): the pixel measure counted a hand over the mouth as mouth
+  motion; frames with the mouth covered are now excluded and a frozen mouth fails.
+* **Originality screen compared a video with itself** when screening against recent videos.
