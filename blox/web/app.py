@@ -246,7 +246,7 @@ def create_app():
         if not isinstance(plan_body, dict) or len(json.dumps(plan_body)) > C.MAX_PLAN_BYTES:
             raise ValueError('Plan must be a JSON object under 400 KB')
         pr = p['production']
-        m = C.compile_plan(plan_body, fps=pr['fps'], width=pr['width'], height=pr['height'])
+        m = C.compile_plan(plan_body, fps=pr['fps'], width=pr['width'], height=pr['height'], **C.pace_kwargs(p))
         rep = V.validate(m, p)
         vid = videos.create(m['title'] or 'Untitled', 'demo' if source == 'demo' else 'manual', status='concept_selected', d=d,
                             metadata={'publish_metadata': m.get('metadata') or {'title': m['title']}}, actor='owner')
@@ -273,7 +273,7 @@ def create_app():
         if not isinstance(plan_body, dict) or len(json.dumps(plan_body)) > C.MAX_PLAN_BYTES:
             raise ValueError('Plan must be a JSON object under 400 KB')
         pr = p['production']
-        m = C.compile_plan(plan_body, fps=pr['fps'], width=pr['width'], height=pr['height'])
+        m = C.compile_plan(plan_body, fps=pr['fps'], width=pr['width'], height=pr['height'], **C.pace_kwargs(p))
         rep = V.validate(m, p)
         chars = repo.characters(active_only=False, d=d)
         names = {c['id']: chars.get(c['character_id'], {}).get('name', c['id']) for c in m['cast']}
@@ -296,7 +296,7 @@ def create_app():
         p = prefsmod.get()
         plan_body = (request.get_json(force=True) or {}).get('plan')
         pr = p['production']
-        m = C.compile_plan(plan_body, fps=pr['fps'], width=pr['width'], height=pr['height'])
+        m = C.compile_plan(plan_body, fps=pr['fps'], width=pr['width'], height=pr['height'], **C.pace_kwargs(p))
         rep = V.validate(m, p)
         return jsonify(validation=rep, script=director.script(m), beats=len(m['beats']))
 
@@ -704,6 +704,7 @@ def create_app():
         pl['setting']['props'] = [{'id': 'p', 'type': 'platform', 'position': [0, 0, 0], 'size': [3, 3], 'color': '#4CAF50'}]
         pl['shots'] = [{'id': 's1', 'start_s': 0, 'end_s': 30, 'camera': {'subject': 'hero', 'framing_start': 'medium_wide',
                                                                          'framing_end': 'medium_wide', 'move': 'static'}}]
+        # A still of a held pose: timing (and so the production pace) does not affect it.
         m = C.compile_plan(pl, fps=30, width=540, height=960)
         from ..animation import solver as SV
         bibles = {'hero': chars[cid]['bible']}
@@ -731,9 +732,13 @@ def create_app():
         out_dir = config.WORK_DIR / 'character_previews' / cid
         out_dir.mkdir(parents=True, exist_ok=True)
         speaker = piper.speaker_for(cid, voice)
-        out = out_dir / f'voice_{speaker}.wav'
-        line = {'id': 'preview', 'text': text, 'emotion': 'happy', 'pace': 'normal', 'volume': 'normal'}
-        piper.synthesize(tts.spoken_text(text, prefsmod.get()['production']['pronunciations']), str(out), speaker, line)
+        pr = prefsmod.get()['production']
+        # Preview at the production speech rate, so it sounds like the finished videos.
+        rate = float(C.pace_kwargs({'production': pr})['speech_rate'])
+        out = out_dir / f'voice_{speaker}_r{rate:g}.wav'
+        line = {'id': 'preview', 'text': text, 'emotion': 'happy', 'pace': 'normal', 'volume': 'normal',
+                'speech_rate': rate}
+        piper.synthesize(tts.spoken_text(text, pr['pronunciations']), str(out), speaker, line)
         return jsonify(preview='/media/' + repo.rel(str(out)), speaker=speaker,
                        license=piper.VOICES[piper.DEFAULT_MODEL]['license'])
 

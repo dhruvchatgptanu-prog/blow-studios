@@ -102,8 +102,21 @@ def speaker_for(character_id, voice):
     return int(sp)
 
 
+def speech_rate(line):
+    """Native speaking speed for a line (compiled from the owner's speech_rate; 1.0 = normal)."""
+    try:
+        rate = float(line.get('speech_rate', 1.0))
+    except (TypeError, ValueError):
+        return 1.0
+    return rate if 0.5 <= rate <= 2.0 else 1.0
+
+
 def delivery(line):
-    """Map the line's direction onto Piper's controls (pace and variation)."""
+    """Map the line's direction onto Piper's controls (pace and variation).
+
+    The production speech rate is applied natively through length_scale
+    (Piper's phoneme durations, pauses included), so faster speech is
+    synthesised faster rather than time-stretched afterwards."""
     length = PACE.get(line.get('pace', 'normal'), 1.0)
     emo = line.get('emotion', 'neutral')
     if emo in LIVELY:
@@ -113,6 +126,7 @@ def delivery(line):
         length *= 1.04
     else:
         noise, noise_w = 0.667, 0.8
+    length /= speech_rate(line)
     return round(length, 3), noise, noise_w
 
 

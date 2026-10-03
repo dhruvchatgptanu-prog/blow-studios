@@ -35,7 +35,7 @@ def add(plans, source, p, d=None):
             out.append({'title': title, 'status': 'rejected', 'reason': 'Not a JSON object under 400 KB'})
             continue
         try:
-            m = C.compile_plan(plan, fps=pr['fps'], width=pr['width'], height=pr['height'])
+            m = C.compile_plan(plan, fps=pr['fps'], width=pr['width'], height=pr['height'], **C.pace_kwargs(p))
             rep = validate(m, p)
         except (ValueError, KeyError, TypeError) as e:
             out.append({'title': title, 'status': 'rejected', 'reason': f'Could not compile: {e}'[:300]})

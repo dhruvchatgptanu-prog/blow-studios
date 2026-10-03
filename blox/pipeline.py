@@ -179,7 +179,8 @@ def develop_step(v, p, d, chars):
         pr = p['production']
         if meta.get('backlog_id'):
             item = backlog.get(meta['backlog_id'], d)
-            m = C.compile_plan(item['plan'], fps=pr['fps'], width=pr['width'], height=pr['height'])
+            m = C.compile_plan(item['plan'], fps=pr['fps'], width=pr['width'], height=pr['height'],
+                               **C.pace_kwargs(p))
             rep = V.validate(m, p)
             if not rep['ok']:
                 raise Blocked('Backlog story no longer validates with the current settings: ' +
@@ -196,7 +197,7 @@ def develop_step(v, p, d, chars):
             source = 'backlog'
         elif meta.get('template_seed') is not None:
             plan = template.make(meta['template_seed'])
-            m = C.compile_plan(plan, fps=pr['fps'], width=pr['width'], height=pr['height'])
+            m = C.compile_plan(plan, fps=pr['fps'], width=pr['width'], height=pr['height'], **C.pace_kwargs(p))
             rep = V.validate(m, p)
             if not rep['ok']:
                 raise Blocked('Template plan failed validation: ' + rep['errors'][0]['message'], state='failed')
@@ -255,6 +256,8 @@ def story_source(p):
 def estimate_video(m, p):
     pr, prices = p['production'], p['budget']['prices']
     words = sum(len(C.words(ln['text'])) for ln in m['lines'])
+    # Not reduced by the speech rate: gpt-4o-mini-tts only takes the rate as an instruction, so the
+    # conservative real-time estimate is kept. Duration-based items below use the compiled (paced) length.
     speech_min = words / 150.0
     est = {}
     if pr['tts_provider'] == 'openai':

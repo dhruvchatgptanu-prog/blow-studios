@@ -10,6 +10,7 @@ import re
 from zoneinfo import ZoneInfo
 
 from . import db as dbmod
+from .manifest.schema import PACE_RANGE, SPEECH_RATE_RANGE
 from .util import finite, integer, text
 
 KEY = 'studio_prefs'
@@ -107,10 +108,16 @@ DEFAULTS = {
     },
     'production': {
         'renderer': 'blender',
-        'min_seconds': 30,
+        # Finished video length (after the pace below is applied).
+        'min_seconds': 20,
         'max_seconds': 60,
-        'target_seconds': 42,
+        'target_seconds': 28,
         'fps': 30,
+        # Production pace. Stories are written in "story time"; pace 1.5 plays every action, camera move, pause and
+        # line 1.5 times faster (a 30 s story becomes a 20 s video). Voices speak natively at speech_rate (no time
+        # stretching); faster than ~1.3x stops sounding natural, so the rest comes out of the pauses between lines.
+        'pace': 1.5,
+        'speech_rate': 1.3,
         'width': 1080,
         'height': 1920,
         'blender_engine': 'BLENDER_EEVEE',
@@ -207,10 +214,25 @@ def _merge(base, over):
     return out
 
 
+# Length defaults before the production pace existed (they were real-time story lengths).
+PRE_PACE_LENGTHS = {'min_seconds': 30, 'target_seconds': 42}
+
+
+def _upgrade(stored):
+    """Settings saved before the production pace existed store every production value, including lengths the
+    owner never changed. Lengths still at the old defaults were not a choice; at the default pace they would
+    reject every 30 s story, so they follow the new finished-video defaults. Customised lengths are kept."""
+    pr = stored.get('production')
+    if isinstance(pr, dict) and 'pace' not in pr and all(pr.get(k) == v for k, v in PRE_PACE_LENGTHS.items()):
+        for k in PRE_PACE_LENGTHS:
+            pr.pop(k)
+    return stored
+
+
 def get(d=None):
     d = d or dbmod.get()
     row = d.one('SELECT value FROM settings WHERE key=?', (KEY,))
-    stored = json.loads(row['value']) if row else {}
+    stored = _upgrade(json.loads(row['value'])) if row else {}
     return _merge(DEFAULTS, stored)
 
 
@@ -351,6 +373,8 @@ def validate(p):
         text(k, 60, 'pronunciation word', allow_empty=False)
         text(v, 120, 'pronunciation', allow_empty=False)
     pr['max_tempo'] = finite(pr['max_tempo'], 1.0, 1.15, 'max tempo')
+    pr['pace'] = finite(pr['pace'], *PACE_RANGE, 'pace')
+    pr['speech_rate'] = finite(pr['speech_rate'], *SPEECH_RATE_RANGE, 'speech rate')
     pr['min_expression_frames'] = integer(pr['min_expression_frames'], 4, 60, 'min expression frames')
     _bool(pr['allow_template_stories'], 'allow template stories')
 

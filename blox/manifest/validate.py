@@ -6,7 +6,7 @@ video, because a valid plan does not prove the renderer followed it.
 import math
 
 from . import geometry as G, schema as S
-from .compile import pose_at, tc, words
+from .compile import line_fit_allowance, pose_at, tc, words
 from .geometry import camera_azimuth, face_visible
 
 FULL_BODY = {'walk', 'run', 'jump', 'hop', 'crouch', 'stand_up', 'stumble', 'fall_down', 'get_up', 'turn',
@@ -59,8 +59,12 @@ def validate(m, prefs=None, characters=None, measured=False):
         r.err('fps', f'Unsupported fps {fps}')
         return r.as_dict({})
     if not (min_s * fps <= D <= max_s * fps):
-        r.err('duration', f'Duration {D / fps:.2f}s is outside the configured {min_s}-{max_s}s',
-              fix='Adjust duration_s or the length settings')
+        pace = float((m.get('pace') or {}).get('timeline', 1.0))
+        at_pace = (f' ({D / fps * pace:.2f}s of story played at pace {pace:g})' if pace != 1.0 else '')
+        r.err('duration', f'Duration {D / fps:.2f}s{at_pace} is outside the configured {min_s}-{max_s}s',
+              fix='Adjust duration_s or the length settings' + (
+                  f'; at pace {pace:g} the story needs {min_s * pace:g}-{max_s * pace:g}s of duration_s'
+                  if pace != 1.0 else ''))
     _structure(r, m)
     if r.errors:
         return r.as_dict({'duration_s': round(D / fps, 3)})
@@ -310,11 +314,27 @@ def _actions(r, m):
 def _dialogue(r, m, measured):
     fps = m['fps']
     lines = m['lines']
+    # At a production pace the slots shrink by the pace but voices speak only
+    # speech_rate faster; line fitting may speed an estimated line up further,
+    # to at most the pace and never above 1.5x in total (1.0 = no allowance,
+    # which is always the case at pace 1). Measured lines are already fitted.
+    allow = line_fit_allowance(m)
+    rate = float((m.get('pace') or {}).get('speech_rate', 1.0))
+    end = {}
     for ln in lines:
         need = ln.get('measured_frames') or ln['est_frames']
         avail = ln['window_end_frame'] - ln['start_frame']
+        end[ln['id']] = ln['est_end_frame']
         if need > avail:
             kind = 'measured' if ln.get('measured_frames') else 'estimated'
+            if kind == 'estimated' and need <= avail * allow:
+                tempo = need / max(1, avail)
+                r.warn('dialogue_tempo', f'Line {ln["id"]} needs {need / fps:.2f}s at speech rate {rate:g} but has '
+                                         f'{avail / fps:.2f}s; line fitting will speed it up {tempo:.2f}x '
+                                         f'({rate * tempo:.2f}x in total, limit {rate * allow:.2f}x)',
+                       frames=(ln['start_frame'], ln['window_end_frame']))
+                end[ln['id']] = ln['window_end_frame']
+                continue
             r.err('dialogue_fit', f'Line {ln["id"]} needs {need / fps:.2f}s ({kind}) but has {avail / fps:.2f}s before '
                                   'the next line or the end', frames=(ln['start_frame'], ln['window_end_frame']),
                   fix='Shorten the line, move the next line later, or extend the scene')
@@ -323,12 +343,12 @@ def _dialogue(r, m, measured):
         by_spk.setdefault(ln['speaker'], []).append(ln)
     for spk, ls in by_spk.items():
         for a, b in zip(ls, ls[1:]):
-            if b['start_frame'] < a['est_end_frame']:
+            if b['start_frame'] < end[a['id']]:
                 r.err('dialogue_overlap', f'{spk} starts {b["id"]} before finishing {a["id"]}',
-                      frames=(b['start_frame'], a['est_end_frame']))
+                      frames=(b['start_frame'], end[a['id']]))
     for a, b in zip(lines, lines[1:]):
-        if a['speaker'] != b['speaker'] and b['start_frame'] < a['est_end_frame']:
-            r.warn('crosstalk', f'Lines {a["id"]} and {b["id"]} overlap', frames=(b['start_frame'], a['est_end_frame']))
+        if a['speaker'] != b['speaker'] and b['start_frame'] < end[a['id']]:
+            r.warn('crosstalk', f'Lines {a["id"]} and {b["id"]} overlap', frames=(b['start_frame'], end[a['id']]))
     cast = {c['id'] for c in m['cast']}
     for ln in lines:
         if ln['speaker'] in cast:

@@ -100,6 +100,17 @@ VOLUMES = ['whisper', 'soft', 'normal', 'loud', 'shout']
 # Speaking rate used for planning, words per second.
 PACE_WPS = {'slow': 2.1, 'normal': 2.7, 'fast': 3.3}
 
+# Production pace. Plans are authored in "story time"; compiling divides every
+# time quantity by the timeline pace, so pace 1.5 plays the same story in two
+# thirds of the time. Voices speak natively faster by speech_rate (no time
+# stretching); speech much faster than ~1.3x stops sounding natural, so the
+# remaining compression comes out of the pauses between lines.
+PACE_RANGE = (1.0, 2.0)
+SPEECH_RATE_RANGE = (0.8, 1.6)
+# Ceiling on the total speed-up of a voiced line: native speech_rate times any
+# tempo the line-fitting step applies afterwards.
+MAX_LINE_SPEEDUP = 1.5
+
 SFX_CUES = ['whoosh', 'pop', 'boing', 'thud', 'ding', 'coin', 'click', 'rumble', 'sizzle', 'swoosh_up', 'fail_horn',
             'sparkle', 'footstep', 'gasp_sting', 'drumroll', 'tada', 'beep']
 MUSIC_CUES = ['playful', 'tension', 'triumph', 'sad', 'mystery', 'chill', 'none']
