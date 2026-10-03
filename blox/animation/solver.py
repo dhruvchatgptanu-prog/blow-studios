@@ -991,6 +991,39 @@ def apply_shot_repairs(shot, params):
     return s
 
 
+def _blocked_frames(frames, chars, subj, f0):
+    """Frames in which another character's body is between the camera and the subject's face."""
+    c = chars[subj]
+    bad = []
+    for i, fr in enumerate(frames):
+        f = f0 + i
+        cam = np.array(fr['location'], dtype=float)
+        face = np.array([c.root_xy[f][0], c.root_xy[f][1], R.FACE_CENTER_Z * c.scale + c.root_z[f]])
+        if line_hits_others(cam, face, chars, subj, f):
+            bad.append(f)
+    return bad
+
+
+def line_hits_others(cam, face, chars, subj, f, near_subject=0.35):
+    """True when the sight line camera -> face passes through another character's body cylinder."""
+    seg = face - cam
+    length = float(np.linalg.norm(seg))
+    if length < 1e-6:
+        return False
+    stop = max(0.0, 1.0 - near_subject / length)
+    for oid, o in chars.items():
+        if oid == subj:
+            continue
+        ctr = np.array([o.root_xy[f][0], o.root_xy[f][1]])
+        rad = 0.42 * o.scale
+        top = (R.HEIGHT + 0.12) * o.scale + o.root_z[f]
+        for t in np.linspace(0.0, stop, 48):
+            p = cam + seg * t
+            if o.root_z[f] - 0.05 <= p[2] <= top and np.hypot(p[0] - ctr[0], p[1] - ctr[1]) < rad:
+                return True
+    return False
+
+
 def solve_camera(m, chars, n, repair=None):
     """Per-frame camera {location, look_at, lens} for the whole timeline."""
     from ..manifest.compile import camera_state
@@ -1028,7 +1061,14 @@ def solve_camera(m, chars, n, repair=None):
         follow_z.reset([0.0])
         face_z = R.FACE_CENTER_Z * (chars[subj].scale if subj in chars else 1.0)
         rnd = (zlib.crc32(shot['id'].encode()) % 1000) / 1000.0
-        for f in range(f0, min(n, shot['end_frame'])):
+        shot_rp = (((repair or {}).get('shots') or {}).get(shot['id'])) or {}
+
+        def frames_at(az_offset):
+            follow.reset(base_target)
+            follow_z.reset([0.0])
+            return [frame_at(f, az_offset) for f in range(f0, min(n, shot['end_frame']))]
+
+        def frame_at(f, az_offset):
             st = camera_state(shot, f)
             visible = st['visible_height_ratio'] * height
             dist = (visible / 2) / math.tan(vfov / 2)
@@ -1049,7 +1089,7 @@ def solve_camera(m, chars, n, repair=None):
             else:
                 target = base_target
             u = st['progress']
-            az = az0
+            az = az0 + az_offset
             if cam['move'] in ('orbit_left', 'orbit_right'):
                 az += (25.0 if cam['move'] == 'orbit_left' else -25.0) * u
             pitch = ANGLE_PITCH.get(cam['angle'], 0.0)
@@ -1071,9 +1111,29 @@ def solve_camera(m, chars, n, repair=None):
             if cam['shake'] > 0:
                 k = cam['shake'] * 0.015 * dist
                 look = look + np.array([k * math.sin(f * 0.9 + rnd * 7), 0.0, k * math.sin(f * 1.3 + rnd * 3)])
-            out[f] = {'shot': shot['id'], 'location': [round(float(v), 4) for v in loc],
-                      'look_at': [round(float(v), 4) for v in look], 'lens': lens,
-                      'sensor_width': SENSOR_W, 'framing': st['framing']}
+            return {'shot': shot['id'], 'location': [round(float(v), 4) for v in loc],
+                    'look_at': [round(float(v), 4) for v in look], 'lens': lens,
+                    'sensor_width': SENSOR_W, 'framing': st['framing']}
+
+        # Another character standing between the camera and the subject would hide the subject (or put
+        # the camera inside that character). Swing the camera around the subject to the nearest angle
+        # with the fewest blocked frames, the same for the whole shot so it does not jump.
+        frames = frames_at(0.0)
+        if subj in chars:
+            best = _blocked_frames(frames, chars, subj, f0)
+            if best:
+                offsets = [35, -35, 55, -55, 80, -80] + ([110, -110, 140, -140] if shot_rp.get('camera_clear') else [])
+                for off in offsets:
+                    trial = frames_at(float(off))
+                    bad = _blocked_frames(trial, chars, subj, f0)
+                    if len(bad) < len(best):
+                        frames, best = trial, bad
+                        for fr in frames:
+                            fr['occlusion_avoided_deg'] = off
+                    if not best:
+                        break
+        for i, fr in enumerate(frames):
+            out[f0 + i] = fr
     for f in range(n):
         if out[f] is None:
             out[f] = out[f - 1] if f else {'shot': None, 'location': [0, -6, 1.5], 'look_at': [0, 0, 1],

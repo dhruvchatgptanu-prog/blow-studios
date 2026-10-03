@@ -92,6 +92,7 @@ def run(ck, m, solved, tele, prefs, joined_path, dialog_by_line):
         _expressions(ck, m, cid, recs, gray, prefs)
         _lipsync(ck, m, cid, recs, gray, dialog_by_line)
     _camera(ck, m, tele)
+    _sightlines(ck, m, tele, solved)
     _props(ck, m, tele, solved)
     _identity(ck, m, tele, joined_path)
 
@@ -470,6 +471,52 @@ def _camera(ck, m, tele):
            frames=(jumps[0]['frame'] - 1, jumps[0]['frame']) if jumps else None,
            target={'kind': 'shot', 'id': jumps[0]['shot']} if jumps else None,
            repair={'action': 're_render_shot', 'shot': jumps[0]['shot'], 'params': {'camera_smooth': True}} if jumps else None)
+
+
+def _sightlines(ck, m, tele, solved):
+    """The shot's subject must not be hidden behind (or have the camera inside) another character.
+
+    Uses the evaluated scene: camera position, the subject's face and the other characters' positions,
+    with each body approximated by an upright cylinder.
+    """
+    scales = solved.get('scales', {})
+    for s in m['shots']:
+        subj = s['camera']['subject']
+        frames = [f for f in range(s['start_frame'], s['end_frame']) if tele.get(f)]
+        if not frames or subj not in tele[frames[0]]['characters']:
+            continue
+        blocked = []
+        for f in frames:
+            r = tele[f]
+            cam = np.array(r['camera']['location'], dtype=float)
+            face = np.array(r['characters'][subj]['face'], dtype=float)
+            seg = face - cam
+            length = float(np.linalg.norm(seg))
+            stop = max(0.0, 1.0 - 0.35 / max(length, 1e-6))
+            for oid, o in r['characters'].items():
+                if oid == subj:
+                    continue
+                sc = scales.get(oid, 1.0)
+                ctr, z0 = np.array(o['root'][:2], dtype=float), float(o['root'][2])
+                top = z0 + 2.22 * sc
+                pts = cam + np.outer(np.linspace(0.0, stop, 48), seg)
+                inside = (np.hypot(pts[:, 0] - ctr[0], pts[:, 1] - ctr[1]) < 0.42 * sc) & \
+                         (pts[:, 2] >= z0 - 0.05) & (pts[:, 2] <= top)
+                if inside.any():
+                    blocked.append((f, oid, bool(inside[0])))
+                    break
+        # The camera inside a character is always a defect; the subject briefly passing behind someone
+        # (a walk past) is normal staging unless it hides them for a large part of the shot.
+        inside = sum(1 for b in blocked if b[2])
+        bad = inside >= 3 or len(blocked) > max(15, 0.25 * len(frames))
+        ev = {'subject': subj, 'frames_blocked': len(blocked), 'shot_frames': len(frames),
+              'blocked_by': sorted({b[1] for b in blocked}), 'camera_inside_character': inside > 0,
+              'frames_camera_inside': inside, 'tolerance_frames': int(max(15, 0.25 * len(frames))),
+              'method': 'camera-to-face line vs character body cylinders in the evaluated scene'}
+        ck.add(f'sightline:{s["id"]}', f'Shot {s["id"]}: {subj} is not hidden behind another character', 'visual',
+               'fail' if bad else 'pass', 'critical', ev, 0.9, 'telemetry',
+               frames=(blocked[0][0], blocked[-1][0] + 1) if bad else None, target={'kind': 'shot', 'id': s['id']},
+               repair={'action': 're_render_shot', 'shot': s['id'], 'params': {'camera_clear': True}} if bad else None)
 
 
 def _props(ck, m, tele, solved):
