@@ -6,6 +6,30 @@ everywhere it appears and is not presented as AI output or as research-driven.
 """
 import copy
 
+# How the free Piper voices were cast (2026-10). Nobody could listen, so LibriTTS speakers were auditioned by
+# measurement: every 6th of the 904 speakers read one test line, then 55 candidates read three more (narration,
+# a shout, a verdict) and the finalists ten more at production speed. Measured: median pitch (YIN), pitch spread
+# in semitones (liveliness), spectral centroid (brightness) and natural words/second. Picks are spaced on a pitch
+# ladder after the pitch shift (Pip ~98, Ms. Tally ~124, Bloxy ~143, Rook ~180, Dot ~276 Hz) and differ in spread,
+# brightness and pace, so each recurring character is recognisable by ear. Qualities only: no voice was chosen to
+# resemble any person or creator.
+CASTING = {
+    'ch_bloxy': 'Piper LibriTTS speaker 744: mid pitch (~143 Hz median at production speed), the liveliest '
+                'candidate in range (2.9 st spread), bright, crisp 3.7 w/s natural rate; confident storytime '
+                'narrator. About 5 w/s at speech rate 1.3, so narration is not sped up further (set '
+                'narration_length_scale below 1 to do so).',
+    'ch_pip': 'Piper LibriTTS speaker 288: the low end of the cast (~98 Hz), dark and dry; slightly slower (x1.04) '
+              'with less variation (0.6/0.7), the half-beat-late sidekick.',
+    'ch_rook': 'Piper LibriTTS speaker 456 +2 st (~160 -> ~180 Hz): higher and brighter than Bloxy, nasal-bright '
+               'timbre (centroid ~3.9 kHz), naturally slow 3.2 w/s drawl for brags; livelier variation (0.75/0.92).',
+    'ch_dot': 'Piper LibriTTS speaker 408 +4 st with shifted formants (~219 -> ~276 Hz): light and lively '
+              '(2.9 st spread); the shifted formants read as a smaller, younger speaker. Livelier variation '
+              '(0.75/0.9).',
+    'ch_tally': 'Piper LibriTTS speaker 504 -2 st (~139 -> ~124 Hz), formants preserved: the steadiest candidate '
+                'measured (1.1 st spread), between Pip and Bloxy on the pitch ladder; slower (x1.1) with subdued '
+                'variation (0.5/0.6) for deadpan verdicts.',
+}
+
 CHARACTERS = [
     {
         'id': 'ch_bloxy',
@@ -25,7 +49,9 @@ CHARACTERS = [
         'voice': {'openai_voice': 'verse',
                   'openai_instructions': 'Young, bright, energetic adventurer. Expressive, natural, not cartoonish.',
                   'elevenlabs_voice_id': '', 'local_test_voice': 'kal16', 'pitch_semitones': 0,
-                  'piper_speaker': 60, 'rights_note': 'Piper LibriTTS model (CC BY 4.0) / provider catalogue voices'},
+                  'piper_speaker': 744, 'piper_noise_scale': 0.72, 'piper_noise_w': 0.88,
+                  'casting_note': CASTING['ch_bloxy'],
+                  'rights_note': 'Piper LibriTTS model (CC BY 4.0) / provider catalogue voices'},
     },
     {
         'id': 'ch_pip',
@@ -43,9 +69,96 @@ CHARACTERS = [
         'voice': {'openai_voice': 'sage',
                   'openai_instructions': 'Calm, dry, gently teasing friend. Natural conversational timing.',
                   'elevenlabs_voice_id': '', 'local_test_voice': 'slt', 'pitch_semitones': 0,
-                  'piper_speaker': 288, 'rights_note': 'Piper LibriTTS model (CC BY 4.0) / provider catalogue voices'},
+                  'piper_speaker': 288, 'piper_length_scale': 1.04, 'piper_noise_scale': 0.6, 'piper_noise_w': 0.7,
+                  'casting_note': CASTING['ch_pip'],
+                  'rights_note': 'Piper LibriTTS model (CC BY 4.0) / provider catalogue voices'},
+    },
+    {
+        'id': 'ch_rook',
+        'name': 'Rook',
+        'bible': {
+            'summary': 'Show-off rival from the next obby over who has to win everything, loudly. Vain and '
+                       'competitive but never cruel; secretly worried nobody would notice him if he stopped winning.',
+            'personality': 'Brags with a slow drawl, poses for cameras that are not there, sulks for a second when '
+                           'he loses, then turns out decent when it counts. Teases skills and plans, never looks. '
+                           'Redeemable: he helps in the end more often than he admits.',
+            'scale': 1.05,
+            'palette': {'skin': '#C68B59', 'top': '#E3B23C', 'top2': '#1B1B2F', 'top_trim': '#FFFFFF',
+                        'pants': '#1B1B2F', 'shoes': '#F4F1DE', 'hair': '#2B1D14', 'eyes': '#16161D',
+                        'brows': '#2B1D14', 'mouth': '#5B1A1A', 'badge': '#5BC0EB', 'accessory': '#E3B23C',
+                        'hat': '#1B1B2F'},
+            'costume': {'hair': 'spiky', 'hat': 'cap_backwards', 'eyewear': 'sunglasses', 'top': 'jacket',
+                        'tie': False, 'badge': 'diamond'},
+            # Brag moments swap the backwards cap for a gold crown (accessory colour).
+            'costume_variants': {'brag': {'hat': 'crown'}},
+            'visual_rules': ['Navy jacket open over a gold tee, white trim', 'Light-blue diamond badge on the jacket',
+                             'Spiky dark hair, black sunglasses always on',
+                             'Navy cap worn backwards; a gold crown replaces it only in brag moments',
+                             'Navy trousers and cream trainers', 'Slightly taller than Bloxy'],
+        },
+        'voice': {'openai_voice': 'ash',
+                  'openai_instructions': 'Cocky, bright show-off with a slight drawl on brags; whiny but harmless when '
+                                         'he loses. Playful, never mean.',
+                  'elevenlabs_voice_id': '', 'local_test_voice': 'rms', 'pitch_semitones': 2,
+                  'piper_speaker': 456, 'piper_noise_scale': 0.75, 'piper_noise_w': 0.92,
+                  'casting_note': CASTING['ch_rook'],
+                  'rights_note': 'Piper LibriTTS model (CC BY 4.0) / provider catalogue voices'},
+    },
+    {
+        'id': 'ch_dot',
+        'name': 'Dot',
+        'bible': {
+            'summary': "Pip's little sister: tiny, earnest and blunt, a genius builder who fixes in five minutes what "
+                       'the others broke in fifty.',
+            'personality': 'Says exactly what she thinks in one to six words, takes every plan literally, builds '
+                           'gadgets out of spare blocks and usually gets the last word. Proud of her brother, would '
+                           'never say so.',
+            'scale': 0.72,
+            'palette': {'skin': '#E9B48A', 'top': '#FF6F91', 'top_trim': '#FFD23F', 'pants': '#18A999',
+                        'shoes': '#F4F1DE', 'hair': '#1F1A17', 'eyes': '#16161D', 'brows': '#1F1A17',
+                        'mouth': '#5B1A1A', 'badge': '#FFD23F', 'accessory': '#FF6F91'},
+            'costume': {'hair': 'pigtails', 'hat': 'bow', 'eyewear': None, 'top': 'hoodie', 'tie': False,
+                        'badge': 'star'},
+            'visual_rules': ['Coral hoodie with yellow trim', 'Coral bow on top of black pigtails',
+                             'Yellow star badge', 'Teal trousers and cream trainers',
+                             'Smallest of the cast (about knee-to-shoulder of Bloxy)'],
+        },
+        'voice': {'openai_voice': 'coral',
+                  'openai_instructions': 'Small, earnest kid sister. Short, blunt, matter-of-fact lines; mischievous '
+                                         'when she lands the last word.',
+                  'elevenlabs_voice_id': '', 'local_test_voice': 'slt', 'pitch_semitones': 4,
+                  'pitch_formants': 'shift', 'piper_speaker': 408, 'piper_noise_scale': 0.75, 'piper_noise_w': 0.9,
+                  'casting_note': CASTING['ch_dot'],
+                  'rights_note': 'Piper LibriTTS model (CC BY 4.0) / provider catalogue voices'},
+    },
+    {
+        'id': 'ch_tally',
+        'name': 'Ms. Tally',
+        'bible': {
+            'summary': 'The obby teacher and referee: fair, deadpan and impossible to rattle. Secretly a retired obby '
+                       'champion who can still clear any course without spilling her cup.',
+            'personality': 'Speaks in short verdicts, keeps score, sides with whoever played fair and never raises '
+                           'her voice. One raised eyebrow does more than a lecture.',
+            'scale': 1.12,
+            'palette': {'skin': '#A0674B', 'top': '#2E4057', 'top2': '#E1A140', 'top_trim': '#E1A140',
+                        'pants': '#6D2E46', 'shoes': '#5B3A21', 'hair': '#9AA0A6', 'eyes': '#16161D',
+                        'brows': '#6B7076', 'mouth': '#5B1A1A', 'badge': '#E2504C', 'accessory': '#3B3B44'},
+            'costume': {'hair': 'bun', 'hat': None, 'eyewear': 'glasses', 'top': 'cardigan', 'tie': False,
+                        'badge': 'star'},
+            'visual_rules': ['Mustard cardigan over a slate-blue top', 'Grey hair in a neat bun',
+                             'Dark rectangular glasses', 'Red star badge (referee)',
+                             'Plum trousers and brown shoes', 'Tallest of the cast'],
+        },
+        'voice': {'openai_voice': 'shimmer',
+                  'openai_instructions': 'Low, flat, deadpan teacher and referee. Measured verdicts, never loud.',
+                  'elevenlabs_voice_id': '', 'local_test_voice': 'awb', 'pitch_semitones': -2,
+                  'piper_speaker': 504, 'piper_length_scale': 1.1, 'piper_noise_scale': 0.5, 'piper_noise_w': 0.6,
+                  'casting_note': CASTING['ch_tally'],
+                  'rights_note': 'Piper LibriTTS model (CC BY 4.0) / provider catalogue voices'},
     },
 ]
+# Ids added after the first release (seeded by migration 0005 on existing installs).
+NEW_CAST_IDS = ('ch_rook', 'ch_dot', 'ch_tally')
 
 
 def _k(t, **pose):

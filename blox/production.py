@@ -11,7 +11,7 @@ import os
 
 from .animation import blender as BL, solver as SV
 from .assembly import assemble
-from .manifest import compile as C, validate as V
+from .manifest import compile as C, schema as S, validate as V
 from .voice import tts
 
 
@@ -107,6 +107,8 @@ def envelopes(m, results):
     fps, n = m['fps'], m['duration_frames']
     out = {}
     for ln in m['lines']:
+        if not S.lip_synced(ln):
+            continue  # narration is voice-over: the narrator's jaw does not follow it
         r = (results or {}).get(ln['id'])
         if not r or not r.get('file') or not os.path.exists(r['file']):
             continue

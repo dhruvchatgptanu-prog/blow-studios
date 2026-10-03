@@ -53,7 +53,7 @@ def test_piper_line_is_natural_free_and_credited(db, voices, tmp_path):
     assert res['alignment_kind'] == 'estimated' and res['words']
     assert res['voice_meta']['license'] == 'CC BY 4.0' and 'LibriTTS' in res['voice_meta']['attribution']
     args = voices[-1]
-    assert args[args.index('-s') + 1] == '60'
+    assert args[args.index('-s') + 1] == '744'  # Bloxy's re-auditioned default speaker
     assert float(args[args.index('--length-scale') + 1]) < 1.0, 'fast pace speaks quicker'
     assert tts.estimate_cost(line['text'], 'piper', p['budget']['prices']) == 0.0
 

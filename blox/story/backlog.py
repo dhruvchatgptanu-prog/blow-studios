@@ -28,6 +28,8 @@ def add(plans, source, p, d=None):
     if len(plans) > MAX_BATCH:
         raise ValueError(f'At most {MAX_BATCH} stories per import')
     pr = p['production']
+    from .. import repo
+    chars = repo.characters(active_only=False, d=d)
     out = []
     for plan in plans:
         title = str((plan or {}).get('title', 'Untitled'))[:100] if isinstance(plan, dict) else 'Untitled'
@@ -36,7 +38,7 @@ def add(plans, source, p, d=None):
             continue
         try:
             m = C.compile_plan(plan, fps=pr['fps'], width=pr['width'], height=pr['height'], **C.pace_kwargs(p))
-            rep = validate(m, p)
+            rep = validate(m, p, characters=chars)
         except (ValueError, KeyError, TypeError) as e:
             out.append({'title': title, 'status': 'rejected', 'reason': f'Could not compile: {e}'[:300]})
             continue

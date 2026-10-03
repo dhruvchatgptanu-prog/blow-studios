@@ -82,6 +82,7 @@ def plan_schema(cast_ids, character_ids):
                                           'size': {'type': ['array', 'null'], 'items': N}, 'rotation': N,
                                           'color': STR}))}),
         'cast': arr(obj({'id': enum(cast_ids), 'character_id': enum(character_ids)})),
+        'narrator': enum(cast_ids, True),
         'shots': arr(obj({'id': STR, 'start_s': N, 'end_s': N, 'transition_in': enum(S.TRANSITIONS),
                           'camera': obj({'subject': STR, 'framing_start': enum(S.FRAMINGS),
                                          'framing_end': enum(S.FRAMINGS), 'angle': enum(S.CAMERA_ANGLES),
@@ -105,7 +106,8 @@ def plan_schema(cast_ids, character_ids):
                             'anticipation_frames': N, 'main_frames': N, 'follow_through_frames': N, 'hold_frames': N,
                             'hand': enum(['left', 'right'], True), 'prop': {'type': ['string', 'null']},
                             'to': {'type': ['array', 'null'], 'items': N}, 'to_facing': NN})),
-        'lines': arr(obj({'id': STR, 'speaker': enum(cast_ids + ['narrator']), 'text': STR, 't': N,
+        'lines': arr(obj({'id': STR, 'speaker': enum(cast_ids + ['narrator']), 'kind': enum(S.LINE_KINDS),
+                          'text': STR, 't': N,
                           'emotion': enum(S.EMOTIONS), 'pace': enum(S.PACES), 'volume': enum(S.VOLUMES),
                           'pause_after_ms': N, 'delivery': STR})),
         'sfx': arr(obj({'cue': enum(S.SFX_CUES), 't': N, 'gain_db': N})),
@@ -118,6 +120,8 @@ def plan_schema(cast_ids, character_ids):
 def to_plan(data):
     """LLM list form -> authoring plan accepted by compile_plan."""
     p = copy.deepcopy(data)
+    if p.get('narrator') is None:
+        p.pop('narrator', None)
     perf = {}
     for k in p.pop('performance', []):
         key = {'t': k['t']}
@@ -225,8 +229,12 @@ EXAMPLE = {
     'actions': [{'character': 'hero', 'type': 'jump', 't': 12.4, 'anticipation_frames': 8, 'main_frames': 16,
                  'follow_through_frames': 8, 'hold_frames': 4, 'hand': None, 'prop': None, 'to': [3.0, 0.4],
                  'to_facing': None}],
-    'lines': [{'id': 'l1', 'speaker': 'hero', 'text': "Wait... where's the next platform?!", 't': 0.4,
-               'emotion': 'startled', 'pace': 'fast', 'volume': 'loud', 'pause_after_ms': 0, 'delivery': ''}],
+    'narrator': 'hero',
+    'lines': [{'id': 'l1', 'speaker': 'hero', 'kind': 'dialogue', 'text': "Wait... where's the next platform?!",
+               't': 0.4, 'emotion': 'startled', 'pace': 'fast', 'volume': 'loud', 'pause_after_ms': 0, 'delivery': ''},
+              {'id': 'l2', 'speaker': 'hero', 'kind': 'narration',
+               'text': 'So I did what any genius would do. I panicked.', 't': 2.6, 'emotion': 'smug', 'pace': 'fast', 'volume': 'normal', 'pause_after_ms': 0,
+               'delivery': 'deadpan storytime narration'}],
 }
 
 
@@ -250,6 +258,11 @@ def plan_rules(prefs):
         'the camera (camera side is relative to the subject\'s facing at the shot start).',
         'Lines are short (2-9 words). Speaking rate: fast 3.3, normal 2.7, slow 2.1 words/s plus pauses; leave room '
         'before the next line. Only one character speaks at a time.',
+        'Line kind: "dialogue" is spoken on screen with lip sync, so frame the speaker. "narration" is first-person '
+        'storytime voice-over: set "narrator" to the cast id of the protagonist and let them narrate in the past '
+        'tense with speech tags between the quoted dialogue lines ("I froze.", "he snapped"); narration lines use '
+        'the narrator as speaker, are captioned, have no lip sync (the narrator\'s mouth stays closed on screen) and '
+        'may play over any shot. Use null for "narrator" and only dialogue for a plain skit.',
         'Actions of the same character must not overlap on the same body part (one full-body action at a time; '
         'hand actions use one hand).',
         'grab/reach/push need the character within 0.9 m of the prop. Holdable props: ' + ', '.join(sorted(S.HOLDABLE)) + '.',

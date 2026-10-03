@@ -65,7 +65,7 @@ def validate(m, prefs=None, characters=None, measured=False):
               fix='Adjust duration_s or the length settings' + (
                   f'; at pace {pace:g} the story needs {min_s * pace:g}-{max_s * pace:g}s of duration_s'
                   if pace != 1.0 else ''))
-    _structure(r, m)
+    _structure(r, m, characters)
     if r.errors:
         return r.as_dict({'duration_s': round(D / fps, 3)})
     _timeline(r, m)
@@ -85,7 +85,7 @@ def validate(m, prefs=None, characters=None, measured=False):
     return r.as_dict(stats)
 
 
-def _structure(r, m):
+def _structure(r, m, characters=None):
     cast_ids = []
     for c in m.get('cast', []):
         if not isinstance(c, dict) or not c.get('id'):
@@ -94,6 +94,10 @@ def _structure(r, m):
         if c['id'] in cast_ids:
             r.err('cast', f'Duplicate cast id {c["id"]}')
         cast_ids.append(c['id'])
+        if characters is not None and c.get('character_id') not in characters:
+            r.err('cast_character', f'Cast {c["id"]} uses unknown character {c.get("character_id")!r}',
+                  fix='Use a character from the Characters page (for example ' +
+                      ', '.join(sorted(characters)[:6]) + ')')
     if not cast_ids and any(s.get('renderer') != 'clip' for s in m.get('shots', [])):
         r.err('cast', 'At least one character is required for animated shots')
     st = m.get('setting', {})
@@ -164,12 +168,22 @@ def _structure(r, m):
         if a['type'] == 'turn' and a['params'].get('to_facing') is None:
             r.err('action_params', f'Action {a["id"]} (turn) needs params.to_facing')
     line_ids = set()
+    narrator = m.get('narrator')
+    if narrator is not None and narrator not in cast_ids:
+        r.err('narrator', f'The narrator {narrator!r} is not in the cast', fix='Name a cast id as the narrator')
     for ln in m['lines']:
         if ln['id'] in line_ids:
             r.err('lines', f'Duplicate line id {ln["id"]}')
         line_ids.add(ln['id'])
         if ln['speaker'] not in cast_ids and ln['speaker'] != 'narrator':
             r.err('lines', f'Line {ln["id"]} has unknown speaker {ln["speaker"]!r}')
+        kind = ln.get('kind', 'dialogue')
+        if kind not in S.LINE_KINDS:
+            r.err('enum', f'Line {ln["id"]}: kind {kind!r} unknown')
+        elif kind == 'narration' and narrator is not None and ln['speaker'] != narrator:
+            r.err('narration_speaker', f'Narration line {ln["id"]} is spoken by {ln["speaker"]!r} but the narrator '
+                                       f'is {narrator!r}', fix='Narration is read by the plan narrator; make the line '
+                                                               'dialogue or change its speaker')
         if not ln['text']:
             r.err('lines', f'Line {ln["id"]} is empty')
         if ln['emotion'] not in S.EMOTIONS:
@@ -351,8 +365,9 @@ def _dialogue(r, m, measured):
             r.warn('crosstalk', f'Lines {a["id"]} and {b["id"]} overlap', frames=(b['start_frame'], end[a['id']]))
     cast = {c['id'] for c in m['cast']}
     for ln in lines:
-        if ln['speaker'] in cast:
-            # Visible speech needs the speaker on screen with a readable face.
+        if ln['speaker'] in cast and S.lip_synced(ln):
+            # Visible speech needs the speaker on screen with a readable face (narration is voice-over and may
+            # run over any shot).
             for b in m['beats']:
                 if b['start_frame'] <= ln['start_frame'] < b['end_frame'] and b['camera']:
                     cam = b['camera']['start']

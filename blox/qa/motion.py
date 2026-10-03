@@ -11,6 +11,7 @@ import numpy as np
 
 from .. import config, media
 from ..animation import rig as R
+from ..manifest import schema as S
 from ..voice import audio as A
 
 GW, GH = 216, 384
@@ -363,6 +364,9 @@ def _lipsync(ck, m, cid, recs, gray, dialog_by_line):
     for ln in m['lines']:
         if ln['speaker'] != cid:
             continue
+        if not S.lip_synced(ln):
+            _voiceover(ck, m, cid, ln, recs, dialog_by_line)
+            continue
         a, b = ln['start_frame'], ln['est_end_frame']
         shot = shot_at(m, a)
         vis = [f for f in range(a, b) if recs.get(f) and on_screen(recs[f]) and recs[f]['face_dot'] > 0.2
@@ -445,6 +449,37 @@ def _lipsync(ck, m, cid, recs, gray, dialog_by_line):
         ck.add(f'lipsync:{ln["id"]}', f'Lip sync for line {ln["id"]} ({cid})', 'visual', status, 'major', ev, conf,
                'telemetry+pixel+audio', frames=(a, b), target={'kind': 'shot', 'id': shot['id'] if shot else None},
                repair=repair)
+
+
+def _voiceover(ck, m, cid, ln, recs, dialog_by_line):
+    """Narration is voice-over: lip sync does not apply, and the narrator's mouth must not mouth it on screen."""
+    a, b = ln['start_frame'], ln['est_end_frame']
+    ck.add(f'lipsync:{ln["id"]}', f'Lip sync for line {ln["id"]}', 'visual', 'skipped', 'info',
+           {'reason': 'Narration is voice-over; the narrator does not lip-sync it'}, 0.95, 'manifest',
+           frames=(a, b), target={'kind': 'line', 'id': ln['id']})
+    vis = [f for f in range(a, b) if recs.get(f) and on_screen(recs[f]) and recs[f]['face_dot'] > 0.2
+           and recs[f]['face_height_frac'] > 0.05]
+    env = dialog_by_line.get(ln['id'])
+    if len(vis) < 0.5 * max(1, b - a) or env is None or not len(env):
+        ck.add(f'voiceover:{ln["id"]}', f'Narrator stays silent on screen during narration {ln["id"]}', 'visual',
+               'skipped', 'info', {'reason': 'Narrator face not on screen for most of the narration'}, 0.9,
+               'telemetry', frames=(a, b), target={'kind': 'line', 'id': ln['id']})
+        return
+    mouth = np.array([recs[f]['mouth_open'] if recs.get(f) else 0 for f in range(a, b)])
+    e = np.interp(np.arange(len(mouth)), np.linspace(0, len(mouth) - 1, len(env)), env)
+    corr = 0.0
+    if mouth.std() > 0.02:
+        for L in range(-4, 5):
+            x, y = (mouth[L:], e[:len(e) - L]) if L >= 0 else (mouth[:L], e[-L:])
+            if len(x) > 5 and x.std() > 1e-6 and y.std() > 1e-6:
+                corr = max(corr, float(np.corrcoef(x, y)[0, 1]))
+    ok = corr < 0.5
+    shot = shot_at(m, a)
+    ck.add(f'voiceover:{ln["id"]}', f'Narrator stays silent on screen during narration {ln["id"]} ({cid})', 'visual',
+           'pass' if ok else 'fail', 'minor',
+           {'mouth_voice_correlation': round(corr, 3), 'mouth_open_std': round(float(mouth.std()), 4),
+            'visible_frames': len(vis), 'method': 'scene mouth opening vs narration voice envelope (should not follow)'},
+           0.7, 'telemetry+audio', frames=(a, b), target={'kind': 'shot', 'id': shot['id'] if shot else None})
 
 
 def _camera(ck, m, tele):

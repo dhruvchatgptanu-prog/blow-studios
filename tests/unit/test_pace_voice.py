@@ -49,10 +49,11 @@ LINE = {'id': 'l1', 'speaker': 'hero', 'text': 'Wait... where is it?', 'emotion'
 
 
 def test_piper_speaks_faster_through_length_scale():
+    # Calibrated: Piper delivers 1.3x at length_scale 0.628 (1/1.3 = 0.769 measured only ~1.12x).
     assert piper.delivery(LINE)[0] == 1.0
-    assert piper.delivery(dict(LINE, speech_rate=1.3))[0] == round(1 / 1.3, 3)
+    assert piper.delivery(dict(LINE, speech_rate=1.3))[0] == 0.628
     fast = dict(LINE, pace='fast', emotion='sad', speech_rate=1.3)
-    assert piper.delivery(fast)[0] == round(0.9 * 1.04 / 1.3, 3)
+    assert piper.delivery(fast)[0] == 0.548  # requested 1.3 / (0.9 * 1.04) = 1.389x
     assert piper.delivery(dict(LINE, speech_rate='bogus'))[0] == 1.0
 
 
@@ -65,8 +66,8 @@ def test_synthesis_passes_the_rate_and_keeps_old_cache_keys(db, piper_calls, tmp
     quick = tts.synthesize_line(dict(LINE, speech_rate=1.3), who, p, str(tmp_path / 'v'), 'vid1')
     assert quick['spec_hash'] != old['spec_hash']
     args = piper_calls[-1]
-    assert float(args[args.index('--length-scale') + 1]) == pytest.approx(1 / 1.3, abs=1e-3)
-    assert quick['voice_meta']['controls']['length_scale'] == pytest.approx(1 / 1.3, abs=1e-3)
+    assert float(args[args.index('--length-scale') + 1]) == pytest.approx(0.628, abs=1e-3)
+    assert quick['voice_meta']['controls']['length_scale'] == pytest.approx(0.628, abs=1e-3)
 
 
 @pytest.fixture

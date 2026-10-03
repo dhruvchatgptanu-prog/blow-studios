@@ -1,4 +1,5 @@
-"""PCM helpers built on FFmpeg + numpy (decode, measure, trim, normalise, write)."""
+"""PCM helpers built on FFmpeg + numpy (decode, measure, trim, normalise, pitch-shift, write)."""
+import functools
 import json
 import re
 import wave
@@ -111,3 +112,69 @@ def peak_dbfs(a):
 
 def clipped_fraction(a, level=0.999):
     return float(np.mean(np.abs(a) >= level)) if len(a) else 0.0
+
+
+def squeeze_gaps(a, max_gap_s, sr=SR, threshold_db=-45.0, win_s=0.01):
+    """Shorten every internal silence longer than ``max_gap_s`` to ``max_gap_s`` (the cut is made in the middle
+    of the silence, so no voiced sample is touched). Returns (samples, seconds_removed)."""
+    env = db(rms_envelope(a, sr, win_s))
+    n = max(1, int(sr * win_s))
+    quiet = env <= threshold_db
+    keep_s = int(max_gap_s * sr)
+    cuts = []
+    i = 0
+    while i < len(quiet):
+        if not quiet[i]:
+            i += 1
+            continue
+        j = i
+        while j < len(quiet) and quiet[j]:
+            j += 1
+        # Only silences with voice on both sides (leading/trailing silence is trim_silence's job).
+        if i > 0 and j < len(quiet) and (j - i) * n > keep_s:
+            s0 = i * n + keep_s // 2
+            cuts.append((s0, s0 + (j - i) * n - keep_s))
+        i = j
+    if not cuts:
+        return a, 0.0
+    parts, prev = [], 0
+    for s0, s1 in cuts:
+        parts.append(a[prev:s0])
+        prev = s1
+    parts.append(a[prev:])
+    return np.concatenate(parts), round(sum(s1 - s0 for s0, s1 in cuts) / sr, 3)
+
+
+@functools.lru_cache(maxsize=None)
+def ffmpeg_filters():
+    """Names of the audio/video filters this FFmpeg build provides."""
+    out, _ = media.run([config.FFMPEG_BIN, '-hide_banner', '-filters'], timeout=60)
+    return frozenset(re.findall(r'^\s*[.A-Z|]{3}\s+(\w+)\s', out.decode(errors='replace'), re.M))
+
+
+def has_filter(name):
+    try:
+        return name in ffmpeg_filters()
+    except media.MediaError:
+        return False
+
+
+def pitch_filter(semitones, formants='preserve', sr=SR):
+    """FFmpeg filter chain that shifts pitch by ``semitones`` and keeps the duration.
+
+    With librubberband (``rubberband`` filter) the formants are preserved by default, so a shifted voice keeps its
+    natural timbre; ``formants='shift'`` moves them with the pitch (a smaller, younger-sounding speaker). Without
+    it, the fallback resamples: asetrate raises the pitch and the formants together (the "chipmunk" effect),
+    aresample restores the sample rate and atempo restores the duration. That fallback cannot preserve formants,
+    so it sounds natural only within about +/-2 semitones."""
+    r = 2.0 ** (float(semitones) / 12.0)
+    if has_filter('rubberband'):
+        return (f'rubberband=pitch={r:.6f}:formant={"shifted" if formants == "shift" else "preserved"}'
+                ':pitchq=quality')
+    return f'aresample={sr},asetrate={sr * r:.3f},aresample={sr},atempo={1.0 / r:.6f}'
+
+
+def apply_filter(src, dst, af, sr=SR):
+    media.run([config.FFMPEG_BIN, '-y', '-v', 'error', '-i', str(src), '-af', af, '-ar', str(sr), '-ac', '1',
+               str(dst)], timeout=300)
+    return dst

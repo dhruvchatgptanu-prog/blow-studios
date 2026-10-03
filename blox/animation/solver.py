@@ -826,8 +826,8 @@ class CharacterSolver:
         talks = [a for a in self.actions if a['type'] == 'talk']
         self.speech = []
         for ln in self.m['lines']:
-            if ln['speaker'] != self.cid:
-                continue
+            if not S.lip_synced(ln, self.cid):
+                continue  # narration is voice-over: no talking gestures, mouth stays closed/reacting
             a, b = ln['start_frame'], min(n, ln['est_end_frame'])
             if b - a < 3:
                 continue
@@ -1021,7 +1021,7 @@ class CharacterSolver:
         mode = ['speak' if speak[f] > 0.5 else 'listen' if listen[f] * quiet[f] > 0.5 else 'idle' for f in range(n)]
         L['sacc'] = LF.saccade_track(n, fps, cid, mode)
         avert = np.zeros((n, 2))
-        own_lines = [ln for ln in self.m['lines'] if ln['speaker'] == cid]
+        own_lines = [ln for ln in self.m['lines'] if S.lip_synced(ln, cid)]
         for f0, f1, (x, z) in LF.gaze_aversions(own_lines, fps, cid):
             for f in range(max(0, f0), min(n, f1 + 3)):
                 k = min(1.0, (f - f0 + 1) / 2.0, (f1 + 3 - f) / 3.0)
@@ -1620,7 +1620,7 @@ def build_visemes(m, cid, n, alignments):
     keys = []
     kinds = set()
     for ln in m['lines']:
-        if ln['speaker'] != cid:
+        if not S.lip_synced(ln, cid):
             continue
         al = (alignments or {}).get(ln['id'])
         start_s = ln['start_frame'] / fps
@@ -1958,7 +1958,7 @@ def solve(m, bibles, alignments=None, repair=None, envelopes=None):
         cs.line_frames = set()
         cs.mouth_repair = {}
         for ln in m['lines']:
-            if ln['speaker'] == cid:
+            if S.lip_synced(ln, cid):
                 cs.line_frames.update(range(ln['start_frame'], ln['est_end_frame']))
                 lr = ((repair or {}).get('lines') or {}).get(ln['id'])
                 if lr:
@@ -1970,7 +1970,7 @@ def solve(m, bibles, alignments=None, repair=None, envelopes=None):
             viseme_kinds[cid] = viseme_kinds[cid] + ['amplitude_from_audio']
     # Every character's speech is planned first: listeners react to the speaker's stressed words.
     for cid, cs in chars.items():
-        cs.plan_speech({ln['id']: line_word_frames(m, ln, alignments) for ln in m['lines'] if ln['speaker'] == cid})
+        cs.plan_speech({ln['id']: line_word_frames(m, ln, alignments) for ln in m['lines'] if S.lip_synced(ln, cid)})
     frames = {cid: cs.solve(lambda f: camera[f]['location']) for cid, cs in chars.items()}
     return {'n': n, 'fps': m['fps'], 'camera': camera, 'characters': frames, 'viseme_timing': viseme_kinds,
             'scales': {cid: cs.scale for cid, cs in chars.items()}, 'props': solve_props(m, frames, n),

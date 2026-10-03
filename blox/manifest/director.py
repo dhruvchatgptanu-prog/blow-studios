@@ -166,6 +166,9 @@ def beat_text(m, beat, names):
         ln = lines[lid]
         if ln['start_frame'] >= beat['start_frame']:
             spk = names.get(ln['speaker'], ln['speaker']).upper()
+            if ln.get('kind') == 'narration':
+                # Storytime voice-over: captioned, no lip sync, may play over any shot.
+                spk += ' (V.O. narration, mouth closed)'
             note = f', {ln["delivery"]}' if ln['delivery'] else ''
             pause = f' Pause {ln["pause_after_ms"]} ms after.' if ln['pause_after_ms'] else ''
             out.append(f'  {spk} ({ln["emotion"]}, {ln["pace"]}, {ln["volume"]}{note}) at {tc(ln["start_frame"], fps)}: '
@@ -220,6 +223,9 @@ def script(m, character_names=None):
         '',
     ]
     pace = m.get('pace') or {}
+    if m.get('narrator'):
+        head.insert(-1, f'Narrator: {names.get(m["narrator"], m["narrator"])} reads the narration lines as voice-over '
+                        '(past tense, captioned, no lip sync).')
     if pace.get('timeline', 1.0) != 1.0 or pace.get('speech_rate', 1.0) != 1.0:
         head.insert(-1, f'Pace: the story plays {pace.get("timeline", 1.0):g}x faster than written (beats are one '
                         f'second of story time each); voices speak {pace.get("speech_rate", 1.0):g}x faster.')

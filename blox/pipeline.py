@@ -181,7 +181,7 @@ def develop_step(v, p, d, chars):
             item = backlog.get(meta['backlog_id'], d)
             m = C.compile_plan(item['plan'], fps=pr['fps'], width=pr['width'], height=pr['height'],
                                **C.pace_kwargs(p))
-            rep = V.validate(m, p)
+            rep = V.validate(m, p, characters=repo.characters(active_only=False, d=d))
             if not rep['ok']:
                 raise Blocked('Backlog story no longer validates with the current settings: ' +
                               rep['errors'][0]['message'], state='needs_review')

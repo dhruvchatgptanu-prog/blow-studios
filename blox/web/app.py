@@ -21,6 +21,7 @@ from ..manifest import compile as C, director, schema as S, validate as V
 from ..research import service as research, transcripts, youtube_api as Y
 from ..timeutil import fmt, slot_times
 from ..util import Blocked, now
+from ..voice import piper as piper_mod
 from ..youtube import oauth
 from . import security
 from .assets import register as register_assets
@@ -297,8 +298,10 @@ def create_app():
         plan_body = (request.get_json(force=True) or {}).get('plan')
         pr = p['production']
         m = C.compile_plan(plan_body, fps=pr['fps'], width=pr['width'], height=pr['height'], **C.pace_kwargs(p))
-        rep = V.validate(m, p)
-        return jsonify(validation=rep, script=director.script(m), beats=len(m['beats']))
+        chars = repo.characters(active_only=False)
+        rep = V.validate(m, p, characters=chars)
+        names = {c['id']: chars.get(c.get('character_id'), {}).get('name', c['id']) for c in m['cast']}
+        return jsonify(validation=rep, script=director.script(m, names), beats=len(m['beats']))
 
     @app.post('/api/videos/<vid>/<action>')
     def video_action(vid, action):
@@ -641,10 +644,13 @@ def create_app():
     @app.get('/api/characters')
     def get_characters():
         return jsonify(characters=repo.characters(active_only=False),
-                       vocab={'palette_slots': ['skin', 'top', 'top_trim', 'pants', 'shoes', 'hair', 'eyes', 'brows',
-                                                'mouth', 'badge', 'hat'],
-                              'tops': ['hoodie', 'tee'], 'hair': ['messy_block', 'short_block', None],
-                              'hats': ['cap', None], 'badges': ['star', None]})
+                       vocab={'palette_slots': ['skin', 'top', 'top2', 'top_trim', 'pants', 'shoes', 'hair', 'eyes',
+                                                'brows', 'mouth', 'badge', 'hat', 'accessory'],
+                              'tops': list(S.COSTUME['top']), 'hair': list(S.COSTUME['hair']),
+                              'hats': list(S.COSTUME['hat']), 'eyewear': list(S.COSTUME['eyewear']),
+                              'ties': list(S.COSTUME['tie']), 'badges': list(S.COSTUME['badge']),
+                              'pitch_formants': list(piper_mod.PITCH_FORMANTS),
+                              'voice_limits': {k: list(v) for k, v in piper_mod.VOICE_LIMITS.items()}})
 
     def _speaker(v):
         if v in (None, ''):
@@ -656,6 +662,24 @@ def create_app():
         if not 0 <= n < 904:
             raise ValueError('Free voice speaker must be between 0 and 903')
         return n
+
+    def _delivery(voice):
+        """Per-character delivery: pitch shift and Piper overrides (validated ranges; blank keeps the default)."""
+        out = {}
+        for k, (lo, hi) in piper_mod.VOICE_LIMITS.items():
+            v = voice.get(k)
+            if v in (None, ''):
+                continue
+            try:
+                x = float(v)
+            except (TypeError, ValueError):
+                raise ValueError(f'{k} must be a number')
+            if not (lo <= x <= hi):
+                raise ValueError(f'{k} must be between {lo:g} and {hi:g}')
+            out[k] = x
+        if voice.get('pitch_formants') in piper_mod.PITCH_FORMANTS:
+            out['pitch_formants'] = voice['pitch_formants']
+        return out
 
     @app.put('/api/characters/<cid>')
     def put_character(cid):
@@ -675,16 +699,26 @@ def create_app():
         scale = float(bible.get('scale', 1.0))
         if not 0.6 <= scale <= 1.2:
             raise ValueError('Scale must be between 0.6 and 1.2')
+        def costume(c):
+            # Shared costume vocabulary; unknown values are dropped (the renderer ignores them anyway).
+            c = c if isinstance(c, dict) else {}
+            return {k: c[k] for k in S.COSTUME if k in c and c[k] in S.COSTUME[k]}
         clean_bible = {'summary': str(bible.get('summary', ''))[:400], 'personality': str(bible.get('personality', ''))[:400],
                        'scale': scale, 'palette': pal,
-                       'costume': {k: (bible.get('costume') or {}).get(k) for k in ('top', 'hair', 'hat', 'badge')},
+                       'costume': costume(bible.get('costume')),
                        'visual_rules': [str(x)[:160] for x in (bible.get('visual_rules') or [])][:12]}
+        if isinstance(bible.get('costume_variants'), dict):
+            clean_bible['costume_variants'] = {str(k)[:20]: costume(v)
+                                               for k, v in list(bible['costume_variants'].items())[:6]}
         clean_voice = {'openai_voice': str(voice.get('openai_voice', 'alloy'))[:20],
                        'openai_instructions': str(voice.get('openai_instructions', ''))[:600],
                        'elevenlabs_voice_id': str(voice.get('elevenlabs_voice_id', ''))[:64],
                        'local_test_voice': str(voice.get('local_test_voice', 'kal16'))[:10],
                        'piper_speaker': _speaker(voice.get('piper_speaker')),
                        'rights_note': str(voice.get('rights_note', ''))[:300]}
+        clean_voice.update(_delivery(voice))
+        if voice.get('casting_note'):
+            clean_voice['casting_note'] = str(voice['casting_note'])[:400]
         repo.save_character(cid, name, clean_bible, clean_voice, bool(body.get('active', True)))
         store.audit('character_saved', {'id': cid}, actor='owner')
         return jsonify(ok=True)
@@ -728,19 +762,25 @@ def create_app():
         voice = dict(chars[cid]['voice'])
         if body.get('piper_speaker') not in (None, ''):
             voice['piper_speaker'] = _speaker(body.get('piper_speaker'))
+        voice.update(_delivery(body))  # hear unsaved pitch/delivery edits
         text = str(body.get('text') or f"Hi, I'm {chars[cid]['name']}. Wait... where's the next platform?!")[:200]
         out_dir = config.WORK_DIR / 'character_previews' / cid
         out_dir.mkdir(parents=True, exist_ok=True)
         speaker = piper.speaker_for(cid, voice)
-        pr = prefsmod.get()['production']
-        # Preview at the production speech rate, so it sounds like the finished videos.
+        voice['piper_speaker'] = speaker
+        p = prefsmod.get()
+        pr = p['production']
+        # Preview at the production speech rate and through the same chain as production lines (the character's
+        # Piper delivery, pitch shift, cleanup), so it sounds like the finished videos.
         rate = float(C.pace_kwargs({'production': pr})['speech_rate'])
-        out = out_dir / f'voice_{speaker}_r{rate:g}.wav'
-        line = {'id': 'preview', 'text': text, 'emotion': 'happy', 'pace': 'normal', 'volume': 'normal',
-                'speech_rate': rate}
-        piper.synthesize(tts.spoken_text(text, pr['pronunciations']), str(out), speaker, line)
-        return jsonify(preview='/media/' + repo.rel(str(out)), speaker=speaker,
-                       license=piper.VOICES[piper.DEFAULT_MODEL]['license'])
+        line = {'id': f'voice_{speaker}_r{rate:g}', 'text': text, 'emotion': 'happy', 'pace': 'normal',
+                'volume': 'normal', 'speech_rate': rate}
+        p = dict(p, production=dict(pr, tts_provider='piper'))
+        res = tts.synthesize_line(line, {'id': cid, 'name': chars[cid]['name'], 'voice': voice}, p, str(out_dir),
+                                  'preview')
+        return jsonify(preview='/media/' + repo.rel(res['file']), speaker=speaker,
+                       pitch_semitones=piper.voice_settings(voice).get('pitch_semitones', 0.0),
+                       duration_s=res['duration_s'], license=piper.VOICES[piper.DEFAULT_MODEL]['license'])
 
     # ------------------------------------------------------------ queue, budget, analytics, audit
     @app.get('/api/tasks')

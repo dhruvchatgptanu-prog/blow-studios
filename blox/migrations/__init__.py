@@ -14,6 +14,7 @@ VERSIONS = [
     '0002_core_schema',
     '0003_seed_and_legacy',
     '0004_story_backlog',
+    '0005_new_cast',
 ]
 
 

@@ -38,6 +38,17 @@ PROP_TYPES = ['platform', 'checkpoint_flag', 'coin', 'key', 'chest', 'door', 'bu
 # Props a hand can hold (attach to hand bone).
 HOLDABLE = {'coin', 'key', 'ball', 'phone', 'gift', 'pizza', 'cup', 'trophy', 'sign'}
 
+# Shared costume vocabulary of character bibles ('costume'). Palette slots may add 'accessory' (glasses, crown, bow
+# colour) and 'top2' (jacket, vest or cardigan colour).
+COSTUME = {
+    'hair': ('messy_block', 'short_block', 'bun', 'pigtails', 'spiky', 'long_block', 'bald'),
+    'hat': (None, 'cap', 'cap_backwards', 'crown', 'bow', 'beanie'),
+    'eyewear': (None, 'glasses', 'sunglasses'),
+    'top': ('hoodie', 'tee', 'jacket', 'vest', 'cardigan'),
+    'tie': (True, False),
+    'badge': (None, 'star', 'diamond'),
+}
+
 MOUTH_SHAPES = ['neutral', 'smile', 'grin', 'open_smile', 'frown', 'o', 'gasp', 'grimace', 'smirk', 'pout', 'flat']
 ARM_POSES = ['rest', 'hips', 'chest', 'point', 'wave', 'raise', 'reach', 'cover_mouth', 'head_scratch', 'fist_pump',
              'arms_out', 'cross', 'hold_prop', 'shrug', 'thumbs_up', 'facepalm', 'chin']
@@ -97,6 +108,15 @@ EMOTIONS = ['neutral', 'happy', 'excited', 'startled', 'worried', 'sad', 'angry'
             'confused', 'embarrassed', 'laughing', 'proud', 'bored', 'disgusted', 'relieved', 'curious']
 PACES = ['slow', 'normal', 'fast']
 VOLUMES = ['whisper', 'soft', 'normal', 'loud', 'shout']
+# 'dialogue' is spoken on screen (lip sync). 'narration' is first-person "storytime" voice-over: the plan's narrator
+# reads it in past tense with speech tags ("I froze", "he snapped") between the quoted lines. It plays over any shot,
+# is captioned like dialogue, and nobody's mouth moves with it.
+LINE_KINDS = ['dialogue', 'narration']
+
+
+def lip_synced(line, cid=None):
+    """True when a line is spoken on screen (by ``cid``, if given). Narration is voice-over: no lip sync."""
+    return line.get('kind', 'dialogue') != 'narration' and (cid is None or line.get('speaker') == cid)
 # Speaking rate used for planning, words per second.
 PACE_WPS = {'slow': 2.1, 'normal': 2.7, 'fast': 3.3}
 

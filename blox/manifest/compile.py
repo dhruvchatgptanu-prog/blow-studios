@@ -355,6 +355,10 @@ def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_
         'notes': [],
         'pace': {'timeline': pace, 'speech_rate': speech_rate},
     }
+    # Storytime: the cast id whose voice reads the narration lines (voice-over, no lip sync).
+    narrator = plan.get('narrator')
+    if narrator not in (None, ''):
+        m['narrator'] = str(narrator)
     hook = plan.get('hook') or {}
     payoff = plan.get('payoff') or {}
     m['hook'] = {'id': 'hook', 'text': str(hook.get('text', ''))[:400], 'question': str(hook.get('question', ''))[:300],
@@ -543,7 +547,10 @@ def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_
     # Lines
     lines = []
     for i, ln in enumerate(plan.get('lines') or []):
-        line = {'id': str(ln.get('id') or f'l{i + 1}'), 'speaker': ln.get('speaker', 'narrator'),
+        kind = str(ln.get('kind') or 'dialogue')[:20]
+        # A narration line without a speaker is read by the plan's narrator (or the off-screen narrator voice).
+        speaker = ln.get('speaker') or (m.get('narrator', 'narrator') if kind == 'narration' else 'narrator')
+        line = {'id': str(ln.get('id') or f'l{i + 1}'), 'speaker': speaker, 'kind': kind,
                 'text': str(ln.get('text', '')).strip()[:400], 'start_frame': F(ln.get('t')),
                 'emotion': ln.get('emotion', 'neutral'), 'pace': ln.get('pace', 'normal'),
                 'volume': ln.get('volume', 'normal'), 'pause_after_ms': int(_num(ln.get('pause_after_ms'), 0) / pace),
@@ -729,7 +736,8 @@ def derive_beats(m, authored):
         for ln in m['lines']:
             if ln['start_frame'] < b and ln['est_end_frame'] > a:
                 beat['dialogue'].append(ln['id'])
-                beat['vocal'].append({'line': ln['id'], 'speaker': ln['speaker'], 'emotion': ln['emotion'],
+                beat['vocal'].append({'line': ln['id'], 'speaker': ln['speaker'], 'kind': ln.get('kind', 'dialogue'),
+                                      'emotion': ln['emotion'],
                                       'pace': ln['pace'], 'volume': ln['volume'], 'pause_after_ms': ln['pause_after_ms']})
         beat['sfx'] = [x['id'] for x in m['sfx'] if a <= x['frame'] < b]
         cue = None

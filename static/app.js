@@ -394,30 +394,43 @@ async function characters() {
     <div class="row"><label>Top<select name="top">${r.vocab.tops.map(x => `<option ${x === c.bible.costume.top ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
       <label>Hair<select name="hair">${r.vocab.hair.map(x => `<option value="${x || ''}" ${x === c.bible.costume.hair ? 'selected' : ''}>${x || 'none'}</option>`).join('')}</select></label>
       <label>Hat<select name="hat">${r.vocab.hats.map(x => `<option value="${x || ''}" ${x === c.bible.costume.hat ? 'selected' : ''}>${x || 'none'}</option>`).join('')}</select></label>
-      <label>Badge<select name="badge">${r.vocab.badges.map(x => `<option value="${x || ''}" ${x === c.bible.costume.badge ? 'selected' : ''}>${x || 'none'}</option>`).join('')}</select></label></div>
+      <label>Badge<select name="badge">${r.vocab.badges.map(x => `<option value="${x || ''}" ${x === c.bible.costume.badge ? 'selected' : ''}>${x || 'none'}</option>`).join('')}</select></label>
+      <label>Eyewear<select name="eyewear">${(r.vocab.eyewear || [null]).map(x => `<option value="${x || ''}" ${x === (c.bible.costume.eyewear ?? null) ? 'selected' : ''}>${x || 'none'}</option>`).join('')}</select></label>
+      <label class="check"><input type="checkbox" name="tie" ${c.bible.costume.tie ? 'checked' : ''}> Tie</label></div>
     <label>Visual rules (one per line)<textarea name="rules">${esc((c.bible.visual_rules || []).join('\n'))}</textarea></label>
     <h3>Voice</h3><div class="row"><label>Free voice (Piper) speaker 0–903<input name="piper_speaker" type="number" min="0" max="903" value="${c.voice.piper_speaker ?? ''}"></label><label>&nbsp;<button type="button" data-hear="${esc(id)}">Hear free voice</button></label></div><div id="hear-${esc(id)}"></div>
+    <div class="row"><label>Pitch (semitones)<input name="pitch_semitones" type="number" step="0.5" min="-6" max="6" value="${c.voice.pitch_semitones ?? 0}"></label>
+      <label>Formants<select name="pitch_formants">${(r.vocab.pitch_formants || ['preserve']).map(x => `<option ${x === (c.voice.pitch_formants || 'preserve') ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
+      <label>Piper length ×<input name="piper_length_scale" type="number" step="0.01" min="0.7" max="1.4" value="${c.voice.piper_length_scale ?? ''}" placeholder="1.0"></label>
+      <label>Variation<input name="piper_noise_scale" type="number" step="0.01" min="0.1" max="1" value="${c.voice.piper_noise_scale ?? ''}" placeholder="0.667"></label>
+      <label>Rhythm variation<input name="piper_noise_w" type="number" step="0.01" min="0.1" max="1.2" value="${c.voice.piper_noise_w ?? ''}" placeholder="0.8"></label>
+      <label>Narration length ×<input name="narration_length_scale" type="number" step="0.01" min="0.8" max="1.2" value="${c.voice.narration_length_scale ?? ''}" placeholder="1.0"></label></div>
+    ${c.voice.casting_note ? `<p class="small muted">${esc(c.voice.casting_note)}</p>` : ''}
     <div class="row"><label>OpenAI voice<input name="openai_voice" value="${esc(c.voice.openai_voice || '')}"></label><label>ElevenLabs voice id<input name="elevenlabs_voice_id" value="${esc(c.voice.elevenlabs_voice_id || '')}"></label><label>Local test voice<input name="local_test_voice" value="${esc(c.voice.local_test_voice || '')}"></label></div>
     <label>Voice direction<input name="openai_instructions" value="${esc(c.voice.openai_instructions || '')}"></label>
     <label>Voice rights note<input name="rights_note" value="${esc(c.voice.rights_note || '')}" placeholder="e.g. provider catalogue voice"></label>
     <div class="actions"><button class="primary">Save</button><button type="button" data-preview="${esc(id)}">Render preview</button></div><div id="pv-${esc(id)}"></div></form></div>`).join('')}</div>`);
+  const DELIVERY = ['pitch_semitones', 'piper_length_scale', 'piper_noise_scale', 'piper_noise_w', 'narration_length_scale'];
+  const delivery = f => { const v = {pitch_formants: f.pitch_formants.value}; DELIVERY.forEach(k => { if (f[k].value !== '') v[k] = Number(f[k].value); }); return v; };
   bind('form[data-char]', 'submit', async e => {
-    const f = e.target, pal = {};
+    const f = e.target, pal = {}, c = r.characters[f.dataset.char];
     r.vocab.palette_slots.forEach(k => pal[k] = f['pal_' + k].value);
     await api('characters/' + f.dataset.char, 'PUT', {name: f.name.value, active: f.active.checked,
       bible: {summary: f.summary.value, personality: f.personality.value, scale: Number(f.scale.value), palette: pal,
-        costume: {top: f.top.value, hair: f.hair.value || null, hat: f.hat.value || null, badge: f.badge.value || null},
+        costume: {top: f.top.value, hair: f.hair.value || null, hat: f.hat.value || null, badge: f.badge.value || null,
+          eyewear: f.eyewear.value || null, tie: f.tie.checked},
+        costume_variants: c.bible.costume_variants,
         visual_rules: f.rules.value.split('\n').filter(Boolean)},
-      voice: {piper_speaker: f.piper_speaker.value === '' ? null : Number(f.piper_speaker.value),
+      voice: Object.assign({piper_speaker: f.piper_speaker.value === '' ? null : Number(f.piper_speaker.value),
         openai_voice: f.openai_voice.value, elevenlabs_voice_id: f.elevenlabs_voice_id.value, local_test_voice: f.local_test_voice.value,
-        openai_instructions: f.openai_instructions.value, rights_note: f.rights_note.value}});
+        openai_instructions: f.openai_instructions.value, rights_note: f.rights_note.value, casting_note: c.voice.casting_note}, delivery(f))});
     toast('Character saved');
   });
   bind('[data-hear]', 'click', async e => {
     const id = e.target.dataset.hear, f = e.target.closest('form');
     $('#hear-' + id).innerHTML = '<p class="muted small">Generating with the free offline voice…</p>';
-    const r = await api('characters/' + id + '/voice-preview', 'POST', {piper_speaker: f.piper_speaker.value});
-    $('#hear-' + id).innerHTML = `<audio controls autoplay src="${r.preview}?t=${Date.now()}"></audio><p class="small muted">Speaker ${r.speaker} · ${esc(r.license)} · save the character to keep it</p>`;
+    const r = await api('characters/' + id + '/voice-preview', 'POST', Object.assign({piper_speaker: f.piper_speaker.value}, delivery(f)));
+    $('#hear-' + id).innerHTML = `<audio controls autoplay src="${r.preview}?t=${Date.now()}"></audio><p class="small muted">Speaker ${r.speaker} · pitch ${r.pitch_semitones ?? 0} st · ${esc(r.license)} · save the character to keep it</p>`;
   });
   bind('[data-preview]', 'click', async e => { const id = e.target.dataset.preview; $('#pv-' + id).innerHTML = '<p class="muted">Rendering with Blender…</p>'; const p = await api('characters/' + id + '/preview', 'POST', {}); $('#pv-' + id).innerHTML = `<img src="${p.preview}?t=${Date.now()}" alt="Preview" class="preview-still">`; });
 }

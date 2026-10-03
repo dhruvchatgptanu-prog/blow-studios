@@ -33,6 +33,13 @@ LOUDNESS_VOLUME = {'whisper': -6.0, 'soft': -3.0, 'normal': 0.0, 'loud': 1.5, 's
 OPENAI_SPEED_MODELS = {'tts-1', 'tts-1-hd'}
 # ElevenLabs voice_settings.speed accepts 0.7-1.2; faster requests are clamped to 1.2.
 ELEVENLABS_SPEED = (0.7, 1.2)
+# Piper reads every line at the same calm level, so on top of the loudness lift above, loud and shouted lines rise
+# a little in pitch and gain presence (a high shelf from 2.5 kHz), the way a raised voice does:
+# volume -> (extra semitones, presence dB).
+PIPER_VOLUME_FX = {'loud': (0.5, 2.0), 'shout': (1.0, 4.0)}
+# Longest silence kept inside a Piper line at speech rate 1 (it shrinks with the rate). Piper leaves 0.2-0.5 s
+# between sentences; storytime delivery runs them together. Deliberate pauses belong in pause_after_ms.
+PIPER_MAX_GAP_S = 0.16
 
 
 def line_rate(line):
@@ -125,6 +132,24 @@ def _local_tts(text, voice, out_path):
     return {'path': out_path}
 
 
+def post_filter(provider, voice, line):
+    """FFmpeg filter chain applied to a voiced line before cleanup: the character's pitch shift
+    (``voice.pitch_semitones``, any provider) plus, for Piper, the raised-voice colour of loud lines.
+    Returns '' when nothing applies."""
+    from .piper import voice_settings
+    vs = voice_settings(voice)
+    semitones, presence = vs.get('pitch_semitones', 0.0), 0.0
+    if provider == 'piper':
+        extra, presence = PIPER_VOLUME_FX.get(line.get('volume'), (0.0, 0.0))
+        semitones += extra
+    parts = []
+    if abs(semitones) >= 0.05:
+        parts.append(A.pitch_filter(semitones, vs['pitch_formants']))
+    if presence:
+        parts.append(f'highshelf=f=2500:g={presence:g}')
+    return ','.join(parts)
+
+
 # ------------------------------------------------------------------ alignment
 def words_from_chars(text, al):
     chars = al.get('characters') or []
@@ -208,6 +233,8 @@ def synthesize_line(line, character, prefs, work_dir, video_id, attempt=0, use_a
             'attempt': attempt}
     if line_rate(line) != 1.0:
         spec['rate'] = line_rate(line)
+    if line.get('kind') == 'narration':
+        spec['kind'] = 'narration'
     voice_meta = None
     if provider == 'piper':
         from . import piper
@@ -220,7 +247,7 @@ def synthesize_line(line, character, prefs, work_dir, video_id, attempt=0, use_a
     if provider == 'local_test':
         _local_tts(say, voice.get('local_test_voice', 'kal16'), raw)
     elif provider == 'piper':
-        voice_meta = piper.synthesize(say, raw, spec['piper'][1], line, model=spec['piper'][0])
+        voice_meta = piper.synthesize(say, raw, spec['piper'][1], line, model=spec['piper'][0], voice=voice)
     else:
         est = estimate_cost(say, provider, prefs['budget']['prices'], line['pace'])
         key = f'tts:{video_id}:{line["id"]}:{h}'
@@ -238,10 +265,18 @@ def synthesize_line(line, character, prefs, work_dir, video_id, attempt=0, use_a
                        video_id=video_id, summary={'line': line['id'], 'chars': len(say)},
                        recover=lambda: ({'path': raw} if os.path.exists(raw) and os.path.getsize(raw) > 1000 else None))
         char_al = (res or {}).get('char_alignment')
-    samples = A.decode(raw)
+    fx = post_filter(provider, voice, line)
+    src = raw
+    if fx:
+        src = os.path.join(work_dir, f'{line["id"]}_{h}_fx.wav')
+        A.apply_filter(raw, src, fx)
+    samples = A.decode(src)
     if len(samples) < A.SR * 0.15:
         raise Blocked(f'Line {line["id"]}: the voice provider returned silence', state='failed')
     trimmed, lead = A.trim_silence(samples)
+    squeezed = 0.0
+    if provider == 'piper':
+        trimmed, squeezed = A.squeeze_gaps(trimmed, max(0.08, PIPER_MAX_GAP_S / line_rate(line)))
     gain = 10 ** (LOUDNESS_VOLUME.get(line['volume'], 0.0) / 20)
     clean = os.path.join(work_dir, f'{line["id"]}_{h}.wav')
     tmp = clean + '.tmp.wav'
@@ -283,6 +318,7 @@ def synthesize_line(line, character, prefs, work_dir, video_id, attempt=0, use_a
         'internal_silence_s': round(max([b[0] - a[1] for a, b in zip(regions, regions[1:])] or [0.0]), 3),
         'test_voice': provider == 'local_test',
         'voice_meta': voice_meta,
+        'post': {'filter': fx, 'gaps_removed_s': squeezed},
     }
 
 
