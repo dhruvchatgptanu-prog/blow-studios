@@ -1,4 +1,5 @@
 """Task handler registry and the execution context handed to handlers."""
+import importlib
 import time
 
 from . import jobs, prefs as prefsmod
@@ -56,6 +57,5 @@ class Ctx:
 
 def ensure_loaded():
     """Import modules that register handlers."""
-    from . import pipeline  # noqa: F401
-    from .research import tasks as research_tasks  # noqa: F401
-    from .youtube import analytics, publisher  # noqa: F401
+    for name in ('pipeline', 'research.tasks', 'youtube.analytics', 'youtube.publisher'):
+        importlib.import_module(f'{__package__}.{name}')

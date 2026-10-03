@@ -1,0 +1,41 @@
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: blox
+          POSTGRES_PASSWORD: blox
+          POSTGRES_DB: blox_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U blox -d blox_test" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: System tools (FFmpeg, fonts, Blender, EGL)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core blender libegl1 libegl-mesa0 libgl1-mesa-dri libgles2
+      - name: Python dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Lint
+        run: python -m pyflakes blox tests app.py worker.py setup.py
+      - name: Tests (mocked unit + local Blender/FFmpeg integration, SQLite and PostgreSQL)
+        env:
+          BLOX_TEST_DATABASE_URL: postgresql://blox:blox@localhost:5432/blox_test
+        run: python -m pytest -q
