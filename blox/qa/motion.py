@@ -1,0 +1,497 @@
+"""Motion and visual checks from Blender telemetry and rendered pixels.
+
+Telemetry is read back from Blender's evaluated scene after each frame was
+applied, so it reflects what was rendered, not what was planned. Pixel checks
+read the encoded video to confirm that changes are visible in the image.
+"""
+import json
+import math
+
+import numpy as np
+
+from .. import config, media
+from ..animation import rig as R
+from ..voice import audio as A
+
+GW, GH = 216, 384
+
+
+def load_telemetry(paths):
+    tele = {}
+    for p in paths:
+        with open(p) as f:
+            for line in f:
+                rec = json.loads(line)
+                tele[rec['frame']] = rec
+    return tele
+
+
+def decode_gray(path, w=GW, h=GH):
+    out, _ = media.run([config.FFMPEG_BIN, '-v', 'error', '-i', str(path), '-vf', f'scale={w}:{h},format=gray',
+                        '-f', 'rawvideo', '-'], timeout=900)
+    a = np.frombuffer(out, dtype=np.uint8)
+    n = len(a) // (w * h)
+    return a[:n * w * h].reshape(n, h, w).astype(np.float32)
+
+
+def decode_rgb_frame(path, frame, fps):
+    t = frame / float(fps)
+    info = media.video_stream(media.probe(path))
+    w, h = int(info['width']), int(info['height'])
+    out, _ = media.run([config.FFMPEG_BIN, '-v', 'error', '-ss', f'{t:.4f}', '-i', str(path), '-frames:v', '1',
+                        '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'], timeout=120)
+    return np.frombuffer(out, dtype=np.uint8)[:w * h * 3].reshape(h, w, 3)
+
+
+def on_screen(rec, min_area=0.004):
+    if not rec or not rec.get('in_front_of_camera', True):
+        return False
+    x0, y0, x1, y1 = rec['bbox2d']
+    ix = max(0.0, min(1.0, x1) - max(0.0, x0))
+    iy = max(0.0, min(1.0, y1) - max(0.0, y0))
+    return ix * iy >= min_area
+
+
+def ranges(frames):
+    out = []
+    for f in sorted(frames):
+        if out and f == out[-1][1] + 1:
+            out[-1][1] = f
+        else:
+            out.append([f, f])
+    return out
+
+
+def shot_at(m, f):
+    return next((s for s in m['shots'] if s['start_frame'] <= f < s['end_frame']), None)
+
+
+def run(ck, m, solved, tele, prefs, joined_path, dialog_by_line):
+    q = prefs['qa']
+    D = m['duration_frames']
+    frames = sorted(tele)
+    missing_tele = [f for f in range(D) if f not in tele]
+    ck.add('telemetry_coverage', 'Render telemetry covers every frame', 'motion',
+           'pass' if not missing_tele else 'fail', 'major', {'missing_frames': len(missing_tele)}, 0.99, 'telemetry',
+           repair={'action': 're_render_shot', 'shot': shot_at(m, missing_tele[0])['id']} if missing_tele else None)
+    if not frames:
+        return
+    gray = None
+    try:
+        gray = decode_gray(joined_path)
+    except media.MediaError:
+        gray = None
+    for c in m['cast']:
+        cid = c['id']
+        plan = solved['characters'].get(cid, [])
+        scale = solved['scales'].get(cid, 1.0)
+        recs = {f: tele[f]['characters'].get(cid) for f in frames if cid in tele[f]['characters']}
+        _integrity(ck, m, cid, recs)
+        _feet(ck, m, cid, recs, plan, q, scale)
+        _actions(ck, m, cid, recs, plan, tele, scale)
+        _expressions(ck, m, cid, recs, gray, prefs)
+        _lipsync(ck, m, cid, recs, gray, dialog_by_line)
+    _camera(ck, m, tele)
+    _props(ck, m, tele, solved)
+    _identity(ck, m, tele, joined_path)
+
+
+def _integrity(ck, m, cid, recs):
+    required = set(R.REQUIRED_PARTS)
+    missing = [f for f, r in recs.items() if r and not required.issubset(set(r.get('parts_visible', [])))]
+    counts = [r['object_count'] for r in recs.values() if r]
+    mode = max(set(counts), key=counts.count) if counts else 0
+    odd = [f for f, r in recs.items() if r and r['object_count'] != mode]
+    status = 'fail' if (missing or odd) else 'pass'
+    ck.add(f'integrity:{cid}', f'{cid}: model integrity (no missing/extra limbs, no duplicated parts)', 'visual', status,
+           'critical', {'frames_missing_parts': len(missing), 'frames_with_unexpected_object_count': len(odd),
+                        'object_count': mode, 'required_parts': len(required)}, 0.97, 'telemetry',
+           frames=(min(missing + odd), max(missing + odd)) if (missing or odd) else None,
+           target={'kind': 'shot', 'id': shot_at(m, min(missing + odd))['id']} if (missing or odd) else None,
+           repair={'action': 're_render_shot', 'shot': shot_at(m, min(missing + odd))['id']} if (missing or odd) else None)
+
+
+def _feet(ck, m, cid, recs, plan, q, scale):
+    slide, floating, sink = [], [], []
+    max_slide = 0.0
+    prev = None
+    for f in sorted(recs):
+        r = recs[f]
+        if f >= len(plan) or not r:
+            prev = None
+            continue
+        p = plan[f]
+        for side in ('l', 'r'):
+            if not p['feet'][side]['contact_expected']:
+                continue
+            sole = r['sole_' + side]
+            if sole[2] > 0.03 * scale:
+                floating.append(f)
+            if sole[2] < -0.03:
+                sink.append(f)
+            if prev and prev[0] == f - 1 and prev[1][side] is not None and plan[f - 1]['feet'][side]['contact_expected']:
+                d = math.dist(sole[:2], prev[1][side][:2]) * 1000
+                max_slide = max(max_slide, d)
+                if d > q['foot_slide_mm_per_frame']:
+                    slide.append(f)
+        prev = (f, {s: r['sole_' + s] for s in ('l', 'r')})
+    visible_issue = [f for f in slide + floating + sink if on_screen(recs.get(f))]
+    status = 'fail' if visible_issue else 'pass'
+    sev = 'major'
+    first = min(visible_issue) if visible_issue else None
+    ck.add(f'feet:{cid}', f'{cid}: grounded feet (no floating, sliding or sinking while planted)', 'motion', status,
+           sev, {'sliding_frames': len(slide), 'floating_frames': len(floating), 'sinking_frames': len(sink),
+                 'max_slide_mm_per_frame': round(max_slide, 2), 'threshold_mm': q['foot_slide_mm_per_frame'],
+                 'on_screen_issue_ranges': ranges(visible_issue)[:6],
+                 'note': 'Measured on evaluated foot soles while the plan expects contact.'}, 0.92, 'telemetry',
+           frames=(first, first + 1) if first is not None else None,
+           target={'kind': 'shot', 'id': shot_at(m, first)['id']} if first is not None else None,
+           repair={'action': 're_render_shot', 'shot': shot_at(m, first)['id'],
+                   'params': {'pelvis_drop_extra': 0.03, 'character': cid}} if first is not None else None)
+
+
+def _actions(ck, m, cid, recs, plan, tele, scale):
+    props = {p['id']: p for p in m['setting'].get('props', [])}
+    for a in m['tracks']['actions']:
+        if a['character'] != cid:
+            continue
+        a0 = a['start_frame']
+        a1 = a0 + a['anticipation_frames']
+        a2 = a1 + a['main_frames']
+        a4 = a['end_frame']
+        main = [f for f in range(a1, a2) if recs.get(f)]
+        whole = [f for f in range(a0, a4) if recs.get(f)]
+        if not main:
+            continue
+        t = a['type']
+        ok, ev, conf = None, {}, 0.85
+        r0 = recs.get(a0) or recs[main[0]]
+        if t in ('jump', 'hop', 'celebrate'):
+            zmax = max(recs[f]['root'][2] for f in main)
+            need = (0.25 if t == 'jump' else 0.12) * scale
+            ev = {'max_root_height_m': round(zmax, 3), 'required_m': need}
+            ok = zmax >= need
+            if t == 'jump' and a['params'].get('to'):
+                land = recs.get(min(a4 - 1, a2 + 2))
+                if land:
+                    err = math.dist(land['root'][:2], a['params']['to'])
+                    ev['landing_error_m'] = round(err, 3)
+                    ok = ok and err < 0.25
+        elif t in ('walk', 'run'):
+            start, end = recs[main[0]]['root'], recs[main[-1]]['root']
+            planned = math.dist(a['params'].get('from', start[:2]), a['params']['to'])
+            moved = math.dist(start[:2], end[:2])
+            ev = {'moved_m': round(moved, 3), 'planned_m': round(planned, 3)}
+            ok = moved >= 0.8 * planned
+        elif t == 'turn':
+            ys = [recs[f].get('yaw') for f in whole if recs[f].get('yaw') is not None]
+            if ys:
+                dy = abs(((ys[-1] - ys[0]) + 180) % 360 - 180)
+                want = abs(((a['params']['to_facing'] - a['params'].get('from_facing', 0)) + 180) % 360 - 180)
+                ev = {'turned_deg': round(dy, 1), 'planned_deg': round(want, 1)}
+                ok = dy >= 0.8 * want
+            else:
+                ok, conf = None, 0.3
+        elif t == 'wave':
+            side = 'l' if a['params'].get('hand') == 'left' else 'r'
+            # Hand clearly above shoulder height (about 0.25 m below the face centre).
+            above = [f for f in main if recs[f]['palm_' + side][2] > recs[f]['face_z'] - 0.25 * scale] if 'face_z' in recs[main[0]] else []
+            xs = [recs[f]['palm_' + side][0] for f in main]
+            ev = {'frames_hand_raised': len(above), 'main_frames': len(main), 'hand_x_std_m': round(float(np.std(xs)), 4)}
+            ok = (len(above) >= 0.5 * len(main) if above or 'face_z' in recs[main[0]] else True) and np.std(xs) > 0.01
+            if 'face_z' not in recs[main[0]]:
+                conf = 0.6
+        elif t == 'point':
+            side = 'l' if a['params'].get('hand') == 'left' else 'r'
+            ext = max(math.dist(recs[f]['palm_' + side][:2], recs[f]['root'][:2]) for f in whole)
+            ev = {'max_hand_reach_m': round(ext, 3)}
+            ok = ext >= 0.45 * scale
+        elif t in ('reach', 'grab', 'push'):
+            side = 'l' if a['params'].get('hand') == 'left' else 'r'
+            prop = props.get(a['params'].get('prop'))
+            contact = min(a4 - 1, a2)
+            pr = tele.get(contact, {}).get('props', {}).get(prop['id']) if prop else None
+            if pr and recs.get(contact):
+                d = math.dist(recs[contact]['palm_' + side], pr['location'])
+                ev = {'palm_to_prop_m': round(d, 3), 'contact_frame': contact}
+                ok = d <= 0.2 * scale
+            else:
+                ok, conf = None, 0.3
+        elif t in ('facepalm', 'think'):
+            side = 'l' if a['params'].get('hand') == 'left' else 'r'
+            ds = [math.dist(recs[f]['palm_' + side], recs[f]['face']) for f in range(a2, a4) if recs.get(f)]
+            ev = {'min_palm_to_face_m': round(min(ds), 3) if ds else None}
+            ok = bool(ds) and min(ds) <= 0.2 * scale
+        elif t in ('crouch', 'cower', 'fall_down'):
+            z0 = r0.get('face_z', r0['face'][2])
+            zmin = min(recs[f].get('face_z', recs[f]['face'][2]) for f in range(a1, a4) if recs.get(f))
+            ev = {'head_drop_m': round(z0 - zmin, 3)}
+            ok = z0 - zmin >= 0.18 * scale
+        elif t == 'stumble':
+            base = r0['root']
+            disp = max(math.dist(recs[f]['root'][:2], base[:2]) for f in main)
+            ev = {'max_displacement_m': round(disp, 3)}
+            ok = disp >= 0.05
+        else:
+            fz = [recs[f]['face'] for f in whole]
+            spread = float(np.max(np.std(np.array(fz), axis=0))) if fz else 0
+            ev = {'face_motion_std_m': round(spread, 4)}
+            ok = spread > 0.002
+            conf = 0.55
+        visible = sum(1 for f in main if on_screen(recs.get(f)))
+        ev['on_screen_fraction'] = round(visible / max(1, len(main)), 2)
+        subject = any(s['camera']['subject'] in (cid, 'two_shot') for s in m['shots']
+                      if s['start_frame'] <= a1 < s['end_frame'])
+        if ok is None:
+            status, sev = 'uncertain', 'minor'
+        elif not ok:
+            status, sev = 'fail', 'major'
+        elif visible < 0.5 * len(main):
+            status, sev = ('fail', 'major') if subject else ('pass', 'info')
+            ev['note'] = 'Action happens mostly off-screen' + ('' if subject else ' (character is not the shot subject)')
+        else:
+            status, sev = 'pass', 'major'
+        shot = shot_at(m, a1)
+        ck.add(f'action:{a["id"]}', f'{cid} visibly performs {t} ({a["id"]})', 'motion', status, sev, ev, conf,
+               'telemetry', frames=(a0, a4), target={'kind': 'shot', 'id': shot['id'] if shot else None},
+               repair={'action': 're_render_shot', 'shot': shot['id'],
+                       'params': {'character': cid, 'camera_wider': True}} if status == 'fail' and shot else None)
+
+
+def _crop(gray, f, cx, cy, half_w, half_h):
+    if gray is None or f >= len(gray):
+        return None
+    h, w = gray.shape[1], gray.shape[2]
+    x0, x1 = int((cx - half_w) * w), int((cx + half_w) * w)
+    y0, y1 = int((cy - half_h) * h), int((cy + half_h) * h)
+    x0, y0, x1, y1 = max(0, x0), max(0, y0), min(w, x1), min(h, y1)
+    if x1 - x0 < 4 or y1 - y0 < 4:
+        return None
+    return gray[f, y0:y1, x0:x1]
+
+
+def _expressions(ck, m, cid, recs, gray, prefs):
+    min_frames = prefs['production']['min_expression_frames']
+    keys = m['tracks']['characters'][cid]['keys']
+    for i, k in enumerate(keys):
+        expr = k['pose'].get('expression')
+        prev = keys[i - 1]['pose'].get('expression') if i else None
+        if expr in (None, 'neutral') or expr == prev:
+            continue
+        shot = shot_at(m, k['frame'])
+        if not shot or shot['camera']['subject'] not in (cid, 'two_shot'):
+            continue
+        end = keys[i + 1]['frame'] if i + 1 < len(keys) else m['duration_frames']
+        start = k['frame']
+        hold = [f for f in range(start, min(end, shot['end_frame'])) if recs.get(f)]
+        readable = []
+        for f in hold:
+            r = recs[f]
+            fx, fy = r['face2d'][0], r['face2d'][1]
+            if r['face_dot'] >= 0.35 and r['face_height_frac'] >= 0.08 and 0.03 <= fx <= 0.97 and 0.03 <= fy <= 0.8:
+                readable.append(f)
+        evidence = {'expression': expr, 'readable_frames': len(readable), 'required_frames': min_frames,
+                    'hold_frames': len(hold)}
+        if hold:
+            evidence['face_dot_min'] = round(min(recs[f]['face_dot'] for f in hold), 3)
+            evidence['face_height_frac_min'] = round(min(recs[f]['face_height_frac'] for f in hold), 3)
+        # Pixel evidence: did the face region actually change on screen?
+        pix = None
+        before = max(0, start - (k.get('blend_frames') or 10) - 2)
+        after = min(start + 6, m['duration_frames'] - 1)
+        rb, ra = recs.get(before), recs.get(after)
+        if gray is not None and rb and ra and shot_at(m, before) is shot:
+            hw = max(0.04, ra['face_height_frac'] * 9 / 16 * 0.5)
+            hh = max(0.03, ra['face_height_frac'] * 0.5)
+            c1 = _crop(gray, before, rb['face2d'][0], rb['face2d'][1], hw, hh)
+            c2 = _crop(gray, after, ra['face2d'][0], ra['face2d'][1], hw, hh)
+            if c1 is not None and c2 is not None:
+                hgt = min(c1.shape[0], c2.shape[0])
+                wid = min(c1.shape[1], c2.shape[1])
+                pix = float(np.mean(np.abs(c1[:hgt, :wid] - c2[:hgt, :wid])))
+                evidence['face_pixel_change'] = round(pix, 2)
+        ok = len(readable) >= min_frames
+        status = 'pass' if ok else 'fail'
+        conf = 0.85 if pix is None else (0.9 if pix > 2.0 else 0.7)
+        if ok and pix is not None and pix < 1.0:
+            status = 'uncertain'
+            evidence['note'] = 'Face pixels barely changed; the expression may not read on screen'
+        ck.add(f'expression:{cid}:{start}', f'{cid} "{expr}" expression is readable', 'visual', status, 'major',
+               evidence, conf, 'telemetry+pixel', frames=(start, end),
+               target={'kind': 'shot', 'id': shot['id']},
+               repair={'action': 're_render_shot', 'shot': shot['id'],
+                       'params': {'camera_tighter': True, 'face_camera': cid}} if status == 'fail' else None)
+
+
+def _lipsync(ck, m, cid, recs, gray, dialog_by_line):
+    fps = m['fps']
+    for ln in m['lines']:
+        if ln['speaker'] != cid:
+            continue
+        a, b = ln['start_frame'], ln['est_end_frame']
+        shot = shot_at(m, a)
+        vis = [f for f in range(a, b) if recs.get(f) and on_screen(recs[f]) and recs[f]['face_dot'] > 0.2
+               and recs[f]['face_height_frac'] > 0.05]
+        if len(vis) < 0.5 * max(1, b - a):
+            ck.add(f'lipsync:{ln["id"]}', f'Lip sync for line {ln["id"]}', 'visual', 'skipped', 'info',
+                   {'reason': 'Speaker face not on screen for most of the line; voice plays off-screen'}, 0.9,
+                   'telemetry', frames=(a, b), target={'kind': 'line', 'id': ln['id']})
+            continue
+        env = dialog_by_line.get(ln['id'])
+        mouth = np.array([recs[f]['mouth_open'] if recs.get(f) else 0 for f in range(a, b)])
+        corr, lag = None, None
+        if env is not None and len(env) and mouth.std() > 1e-5:
+            e = np.interp(np.arange(len(mouth)), np.linspace(0, len(mouth) - 1, len(env)), env)
+            best = (-2, 0)
+            for L in range(-4, 5):
+                if L >= 0:
+                    x, y = mouth[L:], e[:len(e) - L]
+                else:
+                    x, y = mouth[:L], e[-L:]
+                if len(x) > 5 and x.std() > 1e-6 and y.std() > 1e-6:
+                    c = float(np.corrcoef(x, y)[0, 1])
+                    if c > best[0]:
+                        best = (c, L)
+            corr, lag = round(best[0], 3), best[1]
+        pix_ratio = None
+        if gray is not None:
+            act, rest = [], []
+            for f in range(max(1, a - int(0.6 * fps)), min(len(gray), b + int(0.6 * fps))):
+                r = recs.get(f)
+                if not r or shot_at(m, f) is not shot or not on_screen(r):
+                    continue
+                hw = max(0.015, r['mouth_width_px'] / max(1, 1080) * 0.9)
+                c1 = _crop(gray, f, r['mouth2d'][0], r['mouth2d'][1], hw, hw * 0.9)
+                c0 = _crop(gray, f - 1, r['mouth2d'][0], r['mouth2d'][1], hw, hw * 0.9)
+                if c1 is None or c0 is None or c1.shape != c0.shape:
+                    continue
+                d = float(np.mean(np.abs(c1 - c0)))
+                (act if a <= f < b else rest).append(d)
+            if act and rest:
+                pix_ratio = round((np.mean(act) + 0.05) / (np.mean(rest) + 0.05), 2)
+        ev = {'mouth_envelope_correlation': corr, 'best_lag_frames': lag, 'mouth_pixel_activity_ratio': pix_ratio,
+              'visible_frames': len(vis)}
+        if corr is None:
+            status, conf = 'uncertain', 0.4
+        else:
+            ok = corr >= 0.3 and abs(lag) <= 2 and (pix_ratio is None or pix_ratio >= 1.15)
+            status, conf = ('pass' if ok else 'fail'), 0.8 if pix_ratio is not None else 0.65
+        ck.add(f'lipsync:{ln["id"]}', f'Lip sync for line {ln["id"]} ({cid})', 'visual', status, 'major', ev, conf,
+               'telemetry+pixel+audio', frames=(a, b), target={'kind': 'shot', 'id': shot['id'] if shot else None},
+               repair={'action': 're_render_shot', 'shot': shot['id'], 'params': {'realign_line': ln['id']}}
+               if status == 'fail' and shot else None)
+
+
+def _camera(ck, m, tele):
+    jumps = []
+    for s in m['shots']:
+        prev = None
+        for f in range(s['start_frame'], s['end_frame']):
+            r = tele.get(f)
+            if not r:
+                prev = None
+                continue
+            loc = r['camera']['location']
+            fw = r['camera'].get('forward')
+            if prev:
+                d = math.dist(loc, prev[0])
+                ang = 0.0
+                if fw and prev[1]:
+                    ang = math.degrees(math.acos(max(-1.0, min(1.0, sum(x * y for x, y in zip(fw, prev[1]))))))
+                if d > 0.3 or ang > 10:
+                    jumps.append({'frame': f, 'shot': s['id'], 'move_m': round(d, 3), 'turn_deg': round(ang, 2)})
+            prev = (loc, fw)
+    ck.add('camera_jumps', 'Smooth camera within shots (no jumps)', 'visual', 'fail' if jumps else 'pass', 'major',
+           {'jumps': jumps[:8], 'thresholds': {'move_m_per_frame': 0.3, 'turn_deg_per_frame': 10}}, 0.9, 'telemetry',
+           frames=(jumps[0]['frame'] - 1, jumps[0]['frame']) if jumps else None,
+           target={'kind': 'shot', 'id': jumps[0]['shot']} if jumps else None,
+           repair={'action': 're_render_shot', 'shot': jumps[0]['shot'], 'params': {'camera_smooth': True}} if jumps else None)
+
+
+def _props(ck, m, tele, solved):
+    """Rendered prop positions must match the plan (static, held or falling)."""
+    problems = []
+    expected = solved.get('props', {})
+    for p in m['setting'].get('props', []):
+        pid = p['id']
+        plan = expected.get(pid)
+        for f in sorted(tele):
+            pr = tele[f]['props'].get(pid)
+            if not pr:
+                problems.append({'prop': pid, 'frame': f, 'issue': 'missing from the rendered scene'})
+                break
+            if not pr['visible']:
+                problems.append({'prop': pid, 'frame': f, 'issue': 'hidden'})
+                break
+            if plan and f < len(plan):
+                d = math.dist(pr['location'], plan[f]['location'])
+                if d > 0.05:
+                    problems.append({'prop': pid, 'frame': f, 'issue': f'{d:.2f} m away from its planned position'})
+                    break
+    ck.add('props_continuity', 'Props persist and move only when handled', 'visual',
+           'fail' if problems else 'pass', 'major', {'problems': problems[:6], 'props': len(m['setting'].get('props', []))},
+           0.9, 'telemetry', frames=(problems[0]['frame'], problems[0]['frame'] + 1) if problems else None,
+           target={'kind': 'shot', 'id': shot_at(m, problems[0]['frame'])['id']} if problems else None,
+           repair={'action': 're_render_shot', 'shot': shot_at(m, problems[0]['frame'])['id']} if problems else None)
+
+
+def _identity(ck, m, tele, joined_path):
+    """Colour-signature consistency of each character across shots (pixel)."""
+    sig = {}
+    for s in m['shots']:
+        mid = (s['start_frame'] + s['end_frame']) // 2
+        r = tele.get(mid)
+        if not r:
+            continue
+        try:
+            img = decode_rgb_frame(joined_path, mid, m['fps']).astype(np.float32)
+        except media.MediaError:
+            continue
+        h, w = img.shape[:2]
+        for cid, rec in r['characters'].items():
+            if not on_screen(rec, 0.02):
+                continue
+            x0, y0, x1, y1 = rec['bbox2d']
+            xa, xb = int(max(0, x0) * w), int(min(1, x1) * w)
+            ya, yb = int(max(0, y0) * h), int(min(1, y1) * h)
+            if xb - xa < 8 or yb - ya < 8:
+                continue
+            crop = img[ya:yb, xa:xb].reshape(-1, 3)
+            hist, _ = np.histogramdd(crop // 32, bins=(8, 8, 8), range=((0, 8), (0, 8), (0, 8)))
+            hist = hist.flatten() / max(1, hist.sum())
+            sig.setdefault(cid, []).append((s['id'], hist))
+    worst = []
+    for cid, items in sig.items():
+        if len(items) < 2:
+            continue
+        ref = np.mean([h for _, h in items], axis=0)
+        for sid, h in items:
+            bc = float(np.sum(np.sqrt(h * ref)))
+            worst.append({'character': cid, 'shot': sid, 'similarity': round(bc, 3)})
+    low = [w for w in worst if w['similarity'] < 0.55]
+    ck.add('identity_consistency', 'Character colour identity consistent across shots', 'visual',
+           'pass' if not low else 'uncertain', 'major',
+           {'per_shot_similarity': worst[:20], 'low': low,
+            'note': 'Bhattacharyya similarity of colour histograms inside each character\'s screen box. '
+                    'Background and framing changes lower it; low values need a look, not automatic failure.'},
+           0.6, 'pixel', target={'kind': 'shot', 'id': low[0]['shot']} if low else None)
+
+
+def dialog_envelopes(m, line_audio):
+    """Per-line RMS envelope (one value per video frame) from the voiced files."""
+    fps = m['fps']
+    out = {}
+    for ln in m['lines']:
+        la = line_audio.get(ln['id'])
+        if not la:
+            continue
+        s = A.decode(la['file'])
+        n = ln['est_end_frame'] - ln['start_frame']
+        if n <= 0:
+            continue
+        hop = A.SR / fps
+        env = np.array([np.sqrt(np.mean(s[int(i * hop):int((i + 1) * hop)] ** 2) + 1e-12) if int(i * hop) < len(s) else 0.0
+                        for i in range(n)])
+        out[ln['id']] = env
+    return out
+
