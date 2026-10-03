@@ -47,6 +47,7 @@ Upgrading from the previous Blox Studio: keep your existing `data/` folder (it h
 sudo apt install python3-venv ffmpeg fonts-dejavu-core blender libegl1 libegl-mesa0 libgl1-mesa-dri libgles2
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.lock
+python -m blox.cli install-voice                      # free Piper voice model (checksum-verified)
 export ADMIN_PASSWORD='choose-a-long-password'       # or ADMIN_PASSWORD_HASH from: python -m blox.cli hash-password
 python -m blox.cli migrate                            # SQLite in ./data unless DATABASE_URL is set
 gunicorn -b 127.0.0.1:8000 app:app &                  # web
