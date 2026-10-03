@@ -6,11 +6,16 @@ so it is deterministic and unit-testable without Blender:
 * base poses interpolated from the manifest's pose keys (with easing);
 * actions layered on top with anticipation / main / follow-through / hold
   phases and blend envelopes;
-* locomotion and turns planned as footsteps; planted feet stay fixed in world
-  space and legs are solved with analytic two-bone IK;
+* locomotion and turns planned as footsteps (cadence and foot placement keep
+  every planted foot inside leg reach, heel strike and toe-off in the swing);
+  planted feet stay fixed in world space and legs are solved with analytic
+  two-bone IK;
 * hand contact poses (chest, mouth, forehead, props) solved with IK;
-* overlapping action and follow-through from a damped spring on body angles;
-* eye-lines from the actual head transform toward the target;
+* idle life, speech gestures and listening reactions (``life``) wherever no
+  authored action or arm pose is using that part of the body;
+* overlapping action and follow-through from damped springs on body angles,
+  with the head and arms dragging behind fast torso and root motion;
+* eye-lines from the actual head transform toward the target, plus saccades;
 * blinks, brows, lids and mouth shapes (expression + visemes);
 * the camera for every frame, using the solved root trajectories.
 
@@ -24,6 +29,7 @@ import zlib
 
 import numpy as np
 
+from . import life as LF
 from . import rig as R
 from . import visemes as VIS
 from ..manifest import schema as S
@@ -32,6 +38,21 @@ from ..manifest.geometry import ANGLE_PITCH, CAMERA_SIDE_DEG, direction, wrap
 
 D2R = math.pi / 180.0
 R2D = 180.0 / math.pi
+# Where the life layers must stay out of the way (authored actions always win).
+BODY_BUSY = S.LOCOMOTION | {'hop', 'celebrate', 'stumble', 'fall_down', 'get_up', 'crouch', 'cower', 'stand_up',
+                            'turn', 'dance', 'flinch'}
+HEAD_BUSY = {'nod', 'head_shake', 'look_around', 'think', 'facepalm', 'flinch', 'cower', 'shrug'}
+ARMS_BUSY = {'walk', 'run', 'jump', 'hop', 'celebrate', 'stumble', 'cower', 'fall_down', 'get_up', 'flinch', 'dance',
+             'shrug'}
+HAND_BUSY = {'wave', 'point', 'reach', 'grab', 'push', 'drop', 'facepalm', 'think'}
+# Damped springs (stiffness, damping) that every pose change passes through: slightly underdamped, so a
+# change eases in, overshoots a little and settles; softer up the chain, so the head trails the hips.
+BODY_SPRINGS = {'pelvis': (0.3, 0.5), 'spine': (0.26, 0.5), 'chest': (0.22, 0.48), 'neck': (0.22, 0.48),
+                'head': (0.2, 0.45)}
+ARM_SPRING = (0.26, 0.5)
+# Breathing rate by expression (1 = calm).
+AROUSAL = {'excited': 1.5, 'startled': 1.6, 'scared': 1.6, 'angry': 1.4, 'laughing': 1.5, 'happy': 1.1, 'proud': 1.1,
+           'determined': 1.15, 'sad': 0.85, 'bored': 0.8, 'relieved': 0.9}
 LENS_BY_FRAMING = {'extreme_wide': 24, 'wide': 28, 'full': 35, 'medium_wide': 40, 'medium': 45,
                    'medium_close': 55, 'close_up': 70, 'extreme_close_up': 85}
 SENSOR_W = 36.0
@@ -183,15 +204,23 @@ def to_local(fkres, joint, world, scale):
 
 
 # ---------------------------------------------------------------- feet
+TOE_PIVOT = (0.0, -0.25, -R.ANKLE_HEIGHT)   # front edge of the sole, local to the ankle joint
+HEEL_PIVOT = (0.0, 0.12, -R.ANKLE_HEIGHT)   # back edge of the sole
+
+
 class Foot:
-    def __init__(self, pos, yaw):
+    def __init__(self, pos, yaw, scale=1.0):
+        self.scale = scale
         self.plants = [(-10 ** 9, np.array(pos, dtype=float), yaw)]
-        self.swings = []   # (f0, f1, from_pos, to_pos, from_yaw, to_yaw, height)
+        # (f0, f1, from_pos, to_pos, from_yaw, to_yaw, height, (toe_off_deg, heel_strike_deg, t_toe, t_heel))
+        self.swings = []
         self.free = []     # (f0, f1) feet driven by the body (air, falls)
 
-    def step(self, f0, f1, to_pos, to_yaw, height=0.1):
+    def step(self, f0, f1, to_pos, to_yaw, height=0.1, roll=(0.0, 0.0)):
+        """Plan a step. roll = (toe-off degrees, heel-strike degrees[, toe-off fraction, heel-strike fraction])."""
         frm_pos, frm_yaw = self.at_plant(f0)
-        self.swings.append((f0, f1, frm_pos, np.array(to_pos, dtype=float), frm_yaw, to_yaw, height))
+        roll = (tuple(roll) + (0.0, 0.0, 0.22, 0.22)[len(roll):])[:4]
+        self.swings.append((f0, f1, frm_pos, np.array(to_pos, dtype=float), frm_yaw, to_yaw, height, roll))
         self.plants.append((f1, np.array(to_pos, dtype=float), to_yaw))
         self.plants.sort(key=lambda p: p[0])
 
@@ -202,21 +231,97 @@ class Foot:
                 cur = p
         return cur[1].copy(), cur[2]
 
+    def swing_at(self, f):
+        for sw in self.swings:
+            if sw[0] <= f < sw[1]:
+                return sw
+        return None
+
     def sample(self, f):
         """(world position of the sole centre, yaw, contact_expected)."""
+        ankle, yaw, planted, _ = self.pose(f)
+        if ankle is None:
+            return None, None, False
+        return ankle - np.array([0.0, 0.0, R.ANKLE_HEIGHT * self.scale]), yaw, planted
+
+    def pose(self, f):
+        """(ankle world position, yaw, contact_expected, sole pitch in degrees; + = toes down).
+
+        A rolling swing peels the heel off while the toes stay put (toe-off), flies, then lands on the heel
+        with the toes up and rolls flat onto the new plant (heel strike). The pivot edge stays fixed in
+        world space during those phases, so the foot never scrapes or slides through them.
+        """
         for a, b in self.free:
             if a <= f < b:
-                return None, None, False
-        for (f0, f1, p0, p1, y0, y1, h) in self.swings:
-            if f0 <= f < f1:
-                u = (f - f0) / max(1, f1 - f0)
-                e = smooth(u)
-                pos = p0 + (p1 - p0) * e
-                pos = pos.copy()
-                pos[2] += h * math.sin(math.pi * u)
-                return pos, y0 + wrap(y1 - y0) * e, False
-        pos, yaw = self.at_plant(f)
-        return pos, yaw, True
+                return None, None, False, 0.0
+        sw = self.swing_at(f)
+        lift = np.array([0.0, 0.0, R.ANKLE_HEIGHT * self.scale])
+        if sw is None:
+            pos, yaw = self.at_plant(f)
+            return pos + lift, yaw, True, 0.0
+        f0, f1, p0, p1, y0, y1, h, (toe, heel, t_toe, t_heel) = sw
+        u = (f - f0) / max(1, f1 - f0)
+        if not (toe or heel):
+            e = smooth(u)
+            pos = p0 + (p1 - p0) * e + lift
+            pos[2] += h * math.sin(math.pi * u)
+            return pos, y0 + wrap(y1 - y0) * e, False, 0.0
+        t1, t2 = t_toe, 1.0 - t_heel
+        toe_l = np.array(TOE_PIVOT) * self.scale
+        heel_l = np.array(HEEL_PIVOT) * self.scale
+
+        def pivoted(ankle, yaw, local, pitch):
+            Rz = rz(yaw * D2R)
+            return ankle + Rz @ local - Rz @ rx(pitch * D2R) @ local
+        if u < t1:
+            pitch = toe * smooth(u / t1)
+            return pivoted(p0 + lift, y0, toe_l, pitch), y0, False, pitch
+        if u >= t2:
+            pitch = -heel * (1 - smooth((u - t2) / (1 - t2)))
+            return pivoted(p1 + lift, y1, heel_l, pitch), y1, False, pitch
+        v = (u - t1) / (t2 - t1)
+        e = smooth(v)
+        a = pivoted(p0 + lift, y0, toe_l, toe)
+        b = pivoted(p1 + lift, y1, heel_l, -heel)
+        pos = a + (b - a) * e
+        pos[2] += h * math.sin(math.pi * v)
+        return pos, y0 + wrap(y1 - y0) * e, False, toe + (-heel - toe) * e
+
+    def flight(self, f):
+        """(flight start, flight end) frames of the step in progress at f when the foot is off the ground
+        entirely (not rolling on its toe or heel), else None."""
+        sw = self.swing_at(f)
+        if sw is None:
+            return None
+        f0, f1, toe, heel, t_toe, t_heel = sw[0], sw[1], sw[7][0], sw[7][1], sw[7][2], sw[7][3]
+        a = f0 + (t_toe * (f1 - f0) if toe else 0.0)
+        b = f1 - (t_heel * (f1 - f0) if heel else 0.0)
+        return (a, b) if a <= f < b else None
+
+    def grounded(self, f):
+        """True when some part of the sole is on the ground: planted, or rolling on the toe or the heel."""
+        return not any(a <= f < b for a, b in self.free) and self.flight(f) is None
+
+    def flight_progress(self, f):
+        fl = self.flight(f)
+        return None if fl is None else (f - fl[0]) / max(1e-6, fl[1] - fl[0])
+
+    def support_progress(self, f):
+        """0..1 through the current ground contact (end of last flight -> start of the next), else None."""
+        if not self.grounded(f):
+            return None
+        ends, starts = [], []
+        for sw in self.swings:
+            fl0 = sw[0] + (sw[7][2] * (sw[1] - sw[0]) if sw[7][0] else 0.0)
+            fl1 = sw[1] - (sw[7][3] * (sw[1] - sw[0]) if sw[7][1] else 0.0)
+            if fl1 <= f:
+                ends.append(fl1)
+            if fl0 > f:
+                starts.append(fl0)
+        if not ends or not starts:
+            return None
+        a, b = max(ends), min(starts)
+        return (f - a) / max(1e-6, b - a)
 
 
 def stance_offsets(stance, scale):
@@ -298,13 +403,19 @@ class CharacterSolver:
                     for f in range(a1, min(self.n, a2)):
                         u = (f - a1) / max(1, a2 - a1)
                         self.root_z[f] = 4 * h * u * (1 - u)
-                # Face the direction of travel while moving, then settle back.
+                # Face the direction of travel while moving, then settle back. A big turn into a walk or
+                # run is spread over the first steps (about half a second for a half turn) instead of
+                # being forced into the anticipation frames, so the feet can step around with it.
                 dv = p1 - p0
                 if np.linalg.norm(dv) > 0.05:
                     move_yaw = math.degrees(math.atan2(dv[0], -dv[1]))
+                    ramp = a1
+                    if t != 'jump':
+                        need = int(round(abs(wrap(move_yaw - self.yaw[min(self.n - 1, a0)])) / 180.0 * self.fps * 0.5))
+                        ramp = max(a1, min(a2 - 1, a0 + need))
                     for f in range(a0, min(self.n, a4)):
                         base = self.yaw[f]
-                        w = envelope(f, a0, a1, a2, max(a3, a2 + 1))
+                        w = envelope(f, a0, ramp, a2, max(a3, a2 + 1))
                         self.yaw[f] = base + wrap(move_yaw - base) * w
             elif t == 'turn':
                 y0 = float(a['params'].get('from_facing', self.yaw[max(0, a0 - 1)]))
@@ -339,7 +450,7 @@ class CharacterSolver:
         sc = self.scale
         p0 = pose_at(self.keys, 0)
         l, r = world_feet(self.root_xy[0], self.yaw[0], p0['feet']['stance'], sc)
-        self.feet = {'l': Foot(l, self.yaw[0]), 'r': Foot(r, self.yaw[0])}
+        self.feet = {'l': Foot(l, self.yaw[0], sc), 'r': Foot(r, self.yaw[0], sc)}
         # Stance changes and actions are planned in strict time order so every
         # step starts from the foot's real planted position at that moment.
         events = []
@@ -374,30 +485,7 @@ class CharacterSolver:
             t = a['type']
             stance = pose_at(self.keys, min(self.n - 1, a4))['feet']['stance']
             if t in ('walk', 'run'):
-                p0 = self.root_xy[a1]
-                p1 = self.root_xy[min(self.n - 1, a2)]
-                dist = float(np.linalg.norm(p1 - p0))
-                stride = (0.5 if t == 'walk' else 0.95) * sc
-                nsteps = max(2, int(math.ceil(dist / stride)) + 1)
-                span = max(1, a2 - a1)
-                h = (0.11 if t == 'walk' else 0.24) * sc
-                order = ['l', 'r'] if (len(self.feet['l'].swings) % 2 == 0) else ['r', 'l']
-                for i in range(nsteps):
-                    fs = a1 + int(span * i / nsteps)
-                    fe = a1 + int(span * (i + 1) / nsteps) + (2 if t == 'walk' else 0)
-                    side = order[i % 2]
-                    u = min(1.0, (i + 1) / nsteps)
-                    target_f = min(self.n - 1, a1 + int(span * u))
-                    yaw = self.yaw[target_f]
-                    lpos, rpos = world_feet(self.root_xy[target_f], yaw, 'neutral', sc)
-                    if i < nsteps - 1:
-                        # Lead foot lands ahead of the hips.
-                        fwd = np.array(list(direction(yaw)) + [0.0]) * stride * 0.25
-                        lpos, rpos = lpos + fwd, rpos + fwd
-                    self.feet[side].step(fs, min(fe, a2 + 6), lpos if side == 'l' else rpos, yaw, h)
-                l, r = world_feet(self.root_xy[min(self.n - 1, a3)], self.yaw[min(self.n - 1, a3)], stance, sc)
-                last = order[(nsteps) % 2]
-                self.feet[last].step(a2, min(a3 + 2, a2 + 10), l if last == 'l' else r, self.yaw[min(self.n - 1, a3)], h * 0.5)
+                self._plan_gait(a, stance)
             elif t == 'turn':
                 third = max(1, (a2 - a1) // 3)
                 y1 = self.yaw[min(self.n - 1, a2)]
@@ -434,10 +522,90 @@ class CharacterSolver:
                     l, r = world_feet(self.root_xy[f], self.yaw[f], 'neutral', sc)
                     self.feet[side].step(f, f + max(5, self.fps // 4), l if side == 'l' else r, self.yaw[f], 0.09 * sc)
 
+    def _plan_gait(self, a, stance):
+        """Footsteps for a walk or run.
+
+        Each step is heel-off (rolling on the toes) -> flight -> heel strike (rolling down from the heel)
+        -> foot flat. Steps start evenly spaced in time over the main phase, so they are short while the
+        root eases in and out and long at full speed. Only the flat-foot part has to hold still in world
+        space, so the cadence is chosen to keep the root's travel during it inside leg reach, and each foot
+        lands flat at the middle of the stretch of path it supports (half behind, half ahead of the hips).
+        A walk always has a foot on the ground; a run has short flights with both feet up. The last two
+        steps settle into the authored end stance.
+        """
+        sc, fps, last = self.scale, self.fps, self.n - 1
+        a0, a1, a2, a3, a4 = self.phases(a)
+        run = a['type'] == 'run'
+        span = max(1, a2 - a1)
+        path = self.root_xy[a1:min(self.n, a2 + 1)]
+        v_peak = float(np.max(np.linalg.norm(np.diff(path, axis=0), axis=1))) if len(path) > 1 else 0.0
+        # Phase lengths in step intervals (one step interval = time between successive lift-offs).
+        toe_t, flight_t, heel_t = (0.18, 1.3, 0.12) if run else (0.3, 0.8, 0.22)
+        step_t = toe_t + flight_t + heel_t          # lift-off -> foot flat
+        flat_t = max(0.25, 2.0 - step_t)             # flat-foot support per foot
+        reach = (0.5 if run else 0.42) * sc          # root travel allowed under one flat foot
+        cad_lo, cad_hi = (2.4, 4.6) if run else (1.5, 3.2)   # steps per second
+        dt = fps / cad_lo
+        if v_peak > 1e-6:
+            dt = min(dt, reach / (v_peak * flat_t))
+        dt = max(fps / cad_hi, dt)
+        nsteps = max(2, int(math.ceil(span / dt)))
+        step = span / nsteps
+        lat = (0.13 if run else 0.15) * sc
+        h = (0.14 if run else 0.07) * sc
+        roll = ((38.0, 6.0) if run else (24.0, 14.0)) + (toe_t / step_t, heel_t / step_t)
+        end_f = min(last, a3)
+        end_l, end_r = world_feet(self.root_xy[end_f], self.yaw[end_f], stance, sc)
+        # The foot further behind (along the direction of travel) steps first; ties are seeded by the id.
+        travel = path[-1] - path[0] if len(path) > 1 else np.zeros(2)
+        behind = {s: float(np.dot(self.feet[s].at_plant(a1)[0][:2] - self.root_xy[a1], travel)) for s in 'lr'}
+        if abs(behind['l'] - behind['r']) > 1e-3:
+            first = 'l' if behind['l'] < behind['r'] else 'r'
+        else:
+            first = 'l' if LF.rand01(self.cid, a['id'], 'lead') < 0.5 else 'r'
+        order = [first, 'r' if first == 'l' else 'l']
+        # Turning into the direction of travel: start stepping right away so the feet turn with the body.
+        start = a1
+        if abs(wrap(self.yaw[min(last, (a1 + a2) // 2)] - self.yaw[min(last, a0)])) > 30 and a1 > a0:
+            start = a0
+            nsteps = max(2, int(math.ceil((a2 - start) / dt)))
+            step = (a2 - start) / nsteps
+        lifts = [start + step * i for i in range(nsteps)] + [float(a2)]
+
+        def placed(side, f_mid):
+            fm = min(last, int(round(min(a2, max(a1, f_mid)))))
+            yaw = self.yaw[fm]
+            off = rz(yaw * D2R) @ np.array([lat if side == 'l' else -lat, 0.0, 0.0])
+            return np.array([self.root_xy[fm][0], self.root_xy[fm][1], 0.0]) + off, yaw
+        for i in range(nsteps):
+            side = order[i % 2]
+            f0 = int(round(lifts[i]))
+            f1 = max(f0 + 4, int(round(lifts[i] + step_t * step)))
+            if i == nsteps - 1:
+                pos, yaw = (end_l if side == 'l' else end_r), self.yaw[end_f]
+            else:
+                flat_end = lifts[i + 2] if i + 2 < len(lifts) else a2
+                pos, yaw = placed(side, (f1 + max(f1, flat_end)) / 2.0)
+            self.feet[side].step(f0, f1, pos, yaw, h, roll)
+        # Closing step: the trailing foot comes alongside into the end stance.
+        side = order[(nsteps - 2) % 2]
+        sw = self.feet[side].swings[-1]
+        c0 = max(a2, sw[1] + 1)
+        c1 = c0 + max(8, int(round(0.8 * step_t * step)))
+        self.feet[side].step(c0, c1, end_l if side == 'l' else end_r, self.yaw[end_f], h * 0.6,
+                             (roll[0] * 0.5, roll[1] * 0.5, roll[2], roll[3]))
+
     def _end_of_state(self, a, ender):
         for b in self.actions:
             if b['type'] == ender and b['start_frame'] >= a['start_frame']:
                 return self.phases(b)[2]
+        return self.n
+
+    def _start_of_ender(self, a, ender):
+        """First frame of the action that ends a held state (crouch -> stand_up, fall_down -> get_up)."""
+        for b in self.actions:
+            if b['type'] == ender and b['start_frame'] >= a['start_frame']:
+                return b['start_frame']
         return self.n
 
     # -- per-frame targets
@@ -460,20 +628,25 @@ class CharacterSolver:
         weight = pose['feet']['weight']
         shift = {'left': 0.05, 'right': -0.05}.get(weight, 0.0)
         hip_roll = {'left': -3.0, 'right': 3.0}.get(weight, 0.0)
-        breathe = math.sin(2 * math.pi * f / (self.fps * 3.6) + zlib.crc32(self.cid.encode()) % 7)
+        # Spine/chest X: positive tips the upper body toward the facing direction (-y), so a forward lean
+        # is positive. (Breathing and idle weight shifts are added by life_layers.)
         tgt = {
             'pelvis': [0.0, hip_roll, 0.0],
-            'spine': [-lean * 0.55 + 0.6 * breathe, side * 0.6, twist * 0.4],
-            'chest': [-lean * 0.45, side * 0.4, twist * 0.6],
+            'spine': [lean * 0.55, side * 0.6, twist * 0.4],
+            'chest': [lean * 0.45, side * 0.4, twist * 0.6],
             'neck': [head_pitch * -0.4, 0.0, head['yaw'] * 0.3],
             'head': [head_pitch * -0.6, head['roll'], head['yaw'] * 0.7],
         }
-        pelvis_loc = [shift + 0.008 * math.sin(2 * math.pi * f / (self.fps * 4.1)), 0.0, -pelvis_drop]
+        pelvis_loc = [shift, 0.0, -pelvis_drop]
         shoulders = pose['shoulders']['raise'] * 0.06
         return tgt, pelvis_loc, shoulders
 
     def action_layers(self, f, tgt, pelvis_loc, arm_override, face_over):
-        """Apply active actions to body targets. Returns (pelvis_z_extra, root_z_extra)."""
+        """Apply active actions to body targets; returns the pelvis offset.
+
+        Spine X is positive for a forward lean (see body_targets). 'idle' and 'talk' have no direct
+        layer here: life_layers performs them (and does so automatically when nothing else is going on).
+        """
         sc = self.scale
         for a in self.actions:
             a0, a1, a2, a3, a4 = self.phases(a)
@@ -487,7 +660,7 @@ class CharacterSolver:
                 crouch = 0.0
                 if a0 <= f < a1:
                     crouch = (0.22 if t == 'jump' else 0.12) * smooth((f - a0) / max(1, a1 - a0))
-                    tgt['spine'][0] -= 18 * smooth((f - a0) / max(1, a1 - a0))
+                    tgt['spine'][0] += 18 * smooth((f - a0) / max(1, a1 - a0))
                     arm_override['both_swing'] = 35 * smooth((f - a0) / max(1, a1 - a0))
                 elif a1 <= f < a2:
                     u = (f - a1) / max(1, a2 - a1)
@@ -499,60 +672,55 @@ class CharacterSolver:
                 elif a2 <= f < a3:
                     u = (f - a2) / max(1, a3 - a2)
                     crouch = 0.24 * math.sin(math.pi * min(1.0, u * 1.2)) * (1.0 if t == 'jump' else 0.6)
-                    tgt['spine'][0] -= 10 * math.sin(math.pi * u)
+                    tgt['spine'][0] += 10 * math.sin(math.pi * u)
                     if t == 'celebrate':
                         arm_override['right_pose'] = 'fist_pump'
                         arm_override['weight'] = 1 - smooth(u)
                 pelvis_loc[2] -= crouch
             elif t in ('walk', 'run'):
-                if a1 <= f < a3:
-                    u = (f - a1) / max(1, a2 - a1)
-                    freq = (2.0 if t == 'walk' else 3.0)
-                    ph = 2 * math.pi * u * max(1, (a2 - a1) / self.fps) * freq / 2
-                    amp = 22 if t == 'walk' else 40
-                    arm_override['swing'] = amp * math.sin(ph) * w
-                    pelvis_loc[2] -= (0.03 if t == 'walk' else 0.06) * abs(math.sin(ph)) * w
-                    tgt['spine'][0] -= (4 if t == 'walk' else 14) * w
-                    if t == 'run':
-                        arm_override['elbow'] = -80 * w
+                self.gait_layers(a, f, w, tgt, pelvis_loc, arm_override)
             elif t == 'stumble':
                 if a0 <= f < a3:
                     u = (f - a0) / max(1, a3 - a0)
-                    tgt['spine'][0] -= 22 * math.sin(math.pi * u)
+                    tgt['spine'][0] += 22 * math.sin(math.pi * u)
                     arm_override['windmill'] = (u, w)
                     face_over['eyes_open'] = max(face_over.get('eyes_open', 0), 1.25 * w)
             elif t in ('crouch', 'cower'):
-                stand = self._end_of_state(a, 'stand_up')
-                if f < stand:
+                # Held until stand_up starts; from then stand_up alone raises the hips (both at once would
+                # drop the pelvis to the floor for the length of the stand-up).
+                stand0, stand1 = self._start_of_ender(a, 'stand_up'), self._end_of_state(a, 'stand_up')
+                if f < stand1:
                     u = smooth((f - a0) / max(1, a2 - a0))
-                    pelvis_loc[2] -= 0.34 * u
-                    tgt['spine'][0] -= 14 * u
+                    rise = smooth((f - stand0) / max(1, stand1 - stand0)) if f >= stand0 else 0.0
+                    if f < stand0:
+                        pelvis_loc[2] -= 0.34 * u
+                        tgt['spine'][0] += 14 * u
                     if t == 'cower':
                         arm_override['both_pose'] = 'cower'
-                        arm_override['weight'] = u
-                        tgt['head'][0] += 14 * u
+                        arm_override['weight'] = u * (1 - rise)
+                        tgt['head'][0] += 14 * u * (1 - rise)
             elif t == 'stand_up':
                 u = smooth((f - a0) / max(1, a2 - a0))
                 pelvis_loc[2] -= 0.34 * (1 - u)
-                tgt['spine'][0] -= 14 * (1 - u)
+                tgt['spine'][0] += 14 * (1 - u)
             elif t == 'fall_down':
-                get_up = self._end_of_state(a, 'get_up')
+                get_up = self._start_of_ender(a, 'get_up')
                 if f < get_up:
                     u = smooth((f - a1) / max(1, a2 - a1)) if f >= a1 else 0.0
                     pelvis_loc[2] -= 0.62 * u
                     pelvis_loc[1] += 0.0
-                    tgt['spine'][0] += 18 * u
+                    tgt['spine'][0] -= 18 * u
                     arm_override['both_pose'] = 'arms_out'
                     arm_override['weight'] = u * (1.0 if f < a3 else 0.4)
                     face_over['eyes_open'] = max(face_over.get('eyes_open', 0), 1.2 * w)
             elif t == 'get_up':
                 u = smooth((f - a0) / max(1, a2 - a0))
                 pelvis_loc[2] -= 0.62 * (1 - u)
-                tgt['spine'][0] += 18 * (1 - u) - 20 * math.sin(math.pi * u)
+                tgt['spine'][0] += -18 * (1 - u) + 20 * math.sin(math.pi * u)
             elif t == 'flinch':
                 u = (f - a0) / max(1, a2 - a0)
                 k = math.sin(math.pi * min(1.0, u)) if f < a2 else (1 - smooth((f - a2) / max(1, a4 - a2)))
-                tgt['spine'][0] += 14 * k
+                tgt['spine'][0] -= 14 * k
                 tgt['head'][0] += 10 * k
                 pelvis_loc[2] -= 0.05 * k
                 arm_override['both_pose'] = 'chest'
@@ -571,11 +739,6 @@ class CharacterSolver:
                 u = (f - a1) / max(1, a2 - a1)
                 if a1 <= f < a2:
                     tgt['head'][2] += 18 * math.sin(3 * 2 * math.pi * u) * (1 - u * 0.5)
-            elif t == 'talk':
-                if a1 <= f < a2:
-                    tgt['head'][0] += 3.0 * math.sin(2 * math.pi * (f - a1) / (self.fps * 0.55))
-                    tgt['head'][2] += 4.0 * math.sin(2 * math.pi * (f - a1) / (self.fps * 1.7))
-                    arm_override['talk_' + a['params'].get('hand', 'right')] = w
             elif t == 'dance':
                 if a1 <= f < a2:
                     ph = 2 * math.pi * (f - a1) / (self.fps * 0.5)
@@ -592,12 +755,436 @@ class CharacterSolver:
                 arm_override['shoulder_raise'] = 0.06 * k
             elif t == 'facepalm':
                 tgt['head'][0] += 16 * w
-                tgt['spine'][0] -= 6 * w
+                tgt['spine'][0] += 6 * w
             elif t == 'think':
                 tgt['head'][1] += 10 * w
                 face_over['look_pitch'] = 18 * w
         _ = sc
         return pelvis_loc
+
+    # -- locomotion body mechanics
+    def _root_speed(self, f):
+        """Root ground speed in metres per frame (central difference)."""
+        a, b = max(0, f - 1), min(self.n - 1, f + 1)
+        return float(np.linalg.norm(self.root_xy[b] - self.root_xy[a])) / max(1, b - a)
+
+    def gait_layers(self, a, f, w, tgt, pelvis_loc, arm_override):
+        """Walk/run mechanics read from the planned footsteps, so arms, hips and bob stay in step with them.
+
+        Arms swing opposite to the legs, hips turn with the stepping leg while the shoulders counter-turn,
+        the pelvis is lowest when both feet are down (walk) or mid-stance (run) and shifts over the planted
+        foot, and the body leans into the speed and into acceleration (back a little when stopping).
+        """
+        run = a['type'] == 'run'
+        fwd = np.array(direction(self.yaw[f]))
+        root = self.root_xy[f]
+        d = {}
+        for s in 'lr':
+            ank = self.feet[s].pose(f)[0]
+            d[s] = float(np.dot(ank[:2] - root, fwd)) if ank is not None else 0.0
+        swing = max(-1.0, min(1.0, (d['l'] - d['r']) / (0.7 * self.scale)))
+        a0, a1, a2, a3, a4 = self.phases(a)
+        peak = max(1e-6, max(self._root_speed(g) for g in range(a1, min(self.n, a2 + 1), 2)) if a2 > a1 else 1e-6)
+        sp = min(1.0, self._root_speed(f) / peak)
+        arm_override['gait'] = {'swing': swing, 'amp': (40.0 if run else 22.0) * w, 'w': w,
+                                'elbow': (-80.0 if run else -12.0) * w}
+        py = -swing * (9.0 if run else 6.0) * w     # + turns the right hip forward
+        tgt['pelvis'][2] += py
+        tgt['spine'][2] -= 0.5 * py
+        tgt['chest'][2] -= 0.7 * py
+        tgt['neck'][2] += 0.2 * py
+        flying = [s for s in 'lr' if self.feet[s].flight(f) is not None]
+        amp = (0.05 if run else 0.03) * (0.3 + 0.7 * sp) * w
+        if run:
+            # Lowest mid-support (the leg absorbs the landing), highest in the flight between steps.
+            support = [s for s in 'lr' if s not in flying]
+            v = self.feet[support[0]].support_progress(f) if len(support) == 1 else None
+            pelvis_loc[2] -= 0.04 * w + (amp * math.sin(math.pi * v) if v is not None else 0.0)
+        elif len(flying) == 1:
+            # Highest as the swinging leg passes the standing one, lowest with both feet down.
+            pelvis_loc[2] -= amp * (1 - math.sin(math.pi * self.feet[flying[0]].flight_progress(f)))
+        elif not flying:
+            pelvis_loc[2] -= amp
+        if len(flying) == 1:
+            u = self.feet[flying[0]].flight_progress(f)
+            side = 1.0 if flying[0] == 'r' else -1.0       # + = weight over the left foot
+            k = math.sin(math.pi * u) * w
+            pelvis_loc[0] += (0.012 if run else 0.022) * side * k
+            tgt['pelvis'][1] -= 2.5 * side * k
+            tgt['spine'][1] += 1.2 * side * k
+        acc = (self._root_speed(min(self.n - 1, f + 2)) - self._root_speed(max(0, f - 2))) / 4.0
+        lean_acc = max(-5.0, min(7.0, math.degrees(math.atan(acc * self.fps * self.fps / 9.81)) * 0.8))
+        lean = ((11.0 if run else 4.0) * sp + lean_acc) * w
+        tgt['spine'][0] += lean * 0.6
+        tgt['chest'][0] += lean * 0.4
+        tgt['head'][0] -= lean * 0.5   # keep the eyes on the path
+
+    # -- life: idle, speech and listening layers
+    def plan_speech(self, words_by_line):
+        """Stressed moments of every line this character speaks (and of explicit silent 'talk' actions)."""
+        fps, n = self.fps, self.n
+        talks = [a for a in self.actions if a['type'] == 'talk']
+        self.speech = []
+        for ln in self.m['lines']:
+            if ln['speaker'] != self.cid:
+                continue
+            a, b = ln['start_frame'], min(n, ln['est_end_frame'])
+            if b - a < 3:
+                continue
+            peaks = LF.emphasis_peaks(ln['text'], words_by_line.get(ln['id']) or [], self.env, a, b, fps,
+                                      (self.cid, ln['id']))
+            hand = next((t['params'].get('hand', 'right') for t in talks
+                         if t['start_frame'] < b and t['end_frame'] > a), None)
+            self.speech.append({'id': ln['id'], 'a': a, 'b': b, 'peaks': peaks, 'text': ln['text'],
+                                'emotion': ln.get('emotion', 'neutral'), 'volume': ln.get('volume', 'normal'),
+                                'hand': hand})
+        for t in talks:
+            a0, a1, a2, a3, a4 = self.phases(t)
+            if a2 <= a1 or any(it['a'] < a2 and it['b'] > a1 for it in self.speech):
+                continue
+            self.speech.append({'id': t['id'], 'a': a1, 'b': min(n, a2), 'text': '', 'volume': 'normal',
+                                'peaks': LF.synthetic_beats(a1, min(n, a2), fps, (self.cid, t['id'])),
+                                'emotion': pose_at(self.keys, a1).get('expression', 'neutral'),
+                                'hand': t['params'].get('hand', 'right')})
+        self.speech.sort(key=lambda it: it['a'])
+
+    def _partner(self, f):
+        """Who this character is talking with at f: its eye-target character, else the nearest other."""
+        others = {k: v for k, v in getattr(self, 'others', {}).items() if k != self.cid}
+        if not others:
+            return None
+        et = self.poses[f].get('eye_target') or {}
+        if et.get('kind') == 'character' and et.get('id') in others:
+            return et['id']
+        return min(sorted(others), key=lambda k: float(np.linalg.norm(others[k].root_xy[f] - self.root_xy[f])))
+
+    def plan_life(self, poses, camera_at=None):
+        """Per-frame idle, speech and listening layers, and where each of them is allowed to act."""
+        n, fps, cid = self.n, self.fps, self.cid
+        self.poses = poses
+        body = np.zeros(n, bool)
+        head = np.zeros(n, bool)
+        arm = {'l': np.zeros(n, bool), 'r': np.zeros(n, bool)}
+        boost = np.zeros(n)
+        for a in self.actions:
+            a0, a1, a2, a3, a4 = self.phases(a)
+            t = a['type']
+            end = a4
+            if t in ('crouch', 'cower', 'fall_down'):
+                end = max(a4, self._end_of_state(a, 'get_up' if t == 'fall_down' else 'stand_up'))
+            lo, hi = max(0, a0), min(n, end)
+            if t in BODY_BUSY:
+                body[lo:hi] = True
+            if t in HEAD_BUSY:
+                head[lo:hi] = True
+            if t in ARMS_BUSY:
+                arm['l'][lo:hi] = arm['r'][lo:hi] = True
+            if t in HAND_BUSY:
+                arm['l' if a['params'].get('hand', 'right') == 'left' else 'r'][lo:hi] = True
+            if t == 'idle':
+                for f in range(lo, hi):
+                    boost[f] = max(boost[f], envelope(f, a0, max(a1, a0 + 6), a3, max(a4, a3 + 6)))
+        held = {'l': False, 'r': False}
+        events = sorted((e for e in self.m['tracks']['props'] if e['character'] == cid), key=lambda e: e['frame'])
+        ei = 0
+        for f in range(n):
+            while ei < len(events) and events[ei]['frame'] <= f:
+                e = events[ei]
+                held['l' if e.get('hand') == 'left' else 'r'] = e['event'] == 'attach'
+                ei += 1
+            for s, name in (('l', 'left'), ('r', 'right')):
+                if poses[f]['arms'][name] != 'rest' or held[s]:
+                    arm[s][f] = True
+            if any(not self.feet[s].pose(f)[2] for s in 'lr'):
+                body[f] = True
+        L = {'idle': LF.free_weight(body, 10), 'head_free': LF.free_weight(head, 8),
+             'arm_free': {s: LF.free_weight(arm[s], 8) for s in 'lr'}}
+        arousal = np.array([AROUSAL.get(p.get('expression'), 1.0) for p in poses])
+        own = [(it['a'], it['b']) for it in self.speech if it['text']]
+        L['breath'] = LF.breath_track(n, fps, cid, own, arousal) * (1 + 0.4 * (arousal - 1))
+        L['sway'] = LF.sway_track(n, fps, cid) * (1 + 0.8 * boost)
+        L['drift'] = 1 + 0.6 * boost
+        # Speech: gesture windows, beats, nods, brow raises and a lean toward the listener.
+        G = {s: np.zeros(n) for s in 'lr'}
+        wsum = {s: np.zeros(n) for s in 'lr'}
+        hold = {s: np.zeros((n, 4)) for s in 'lr'}
+        stroke = {s: np.zeros((n, 4)) for s in 'lr'}
+        wrist = {s: np.zeros((n, 3)) for s in 'lr'}
+        head_s, head_l = np.zeros((n, 3)), np.zeros((n, 3))
+        brow_s, brow_l = np.zeros(n), np.zeros(n)
+        speak, listen = np.zeros(n), np.zeros(n)
+        lean = np.zeros(n)
+        partner = [None] * n
+        pref = 'r' if LF.rand01(cid, 'hand') < 0.75 else 'l'
+        other = {'l': 'r', 'r': 'l'}
+        for it in self.speech:
+            key = (cid, it['id'])
+            a, b, peaks = it['a'], it['b'], it['peaks']
+            emo = it['emotion']
+            gain = LF.VOLUME_GAIN.get(it['volume'], 1.0) * (1.15 if emo in LF.ENERGETIC else
+                                                             0.75 if emo in LF.SUBDUED else 1.0)
+            g0 = min([a] + [p for p, _ in peaks]) - 10
+            g1 = max([b] + [p + 10 for p, _ in peaks]) + 14
+            env = np.zeros(n)
+            for f in range(max(0, g0), min(n, g1)):
+                env[f] = min(smooth((f - g0) / 8.0), 1 - smooth((f - (g1 - 14)) / 14.0))
+            speak = np.maximum(speak, env)
+            lean = np.maximum(lean, 1.8 * env)
+            style = LF.choose_style(key, emo, it['text'], (b - a) / fps)
+            dom = {'left': 'l', 'right': 'r'}.get(it['hand']) or (pref if LF.rand01(key, 'switch') > 0.25 else other[pref])
+            if float(np.mean(L['arm_free'][dom][a:b])) < 0.5:
+                dom = other[dom]
+            D = LF.stroke_curve(peaks, n, key, gain)
+            sides = []
+            if style == 'both':
+                sides = [(dom, 1.0, 'beat', D), (other[dom], 0.85, 'beat', 0.8 * np.roll(D, 1))]
+            elif style != 'still':
+                sides = [(dom, 1.0, style, D)]
+                if LF.rand01(key, 'sym') < 0.4:
+                    sides.append((other[dom], 0.35, 'beat', 0.3 * D))
+            for s, gw, st, Ds in sides:
+                spec = LF.GESTURES[st]
+                m_ = np.array([1, -1, -1, 1]) if s == 'r' else np.ones(4)
+                mw = np.array([1, -1, -1]) if s == 'r' else np.ones(3)
+                ew = env * gw
+                G[s] = np.maximum(G[s], ew)
+                wsum[s] += ew
+                hold[s] += ew[:, None] * (np.array(spec['hold']) * m_)
+                stroke[s] += (ew * Ds)[:, None] * (np.array(spec['stroke']) * m_)
+                wrist[s] += (ew * Ds)[:, None] * (np.array(spec['wrist']) * mw)
+            sign = 1.0 if LF.rand01(key, 'tilt') < 0.5 else -1.0
+            for k, (p, s) in enumerate(peaks):
+                # Head targets lead by two frames (the head spring lags), so the dip lands on the syllable.
+                q = p - 2
+                for f in range(max(0, q), min(n, q + 12)):
+                    head_s[f, 0] += 3.6 * s * gain * LF.kernel_nod(f - q)
+                if LF.rand01(key, 'tilt', k) < 0.3:
+                    sign = -sign
+                    for f in range(max(0, q), min(n, q + 18)):
+                        head_s[f, 1] += 3.0 * s * sign * LF.kernel_nod(f - q, 5, 12)
+                for f in range(max(0, p - 3), min(n, p + 9)):
+                    brow_s[f] = max(brow_s[f], s * min(1.0, gain) * LF.kernel_nod(f - p + 3, 3, 8))
+            if it['text'].rstrip().endswith('?'):
+                # Questions end with a small head tilt, a lift of the chin and raised brows.
+                for f in range(max(0, b - 12), min(n, b + 16)):
+                    k = min(smooth((f - (b - 12)) / 10.0), 1 - smooth((f - b) / 16.0))
+                    head_s[f, 1] += 4.0 * sign * k
+                    head_s[f, 0] -= 2.0 * k
+                    brow_s[f] = max(brow_s[f], 0.6 * k)
+        # Listening: steady eye contact, a tilt, and small nods on the speaker's stressed words.
+        for oid, o in sorted(getattr(self, 'others', {}).items()):
+            if oid == cid:
+                continue
+            for it in getattr(o, 'speech', []):
+                key = (cid, 'listen', oid, it['id'])
+                a, b = it['a'], it['b']
+                env = np.zeros(n)
+                for f in range(max(0, a), min(n, b + 24)):
+                    env[f] = min(smooth((f - a) / 10.0), 1 - smooth((f - (b + 8)) / 16.0))
+                for f in range(max(0, a), min(n, b + 24)):
+                    if env[f] * (1 - speak[f]) > 0.05 and (partner[f] is None or env[f] > listen[f]):
+                        partner[f] = oid
+                listen = np.maximum(listen, env)
+                lean = np.maximum(lean, 1.0 * env * (1 - speak))
+                tilt = 2.2 if LF.rand01(key, 'tilt') < 0.5 else -2.2
+                head_l[:, 1] += tilt * env
+                last = -10 ** 6
+                for k, (p, s) in enumerate(it['peaks']):
+                    if LF.rand01(key, 'nod', k) < 0.2 + 0.35 * s:
+                        q = p + 5 + int(4 * LF.rand01(key, 'delay', k))
+                        if q - last >= 36:
+                            last = q
+                            for f in range(max(0, q), min(n, q + 14)):
+                                head_l[f, 0] += 2.6 * (0.6 + 0.4 * s) * LF.kernel_nod(f - q, 4, 10)
+                if it['text'].rstrip().endswith('?'):
+                    for f in range(max(0, b - 4), min(n, b + 18)):
+                        brow_l[f] = max(brow_l[f], 0.5 * LF.kernel_nod(f - b + 4, 6, 12))
+                elif it['text'] and LF.rand01(key, 'end') < 0.55 and b + 4 - last >= 30:
+                    for f in range(max(0, b + 4), min(n, b + 18)):
+                        head_l[f, 0] += 3.0 * LF.kernel_nod(f - b - 4, 4, 10)
+        for f in range(n):
+            if speak[f] > 0.05 and partner[f] is None:
+                partner[f] = self._partner(f)
+        quiet = 1 - speak
+        L['gesture'] = G
+        for s in 'lr':
+            d = np.maximum(wsum[s], 1e-6)[:, None]
+            hold[s] /= d
+            stroke[s] /= d
+            wrist[s] /= d
+        L['hold'], L['stroke'], L['wrist'] = hold, stroke, wrist
+        L['head'] = head_s + head_l * quiet[:, None]
+        L['brow'] = np.maximum(brow_s, brow_l * quiet)
+        L['lean'] = lean
+        L['attend'] = np.maximum(speak, listen * quiet)
+        L['partner'] = partner
+        mode = ['speak' if speak[f] > 0.5 else 'listen' if listen[f] * quiet[f] > 0.5 else 'idle' for f in range(n)]
+        L['sacc'] = LF.saccade_track(n, fps, cid, mode)
+        avert = np.zeros((n, 2))
+        own_lines = [ln for ln in self.m['lines'] if ln['speaker'] == cid]
+        for f0, f1, (x, z) in LF.gaze_aversions(own_lines, fps, cid):
+            for f in range(max(0, f0), min(n, f1 + 3)):
+                k = min(1.0, (f - f0 + 1) / 2.0, (f1 + 3 - f) / 3.0)
+                avert[f] = (x * k, z * k)
+        L['avert'] = avert
+        # Turn anticipation: within a turn or move (or while a pose key changes the facing) the head looks
+        # ahead to where the body will face. It builds up from the action's first frame, never earlier, so
+        # authored holds (and the readable face of an expression just before the move) keep their timing.
+        moves = [(a['start_frame'], a['end_frame'], max(3, a['anticipation_frames'])) for a in self.actions
+                 if a['type'] in ('turn', 'walk', 'run', 'jump')]
+        lead = np.zeros((n, 2))
+        for f in range(n):
+            win = next((w for w in moves if w[0] <= f < w[1]), None)
+            k = 1.0
+            if win is not None:
+                hi = min(n - 1, win[1] - 1)
+                k = smooth((f - win[0] + 1) / float(win[2]))
+            elif abs(wrap(self.yaw[min(n - 1, f + 1)] - self.yaw[max(0, f - 1)])) > 0.2:
+                hi = n - 1
+            else:
+                continue
+            lead[f] = (k * max(-35.0, min(35.0, 0.7 * wrap(self.yaw[min(hi, f + 7)] - self.yaw[f]))),
+                       k * max(-12.0, min(12.0, 0.35 * wrap(self.yaw[min(hi, f + 3)] - self.yaw[f]))))
+        L['lead'] = lead
+        # Cheat to camera: where the camera is (relative to the body's facing), so idle drift, glances and
+        # turning toward a partner do not swing the face further from the lens than the authored pose has it.
+        cam_rel = np.zeros(n)
+        if camera_at is not None:
+            for f in range(n):
+                d = np.asarray(camera_at(f), dtype=float)[:2] - self.root_xy[f]
+                if float(np.linalg.norm(d)) > 1e-6:
+                    cam_rel[f] = wrap(math.degrees(math.atan2(d[0], -d[1])) - self.yaw[f])
+        L['cam_rel'] = cam_rel
+        # A facepalm buries the face in the hand: the head stops tracking the eye target meanwhile, which
+        # also keeps the forehead inside the arm's reach.
+        cover = np.zeros(n)
+        for a in self.actions:
+            if a['type'] == 'facepalm':
+                a0, a1, a2, a3, a4 = self.phases(a)
+                for f in range(max(0, a0), min(n, a4)):
+                    cover[f] = max(cover[f], envelope(f, a0, a1 if a1 > a0 else a0 + 1, a4 - 4, max(a4, a3 + 1)))
+        L['face_cover'] = cover
+        # A blink often comes with a big change of gaze (a new eye target, glancing away).
+        extra = set()
+        shifts = [f for f in range(1, n) if poses[f].get('eye_target') != poses[f - 1].get('eye_target')]
+        shifts += [f0 for f0, _, _ in LF.gaze_aversions(own_lines, fps, cid)]
+        for f in sorted(shifts):
+            if 0 < f < n - 5 and not any(abs(f - b) < 18 for b in list(self.blinks) + list(extra)):
+                extra.add(f + 1)
+        self.extra_blinks = extra
+        self.L = L
+
+    def life_layers(self, f, pose, tgt, pelvis_loc, face_over):
+        """Add idle life, speech and listening motion to the body targets; returns a shoulder raise."""
+        L, cid = self.L, self.cid
+        iw, hw = float(L['idle'][f]), float(L['head_free'][f])
+        cr = float(L['cam_rel'][f])
+
+        def cheat(yaw):
+            # Yaw that would turn the face away from a camera off to one side is mostly held back.
+            return yaw * 0.1 if abs(cr) > 15.0 and yaw * cr < 0 else yaw
+        # Breathing: the chest lifts and the shoulders rise on the inhale; the head keeps its eye-line.
+        b = float(L['breath'][f])
+        tgt['chest'][0] -= 1.4 * b
+        tgt['spine'][0] -= 0.5 * b
+        tgt['head'][0] += 0.6 * b
+        shoulder = 0.012 * (b + 1) * 0.5
+        # Weight shifts: the pelvis drifts over one foot (the legs are re-solved by IK so the planted feet
+        # stay put), the hip on that side rises and the upper body counter-tilts to stay balanced.
+        s = float(L['sway'][f]) * iw
+        pelvis_loc[0] += 0.032 * s
+        pelvis_loc[2] -= 0.008 * abs(s)
+        tgt['pelvis'][1] -= 2.2 * s
+        tgt['pelvis'][2] += cheat(1.5 * s)
+        tgt['spine'][1] += 1.5 * s
+        tgt['chest'][1] += 0.7 * s
+        # Head drift and following the eyes when they glance away.
+        t = f / float(self.fps)
+        hd = hw * (0.35 + 0.65 * iw) * float(L['drift'][f])
+        av = L['avert'][f]
+        tgt['head'][2] += cheat(2.8 * LF.noise(t / 2.9, (cid, 'yaw')) * hd + 12.0 * av[0] * hw)
+        tgt['head'][0] += 1.6 * LF.noise(t / 2.2, (cid, 'pitch')) * hd - 6.0 * av[1] * hw
+        tgt['head'][1] += 1.8 * LF.noise(t / 3.6, (cid, 'roll')) * hd
+        # Speech beats / listener nods (pitch, roll, yaw).
+        hs = L['head'][f]
+        tgt['head'][0] += hs[0] * hw
+        tgt['head'][1] += hs[1] * hw
+        tgt['head'][2] += cheat(hs[2] * hw)
+        # Lean and turn the chest a little toward the conversation partner.
+        pid, pw = L['partner'][f], float(L['attend'][f])
+        if pid is not None and pw > 0.01 and pid in self.others:
+            dv = self.others[pid].root_xy[f] - self.root_xy[f]
+            if float(np.linalg.norm(dv)) > 0.05:
+                rel = wrap(math.degrees(math.atan2(dv[0], -dv[1])) - self.yaw[f])
+                # Not while an authored head action (facepalm, think, nod...) is playing.
+                tw = cheat(max(-10.0, min(10.0, 0.3 * rel)) * pw * iw * hw)
+                tgt['chest'][2] += 0.6 * tw
+                tgt['spine'][2] += 0.4 * tw
+            tgt['spine'][0] += float(L['lean'][f]) * iw
+        # Turns: the head (and eyes) lead, the chest follows, the hips come last.
+        lead, chest_lead = L['lead'][f]
+        tgt['head'][2] += lead
+        tgt['chest'][2] += chest_lead
+        face_over['pupil_add'] = (float(L['sacc'][f][0] + av[0]) + lead / 70.0, float(L['sacc'][f][1] + av[1]))
+        face_over['brow_emphasis'] = float(L['brow'][f])
+        return shoulder
+
+    def relaxed_arm(self, side, f):
+        """Offsets (shoulder xyz, elbow) that make a hanging arm look relaxed and alive, per side and character."""
+        cid, t = self.cid, f / float(self.fps)
+        k = (cid, side)
+        sx = -4.0 + 8.0 * LF.rand01(k, 'sx') + 2.0 * LF.noise(t / 3.3, (k, 'nx'))
+        sy = -(1.0 + 3.0 * LF.rand01(k, 'sy')) - 1.0 * float(self.L['breath'][f])
+        sz = -5.0 + 10.0 * LF.rand01(k, 'sz')
+        el = -(6.0 + 10.0 * LF.rand01(k, 'el')) + 3.0 * LF.noise(t / 4.1, (k, 'ne'))
+        # The arm on the weight-bearing side hangs a touch closer to the body.
+        sy += 1.5 * float(self.L['sway'][f] * self.L['idle'][f]) * (1 if side == 'l' else -1)
+        out = np.array([sx, sy, sz, el])
+        if side == 'r':
+            out[1], out[2] = -out[1], -out[2]
+        return out
+
+    def relaxed_wrist(self, side):
+        k = (self.cid, side)
+        out = np.array([-6.0 + 12.0 * LF.rand01(k, 'wx'), 0.0, -8.0 + 16.0 * LF.rand01(k, 'wz')])
+        if side == 'r':
+            out[2] = -out[2]
+        return out
+
+    def _reach_drop(self, plan):
+        """Extra pelvis drop per frame (rig units) keeping every planted foot inside leg reach.
+
+        Weight shifts, leans and gait bob move the hips; where that would pull a planted foot off the
+        ground the knees bend a little more instead. The requirement is spread over neighbouring frames
+        so the dip eases in and out rather than popping.
+        """
+        sc, n = self.scale, self.n
+        reach = (R.THIGH + R.SHIN - 0.008) * sc
+        need = np.zeros(n)
+        base = np.array(R.OFFSET['pelvis'], dtype=float)
+        for f in range(n):
+            tgt, pelvis_loc = plan[f][0], plan[f][1]
+            Rz = rz(self.yaw[f] * D2R)
+            Rp = Rz @ euler_m(tgt['pelvis'])
+            P = np.array([self.root_xy[f][0], self.root_xy[f][1], self.root_z[f]]) + Rz @ ((base + pelvis_loc) * sc)
+            for side in 'lr':
+                # Flat feet must reach the ground exactly; a foot rolling on its toe or heel is allowed to
+                # leave it by up to 2 cm (it is not a planted contact) rather than crouching the whole walk.
+                if not self.feet[side].grounded(f):
+                    continue
+                ankle, _, planted, _ = self.feet[side].pose(f)
+                lim = reach if planted else reach + 0.02 * sc
+                d = P + Rp @ (np.array(R.OFFSET['hip_' + side]) * sc) - ankle
+                h2 = d[0] * d[0] + d[1] * d[1]
+                drop = d[2] - math.sqrt(lim * lim - h2) if h2 < lim * lim else d[2]
+                need[f] = max(need[f], drop / sc)
+        need = np.clip(need, 0.0, 0.3)
+        out = need.copy()
+        span = 8
+        for f in np.nonzero(need > 1e-5)[0]:
+            for g in range(max(0, f - span), min(n, f + span + 1)):
+                out[g] = max(out[g], need[f] * smooth(1 - abs(g - f) / (span + 1.0)))
+        return out
 
     # -- arms
     def arm_angles(self, side, label, fkres, sc):
@@ -653,28 +1240,54 @@ class CharacterSolver:
 
     # -- main loop
     def solve(self, camera_at):
-        fps, sc = self.fps, self.scale
+        fps, sc, n = self.fps, self.scale, self.n
         out = []
-        springs = {k: Spring(0.25, 0.55) for k in ('spine', 'chest', 'neck', 'head', 'pelvis')}
-        look_spring = Spring(0.2, 0.5)
-        arm_springs = {'l': Spring(0.3, 0.6), 'r': Spring(0.3, 0.6)}
-        held = {}
-        prop_events = [e for e in self.m['tracks']['props'] if e['character'] == self.cid]
-        for f in range(self.n):
-            pose = pose_at(self.keys, f)
+        poses = [pose_at(self.keys, f) for f in range(n)]
+        if not hasattr(self, 'speech'):
+            self.plan_speech({})
+        self.plan_life(poses, camera_at)
+        # Pass 1: body targets from the pose keys, the actions and the life layers.
+        plan = []
+        for f in range(n):
+            pose = poses[f]
             tgt, pelvis_loc, shoulder_raise = self.body_targets(f, pose)
-            arm_override = {}
-            face_over = {}
+            arm_override, face_over = {}, {}
             pelvis_loc = self.action_layers(f, tgt, pelvis_loc, arm_override, face_over)
             shoulder_raise += arm_override.get('shoulder_raise', 0.0)
+            shoulder_raise += self.life_layers(f, pose, tgt, pelvis_loc, face_over)
+            plan.append((tgt, pelvis_loc, shoulder_raise, arm_override, face_over))
+        drop = self._reach_drop(plan)
+        # Pass 2: springs, eye-lines, arms, legs and face. The pelvis leads and the head trails it a little
+        # (softer springs up the chain), so pose changes ease in, overshoot slightly and settle.
+        springs = {k: Spring(*v) for k, v in BODY_SPRINGS.items()}
+        look_spring = Spring(0.2, 0.5)
+        arm_springs = {'l': Spring(*ARM_SPRING), 'r': Spring(*ARM_SPRING)}
+        wrist_springs = {'l': Spring(0.3, 0.5), 'r': Spring(0.3, 0.5)}
+        torso_lag, lift_lag, speed_lag = Spring(0.16, 0.4), Spring(0.2, 0.45), Spring(0.18, 0.45)
+        prev_elbow = {}
+        held = {}
+        prop_events = [e for e in self.m['tracks']['props'] if e['character'] == self.cid]
+        for f in range(n):
+            pose = poses[f]
+            tgt, pelvis_loc, shoulder_raise, arm_override, face_over = plan[f]
+            pelvis_loc = [pelvis_loc[0], pelvis_loc[1], pelvis_loc[2] - float(drop[f])]
             rot = {}
             for k in ('pelvis', 'spine', 'chest', 'neck', 'head'):
                 rot[k] = list(springs[k].step(tgt[k]))
-            # Eye-line: turn the head part of the way toward the target.
+            # Overlapping action: the head and loose arms drag behind fast torso pitch, vertical motion
+            # (landings, crouches) and changes of ground speed, then catch up with a little overshoot.
+            pitch = rot['spine'][0] + rot['chest'][0]
+            drag_p = pitch - float(torso_lag.step([pitch])[0])
+            z = self.root_z[f] + pelvis_loc[2] * sc
+            drag_z = z - float(lift_lag.step([z])[0])
+            v = self._root_speed(f)
+            drag_v = v - float(speed_lag.step([v])[0])
+            rot['head'][0] += -0.45 * drag_p + 60.0 * drag_z
             self._loc = {'pelvis': pelvis_loc, 'shoulder_l': [0, 0, shoulder_raise], 'shoulder_r': [0, 0, shoulder_raise]}
             state = {'root': [self.root_xy[f][0], self.root_xy[f][1], self.root_z[f]], 'yaw': self.yaw[f],
                      'rot': rot, 'loc': self._loc}
             fkres = fk(state, sc)
+            # Eye-line: turn the head part of the way toward the target.
             eye_target = self.eye_target_world(pose['eye_target'], f, fkres, camera_at)
             extra = np.zeros(2)
             if eye_target is not None and pose['eye_target'].get('kind') != 'forward':
@@ -683,14 +1296,21 @@ class CharacterSolver:
                 want_pitch = math.degrees(math.atan2(local[2] - 0.34, math.hypot(local[0], local[1])))
                 follow = 0.45
                 extra = np.array([max(-20, min(20, want_pitch * follow * 0.6)),
-                                  max(-35, min(35, want_yaw * follow))])
+                                  max(-35, min(35, want_yaw * follow))]) * (1.0 - float(self.L['face_cover'][f]))
             extra = look_spring.step(extra)
             rot['head'][0] -= float(extra[0])
             rot['head'][2] += float(extra[1])
             state['rot'] = rot
             fkres = fk(state, sc)
+            # Last-resort reach guard (the planned drop normally covers it): bend the knees rather than
+            # let a planted foot leave the ground.
+            guard = self._reach_need(f, fkres)
+            if guard > 0:
+                pelvis_loc[2] -= guard
+                fkres = fk(state, sc)
             # Arms
             arms = {}
+            loose = {}
             for side, name in (('l', 'left'), ('r', 'right')):
                 label = pose['arms'][name]
                 sh_ang, el_ang = self.arm_angles(side, label, fkres, sc)
@@ -709,20 +1329,40 @@ class CharacterSolver:
                     ang[0] += arm_override['both_swing']
                 if 'swing' in arm_override:
                     ang[0] += arm_override['swing'] * (1 if side == 'l' else -1)
-                    ang[3] += arm_override.get('elbow', -18) * 0.6 if 'elbow' in arm_override else -14
+                    ang[3] -= 14
+                gw = 0.0
+                if 'gait' in arm_override:
+                    g = arm_override['gait']
+                    gw = g['w']
+                    s_ = g['swing'] * (1 if side == 'l' else -1)    # + when this side's leg is forward
+                    ang[0] += g['amp'] * s_                          # ... so this arm swings back
+                    ang[1] += -4.0 * gw if side == 'l' else 4.0 * gw
+                    ang[3] += g['elbow'] - (0.4 * g['amp']) * max(0.0, -s_)
                 if 'windmill' in arm_override:
                     u, ww = arm_override['windmill']
                     ph = 2 * math.pi * u * 2 + (0 if side == 'l' else math.pi)
                     ang[0] += -70 * math.sin(ph) * ww
                     ang[1] += (-50 if side == 'l' else 50) * ww
-                if arm_override.get('talk_' + name):
-                    tw_ = arm_override['talk_' + name]
-                    g = math.sin(2 * math.pi * f / (fps * 1.3))
-                    ang[0] += (-22 + 10 * g) * tw_
-                    ang[3] += (-45 + 15 * g) * tw_
+                # Life: a relaxed hanging arm, and speech gestures, wherever the arm is not in use.
+                fw = float(self.L['arm_free'][side][f])
+                wrist = np.zeros(3)
+                if fw > 0:
+                    ang = ang + self.relaxed_arm(side, f) * fw
+                    wrist = self.relaxed_wrist(side) * fw
+                    gk = float(self.L['gesture'][side][f]) * fw
+                    if gk > 0:
+                        target = self.L['hold'][side][f] + self.L['stroke'][side][f]
+                        ang = ang + (target - ang) * gk
+                        wrist = wrist + self.L['wrist'][side][f] * gk
+                loose[side] = max(fw, gw)
+                if loose[side] > 0:
+                    ang[0] += (0.7 * drag_p + 260.0 * drag_v) * loose[side]
+                    ang[1] += (-90.0 * drag_z if side == 'l' else 90.0 * drag_z) * loose[side]
                 arms[side] = ang
+                arms[side + '_wrist'] = wrist
             # Hand actions (IK, exact contact)
             contact = {}
+            hand_w = {'l': 0.0, 'r': 0.0}
             for a in self.actions:
                 a0, a1, a2, a3, a4 = self.phases(a)
                 if not (a0 <= f < a4) or a['type'] not in ('wave', 'point', 'reach', 'grab', 'push', 'drop',
@@ -731,6 +1371,7 @@ class CharacterSolver:
                 side = 'l' if a['params'].get('hand', 'right') == 'left' else 'r'
                 w = envelope(f, a0, a1 if a1 > a0 else a0 + 1, a3 if a['type'] != 'facepalm' else a4 - 4,
                              max(a4, a3 + 1))
+                hand_w[side] = max(hand_w[side], w)
                 t = a['type']
                 if t == 'wave':
                     s2, e2 = self.arm_angles(side, 'wave', fkres, sc)
@@ -771,45 +1412,49 @@ class CharacterSolver:
                 if side in contact:
                     arm_springs[side].reset(arms[side])
                     final = arms[side]
+                    wrist_springs[side].reset(np.zeros(3))
+                    wr = np.zeros(3)
                 else:
                     final = arm_springs[side].step(arms[side])
+                    # The hand trails the forearm a little when the elbow moves fast (overlapping action).
+                    el_v = 0.0 if side not in prev_elbow else float(final[3] - prev_elbow[side])
+                    wr = arms[side + '_wrist'] + np.array([max(-12.0, min(12.0, 0.6 * el_v)), 0.0, 0.0]) * loose[side]
+                    wr = wrist_springs[side].step(wr * (1.0 - hand_w[side]))
+                prev_elbow[side] = float(final[3])
                 rot['shoulder_' + side] = [float(final[0]), float(final[1]), float(final[2])]
                 rot['elbow_' + side] = [float(final[3]), 0.0, 0.0]
-                rot['wrist_' + side] = [0.0, 0.0, 0.0]
+                rot['wrist_' + side] = [float(wr[0]), float(wr[1]), float(wr[2])]
             state['rot'] = rot
             fkres = fk(state, sc)
             # Legs
             feet_info = {}
+            foot_rot = {}
             for side in ('l', 'r'):
-                pos, fyaw, planted = self.feet[side].sample(f)
+                ankle, fyaw, planted, pitch = self.feet[side].pose(f)
                 hip_w = fkres['hip_' + side][1]
-                if pos is None:
+                if ankle is None:
                     # Airborne or falling: tuck relative to the hips.
                     Rp = fkres['pelvis'][0]
                     tuck = 0.18 if self.root_z[f] > 0.05 else 0.05
-                    pos = hip_w + Rp @ (np.array([0.0, -0.06, -(R.THIGH + R.SHIN) + tuck]) * sc)
+                    ankle = hip_w + Rp @ (np.array([0.0, -0.06, -(R.THIGH + R.SHIN) + tuck]) * sc)
                     sitting = any(a['type'] == 'fall_down' and self.phases(a)[1] <= f for a in self.actions)
                     if sitting and self.root_z[f] < 0.01:
                         fwd = np.array(list(direction(self.yaw[f])) + [0.0])
-                        pos = hip_w + fwd * 0.55 * sc
-                        pos[2] = R.ANKLE_HEIGHT * sc
-                    fyaw = self.yaw[f]
-                    ankle = pos
-                else:
-                    ankle = pos + np.array([0, 0, R.ANKLE_HEIGHT * sc])
+                        ankle = hip_w + fwd * 0.55 * sc
+                        ankle[2] = R.ANKLE_HEIGHT * sc
+                    fyaw, pitch = self.yaw[f], 0.0
                 upper, knee, err = self.solve_leg(side, ankle, fyaw, fkres, sc)
                 rot['hip_' + side] = upper
                 rot['knee_' + side] = [knee, 0.0, 0.0]
+                foot_rot[side] = rz(fyaw * D2R) @ rx(pitch * D2R)
                 feet_info[side] = {'planned': [round(float(v), 4) for v in ankle], 'contact_expected': bool(planted),
                                    'ik_error_m': round(err * sc, 4)}
             state['rot'] = rot
             fkres = fk(state, sc)
             for side in ('l', 'r'):
-                # Keep the sole flat: ankle cancels the accumulated leg rotation.
+                # Sole flat on the ground while planted; heel/toe pitch through a rolling step.
                 Rk = fkres['knee_' + side][0]
-                _, fyaw, _ = self.feet[side].sample(f)
-                desired = rz((fyaw if fyaw is not None else self.yaw[f]) * D2R)
-                rot['ankle_' + side] = m_to_euler(Rk.T @ desired)
+                rot['ankle_' + side] = m_to_euler(Rk.T @ foot_rot[side])
             state['rot'] = rot
             fkres = fk(state, sc)
             face = self.face(f, pose, fkres, eye_target, face_over)
@@ -838,6 +1483,21 @@ class CharacterSolver:
             })
         return out
 
+    def _reach_need(self, f, fkres):
+        """Extra pelvis drop (rig units) still needed this frame for the planted feet to reach the ground."""
+        sc = self.scale
+        reach = (R.THIGH + R.SHIN - 0.002) * sc
+        need = 0.0
+        for side in 'lr':
+            ankle, _, planted, _ = self.feet[side].pose(f)
+            if not planted:
+                continue
+            d = fkres['hip_' + side][1] - ankle
+            h2 = d[0] * d[0] + d[1] * d[1]
+            drop = d[2] - math.sqrt(reach * reach - h2) if h2 < reach * reach else d[2]
+            need = max(need, drop / sc)
+        return min(0.3, need) if need > 1e-6 else 0.0
+
     def eye_target_world(self, et, f, fkres, camera_at):
         kind = (et or {}).get('kind')
         if kind == 'camera':
@@ -862,7 +1522,7 @@ class CharacterSolver:
         brows = pose['brows']
         eyes_open = max(pose['eyes']['open'], over.get('eyes_open', 0))
         closure = 0.0
-        for b in self.blinks:
+        for b in list(self.blinks) + sorted(getattr(self, 'extra_blinks', ())):
             d = f - b
             if -1 <= d <= 4:
                 closure = max(closure, [0.55, 1.0, 1.0, 0.7, 0.35, 0.1][d + 1])
@@ -876,14 +1536,28 @@ class CharacterSolver:
             pitch = math.atan2(d[2], math.hypot(d[0], d[1]))
             px = max(-1.0, min(1.0, yaw / (35 * D2R)))
             pz = max(-1.0, min(1.0, pitch / (30 * D2R)))
+        # Saccades and glances (life layers) ride on top of the eye-line; action eye overrides replace them.
+        sx, sz = over.get('pupil_add', (0.0, 0.0))
+        px = max(-1.0, min(1.0, px + sx))
+        pz = max(-1.0, min(1.0, pz + sz))
         if 'look_yaw' in over:
             px = max(-1.0, min(1.0, over['look_yaw'] / 35))
         if 'look_pitch' in over:
             pz = max(-1.0, min(1.0, over['look_pitch'] / 30))
         mouth_shape_w = self.mouth_weights(f)
+        # Brows rise on stressed words (a furrowed, angry brow digs in instead).
+        emph = over.get('brow_emphasis', 0.0)
+        inner, outer = brows['inner'], brows['outer']
+        if emph:
+            if inner < -0.3:
+                inner -= 0.2 * emph
+            else:
+                inner += 0.3 * emph
+                outer += 0.3 * emph
+            inner, outer = max(-1.0, min(1.0, inner)), max(-1.0, min(1.0, outer))
         return {
-            'brow_l': [round(brows['inner'], 3), round(brows['outer'], 3), round(brows.get('asym', 0), 3)],
-            'brow_r': [round(brows['inner'], 3), round(brows['outer'], 3), round(-brows.get('asym', 0), 3)],
+            'brow_l': [round(inner, 3), round(outer, 3), round(brows.get('asym', 0), 3)],
+            'brow_r': [round(inner, 3), round(outer, 3), round(-brows.get('asym', 0), 3)],
             'eye_open': round(float(eyes_open), 3),
             'blink': round(closure, 3),
             'squint': round(pose['eyes']['squint'], 3),
@@ -961,6 +1635,18 @@ def build_visemes(m, cid, n, alignments):
     return VIS.frame_weights(keys, fps, n), sorted(kinds)
 
 
+def line_word_frames(m, ln, alignments):
+    """[(start_frame, end_frame, word)] of a line in absolute frames: measured alignment, else estimated."""
+    fps = m['fps']
+    al = (alignments or {}).get(ln['id'])
+    if al and al.get('words'):
+        words = al['words']
+    else:
+        words = VIS.estimate_words(ln['text'], 0.0, (ln.get('measured_frames') or ln['est_frames']) / fps)
+    base = ln['start_frame']
+    return [(base + w['start'] * fps, base + w['end'] * fps, str(w.get('word', ''))) for w in words]
+
+
 def shot_lens(shot):
     cam = shot['camera']
     if cam.get('lens_mm'):
@@ -1003,7 +1689,7 @@ def code_version():
         h = hashlib.sha256()
         here = os.path.dirname(os.path.abspath(__file__))
         for name in (os.path.join(here, 'solver.py'), os.path.join(here, 'rig.py'), os.path.join(here, 'visemes.py'),
-                     os.path.join(here, 'sets.py'),
+                     os.path.join(here, 'sets.py'), os.path.join(here, 'life.py'),
                      os.path.join(here, '..', 'manifest', 'compile.py'), os.path.join(here, '..', 'manifest', 'geometry.py')):
             with open(name, 'rb') as f:
                 h.update(f.read())
@@ -1282,6 +1968,9 @@ def solve(m, bibles, alignments=None, repair=None, envelopes=None):
                         cs.mouth_repair[f] = (shift, boost)
         if cs.env is not None:
             viseme_kinds[cid] = viseme_kinds[cid] + ['amplitude_from_audio']
+    # Every character's speech is planned first: listeners react to the speaker's stressed words.
+    for cid, cs in chars.items():
+        cs.plan_speech({ln['id']: line_word_frames(m, ln, alignments) for ln in m['lines'] if ln['speaker'] == cid})
     frames = {cid: cs.solve(lambda f: camera[f]['location']) for cid, cs in chars.items()}
     return {'n': n, 'fps': m['fps'], 'camera': camera, 'characters': frames, 'viseme_timing': viseme_kinds,
             'scales': {cid: cs.scale for cid, cs in chars.items()}, 'props': solve_props(m, frames, n),
