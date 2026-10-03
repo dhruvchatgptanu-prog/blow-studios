@@ -18,6 +18,8 @@ from . import breaker, budget, db as dbmod, prefs as prefsmod, store
 from .http import ProviderError
 from .util import Blocked, Retry, new_id, now
 
+BILLING_CODES = ('insufficient_quota', 'billing_hard_limit_reached', 'insufficient_credits', 'quota_exceeded')
+
 
 def get(key, d=None):
     d = d or dbmod.get()
@@ -93,6 +95,9 @@ def run(key, *, provider, operation, category, estimate, fn, video_id=None, summ
         # A definitive HTTP response: the provider rejected the request.
         _set(d, key, status='failed', error=str(e)[:500])
         budget.release(attempt_key, d)
+        if e.status == 402 or (e.code or '').lower() in BILLING_CODES:
+            # Checked before 429: OpenAI reports exhausted credit as 429 insufficient_quota.
+            raise Blocked(f'{provider} reports insufficient credits or a billing limit: {e}', state='blocked')
         if e.status == 429 or e.status in (500, 502, 503):
             global_open = breaker.failure(provider, e, d)
             _maybe_global_pause(global_open, d)
@@ -100,8 +105,6 @@ def run(key, *, provider, operation, category, estimate, fn, video_id=None, summ
         if e.auth:
             raise Blocked(f'{provider} rejected the credentials or the account lacks access: {e}',
                           state='needs_credentials')
-        if e.status == 402 or (e.code or '').lower() in ('insufficient_quota', 'billing_hard_limit_reached'):
-            raise Blocked(f'{provider} reports insufficient credits or a billing limit: {e}', state='blocked')
         raise Blocked(f'{provider} rejected the request: {e}', state='failed')
     except (Blocked, Retry):
         raise

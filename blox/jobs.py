@@ -34,6 +34,16 @@ KIND_ROLE = {
     'analytics.collect': 'analytics',
 }
 ROLES = sorted(set(KIND_ROLE.values()))
+
+
+def live_workers(window_s=60, d=None):
+    """Workers whose heartbeat thread reported within ``window_s`` and the roles they cover."""
+    d = d or dbmod.get()
+    rows = d.query("SELECT id, roles, heartbeat_at, current_task FROM workers WHERE status='running' AND heartbeat_at>?",
+                   (now() - window_s,))
+    covered = sorted({r for w in rows for r in w['roles'].split(',') if r})
+    return {'workers': rows, 'covered': covered, 'missing': [r for r in ROLES if r not in covered],
+            'last_seen': max((w['heartbeat_at'] for w in rows), default=None)}
 # Tasks that spend money or publish. Pause and emergency stop gate these.
 PAID_OR_PUBLISHING = {'video.develop', 'video.voice', 'shot.render', 'video.qa', 'video.repair', 'video.upload'}
 READ_ONLY = {'video.verify', 'research.snapshot', 'analytics.collect'}

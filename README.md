@@ -1,109 +1,257 @@
 # Blox Studio
 
-A standalone, single-owner Roblox-inspired animation studio. Built independently of Lovable. This is a runnable source-code package, **not a hosted service**. You retain the files and can deploy them on your computer or a server.
+A self-hosted production system for original, Roblox-style animated YouTube Shorts:
+research → original story → frame-indexed director's manifest → deterministic 3D character animation
+(Blender) with natural voices → assembly → automated QA with bounded repairs → scheduled publishing
+with verification → analytics learning. It is operated from a single-owner web studio.
 
-## Start here
+> **What this is not.** It does not capture or claim gameplay, it does not copy other creators'
+> stories, voices, thumbnails or branding, and it cannot promise views, virality or monetisation.
+> Research covers *a monitored sample* of YouTube, not all of it.
 
-1. Install Docker Desktop (or Docker Engine + Compose on a server) and Python 3.12+.
-2. Unzip this folder and open a terminal inside it.
-3. Run `python setup.py` (or `python3 setup.py`). Choose your studio password.
-4. Run `docker compose up --build -d`.
-5. Open **http://localhost:8000**. Sign in using your studio password.
+## Contents
 
-The web app and background worker share the `data/` directory. The worker processes the queue while the app is running. Closing the browser does not stop it; shutting down or sleeping the computer does. For continuous creation, run on an always-on server. This package does not provision or purchase hosting for you.
+1. [Start it](#1-start-it)
+2. [Connect your accounts](#2-connect-your-accounts)
+3. [Make a first video](#3-make-a-first-video)
+4. [Autopilot: enable, pause, stop](#4-autopilot-enable-pause-stop)
+5. [Costs and capacity for 12 videos a day](#5-costs-and-capacity-for-12-videos-a-day)
+6. [What is implemented and verified](#6-what-is-implemented-and-verified)
+7. [Live versus mocked integrations](#7-live-versus-mocked-integrations)
+8. [Limits of animation and QA](#8-limits-of-animation-and-qa)
+9. [Tests](#9-tests)
+10. [Layout and further docs](#10-layout-and-further-docs)
 
-Stop: `docker compose down`. View logs: `docker compose logs -f`. Update after editing code: `docker compose up --build -d`.
+---
 
-## What works without external accounts
+## 1. Start it
 
-- Password-protected studio, private media and persistent SQLite projects.
-- Editable character identity, costume and scene directions: setting, expression, action and camera.
-- Reorder scenes, trim uploaded footage, save drafts and duplicate projects.
-- Upload owned/licensed PNG/JPEG/WebP references, MP4/MOV/WebM footage and MP3/WAV/M4A music.
-- FFmpeg MP4 assembly, captions from scene narration text and music mixing.
-- Local renders using uploaded clips with AI narration disabled.
+### Docker (recommended)
 
-Create a project, add scenes, upload clips in Media library, select one for each scene, and uncheck AI narrator to render without API services. Scene duration is 5 or 10 seconds. Clips must cover the chosen trim + duration. There is a 24-scene limit: up to four minutes. Output is 720×1280 portrait or 1280×720 landscape, 30 fps. Original clip audio is intentionally replaced by narration/music; this edition does not provide a multitrack source-audio editor.
-
-## Connect generation and publishing
-
-Open **Connections** in the app. Enter secrets there, not into chat. Values are encrypted with a locally generated Fernet key; the page only returns configured/not-configured status. Protect and back up the entire `data/` folder because it contains both the encryption key and encrypted tokens. Encryption does not protect against someone who has access to both.
-
-### OpenAI
-
-Add an OpenAI API key with API billing enabled. The script model defaults to `gpt-4.1-mini` and is editable. Speech uses `gpt-4o-mini-tts`. A ChatGPT subscription is not a substitute for API access. Keys and model access were not available during this build, so live generation was not tested.
-
-**Write scenes with AI** generates an original four-scene story. **Create video** runs animation, narration and final rendering. You can edit the script before generation. Narration is limited by the scene length; the renderer stops when narration would require more than 1.35× speed. Shorten the line instead of accepting unintelligible speech.
-
-### Runway
-
-Add a Runway developer API key with model access and credits. This adapter uses the documented `gen4.5` image-to-video endpoint, which also accepts text-only generation, with the `2024-11-06` API version header. Task IDs are persisted and polled; completed clips are downloaded promptly.
-
-You can supply your own original block-avatar reference image. The app sends the same reference and character description along with each scene's expression, action and camera direction. The reference is a first-frame guide, not a trained character identity lock. Facial acting, fine hand motion, consistent identity and lip synchronization are **not guaranteed**. This version creates AI animation, not recordings from the Roblox game client. It does not play Roblox or scrape other creators' footage. Generated narration is a voiceover; this version does not promise synchronized character speech.
-
-For best results, keep each shot to one clear action, give expressions concrete eye/brow/mouth cues, and use medium shots or close-ups when faces matter. Preview a sample before enabling public autopilot.
-
-### YouTube
-
-1. Create a project in Google Cloud and enable **YouTube Data API v3**.
-2. Configure the Google OAuth consent screen. While testing, add your Google account as a test user.
-3. Create an OAuth **Web application** client. Add the exact redirect URI displayed in Blox Studio's Connections screen. Local default: `http://localhost:8000/oauth/callback`.
-4. Enter the OAuth client ID and client secret in Connections, save, then click **Connect YouTube**.
-5. Select your account/channel and authorize `youtube.upload` and `youtube.readonly`.
-6. Choose visibility, made-for-kids audience and synthetic-content disclosure in Autopilot settings. These saved selections also apply to manually approved uploads.
-
-OAuth state is session-bound and expires after 10 minutes. Refresh tokens are encrypted on the server. Disconnect revokes the token and pauses autopilot. Google quota, app verification and YouTube API audit restrictions apply; some unaudited projects are restricted to private uploads. Check current provider requirements. No claim of monetization eligibility is made.
-
-## Autopilot
-
-1. Make a creative-brief project with a topic, character description and optional reference/music.
-2. Open Autopilot, select that project, and choose the recurrence (every 1–168 hours).
-3. Choose **Create, then wait for my review** or **Create and upload automatically**.
-4. Set video-count and estimated-budget caps, visibility, audience and disclosure.
-5. Enable recurring creation and save. The first job starts about one minute later.
-
-The worker copies the creative brief and writes a fresh four-scene story on each run. It does not repeat the template's existing scenes. A persistent next-run time prevents catch-up bursts after downtime. Recurrence is elapsed hours; the selected timezone determines daily budget resets and is not a local-wall-clock posting calendar. Upload happens when production completes, so the interval schedules creation, not a guaranteed publication minute.
-
-Each production job reserves the configured **estimated cost per video** before making generation calls. The app prevents new jobs after the daily count or estimated allowance is exhausted. These are estimates, not measured charges: set separate billing limits with providers for a firm ceiling. Failed generation jobs retain reservations; retries do not reserve the same job twice. Script-only jobs are outside this production estimate, so provider billing controls still matter. Larger manually edited projects may cost more than the four-scene default.
-
-The pipeline saves its progress across restarts. Only one worker is allowed per data directory. Network reads and resumable upload steps retry with backoff. If a paid submission times out before its task ID is known, the job blocks rather than paying for an automatic duplicate. Check the provider dashboard before making a new job in that case. For an expired or ambiguous YouTube upload session, check YouTube Studio before creating another upload; the app will not silently initiate a replacement session.
-
-**Pause autopilot** prevents new recurring jobs and gates automatic uploads at the next processing step. Already queued generation may finish; an upload already sent cannot be recalled. **Cancel** stops future local steps but does not cancel or refund a provider task already submitted. Review-mode jobs offer an explicit Approve & upload button.
-
-## Hosting securely
-
-Docker Compose binds port 8000 to localhost by default. Do not expose the raw development server to the internet. For a server deployment, keep this binding and put a TLS reverse proxy in front, set `PUBLIC_URL` to the HTTPS domain and `COOKIE_SECURE=1`, update the Google redirect URI, and use a strong unique `ADMIN_PASSWORD`. This is single-owner software, not a multi-tenant SaaS. Do not share the password or data volume with untrusted people.
-
-Use a persistent disk, not ephemeral serverless storage. Back up `data/` and `.env` securely. Do not commit either to a public repository. The included `.gitignore` excludes them. No paid services, hosting or real upload schedules were activated during creation.
-
-## Local development without Docker
-
-Install FFmpeg (including libass caption support) and DejaVu Sans, then:
-
-```sh
-python -m venv .venv
-. .venv/bin/activate
-pip install -r requirements.txt
-export ADMIN_PASSWORD='a-unique-local-password'
-export SESSION_SECRET='a-random-string-at-least-32-characters-long'
-python app.py
+```bash
+python3 setup.py                 # writes .env: password hash, session secret, database password
+mkdir -p data && sudo chown -R 10001:10001 data   # the container runs as uid 10001
+docker compose up --build -d     # PostgreSQL, web, and five role-separated workers
+open http://localhost:8000       # sign in with the password you chose
 ```
 
-Run `python worker.py` in another terminal with the same environment. Native `.env` loading is not automatic; Docker Compose reads it. The worker uses a Unix file lock; Windows users should use Docker or WSL.
+The web port is bound to `127.0.0.1`. To reach it from elsewhere put it behind an HTTPS reverse proxy
+and set `PUBLIC_URL`, `COOKIE_SECURE=1` and `TRUSTED_PROXIES=1` (see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
 
-## Validation and known limits
+Upgrading from the previous Blox Studio: keep your existing `data/` folder (it holds the old
+`studio.db`, uploaded files and `vault.key`). See [Upgrade](docs/DEPLOYMENT.md#upgrading-from-the-previous-release).
 
-Run `pip install pytest` then `python -m pytest -q`.
+### Without Docker (Ubuntu 24.04)
 
-Thirteen checks passed during this build: authentication/CSRF, secret encryption and redaction, edit validation and active-job locking, setup gates, atomic queue claiming, scheduler deduplication, budget reservations, uncertain paid-request protection, paused-upload gating, resumable-upload completion recovery, OAuth state validation, private file boundaries, and a real FFmpeg render with captions/music and checked dimensions/duration. JavaScript syntax and Python compilation also passed.
+```bash
+sudo apt install python3-venv ffmpeg fonts-dejavu-core blender libegl1 libegl-mesa0 libgl1-mesa-dri libgles2
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r requirements.lock
+export ADMIN_PASSWORD='choose-a-long-password'       # or ADMIN_PASSWORD_HASH from: python -m blox.cli hash-password
+python -m blox.cli migrate                            # SQLite in ./data unless DATABASE_URL is set
+gunicorn -b 127.0.0.1:8000 app:app &                  # web
+python worker.py --roles all                          # worker (scheduler runs in its own thread)
+```
 
-Provider interactions in tests are mocked. **Live OpenAI/Runway generation, Google OAuth, YouTube uploads and long-running hosted operation have not been tested with your accounts.** The browser UI has not received a live browser end-to-end test in this environment. Docker build/deployment is included but was not executed here. No thumbnail generator or thumbnail upload is included in this edition.
+A local render with no accounts at all (Blender + the built-in robotic **test** voice, never publishable):
 
-## Official integration references
+```bash
+python -m blox.cli demo --quality preview --voice local_test --out data/demo
+python -m blox.cli qa-demo --dir data/demo
+```
 
-- Runway generation examples: https://docs.dev.runwayml.com/guides/using-the-api/
-- OpenAI API reference: https://platform.openai.com/docs/api-reference
-- YouTube resumable protocol: https://developers.google.com/youtube/v3/guides/using_resumable_upload_protocol
-- YouTube insert endpoint: https://developers.google.com/youtube/v3/docs/videos/insert
+## 2. Connect your accounts
 
-Provider APIs, model access and prices can change. Review these docs when deploying.
+Everything is entered on **Connections** in the studio (stored encrypted with `data/vault.key` or
+`BLOX_VAULT_KEY`; values are never shown again). Nothing paid runs without these.
+
+| Credential | Used for | Required for autopilot | How to get it |
+|---|---|---|---|
+| OpenAI API key | concept + script generation, line rewrites, TTS voices (`gpt-4o-mini-tts`), transcription for alignment and QA (`whisper-1`), optional vision QA, embeddings for originality | Yes | platform.openai.com → API keys. Set a monthly budget limit there too. |
+| YouTube Data API key | trend research (search, video and channel statistics) | Yes | Google Cloud Console → enable *YouTube Data API v3* → Credentials → API key (restrict it to that API). |
+| Google OAuth client (ID + secret) | uploading to and reading your channel | Yes | Same project → OAuth consent screen → Credentials → *OAuth client ID*, type **Web application**, authorised redirect URI exactly `<PUBLIC_URL>/oauth/callback` (shown on Connections). Enable *YouTube Analytics API* for analytics. |
+| YouTube channel authorisation | upload as your channel | Yes | Connections → *Connect YouTube* → choose the channel → **confirm** it in the studio. Scopes: `youtube.upload`, `youtube.readonly`, optional `yt-analytics.readonly`. |
+| Runway API secret | optional generative shots (image-to-video) | No | dev.runwayml.com |
+| ElevenLabs API key | optional voices with character-level timestamps | No | elevenlabs.io; use catalogue voices or voices you have rights to |
+| Transcript provider URL + key | optional transcripts of reference videos from a provider you are licensed to use | No | Your provider; must be HTTPS. Blox never downloads other creators' captions through the Data API. |
+
+**Important YouTube restrictions (check Google's current documentation):** API projects that have not
+passed YouTube's API compliance audit can upload only *private* videos, so scheduled public
+publishing needs an audited project. Uploads use a separate daily quota bucket and channels have
+their own daily upload limits; 12 per day is not guaranteed for every account. Blox detects when
+YouTube drops the scheduled time or refuses an upload and pauses publishing with the reason instead of
+retrying blindly.
+
+Also choose on **Settings → Publishing**: *made for kids* (yes/no) and *altered/synthetic content*
+disclosure. Autopilot refuses to start until both are chosen.
+
+## 3. Make a first video
+
+1. **Director's editor → New from demo story** creates a hand-authored 30-second story (labelled as
+   demo). Inspect the director's script, the 1-second beat timeline, and the plan JSON.
+2. **Produce** runs it through the real pipeline: voices → Blender shots → assembly → QA.
+3. **Quality control** shows every check with time codes, evidence and confidence. Click a time to
+   jump the player there.
+4. If the verdict is *approved*, **Approve for publishing** (review mode) assigns it to the next
+   slot; nothing is uploaded unless YouTube is connected and confirmed.
+
+**New researched video** does the full autonomous path (research brief → patterns → original concepts
+→ originality screen → manifest with validation → production).
+
+## 4. Autopilot: enable, pause, stop
+
+| Action | Where | Effect |
+|---|---|---|
+| **Enable** | Settings → *Autopilot activation*: choose a mode, type `ENABLE` | Refused with a precise list until OpenAI, YouTube Data API, OAuth client, a *confirmed* channel, Blender, FFmpeg, audience + disclosure and a live worker are all in place. |
+| Mode *review* | same | Production runs ahead; each QA-approved video waits for **Approve for publishing**. |
+| Mode *autopilot* | same | QA-approved videos are scheduled without per-video approval. *Hold*/*blocked* videos are never published. |
+| **Pause** / Resume | Dashboard | No new paid generation or uploads start; running steps stop at the next safe checkpoint; research and verification continue. Slots that pass while paused are skipped with the reason. |
+| **Emergency stop** | red button in the sidebar | Cancels queued paid and publishing tasks, kills running renders at a safe point, leaves only read-only work. Clearing it leaves autopilot *paused* until you resume. |
+| Turn off | Dashboard / Settings | Stops scheduling new work. |
+
+Schedule rules (Settings → Schedule): slots every 120 minutes on local wall-clock time in
+Australia/Adelaide (00:00, 02:00, … 22:00), at most 12 per rolling 24 hours. On the spring-forward
+night the non-existent local time has no slot (shown on the calendar); on the fall-back night a repeated
+time is used once. Each slot is filled by one QA-approved video uploaded `upload_lead_minutes`
+(default 180) ahead as **private with a scheduled publish time**; production keeps
+`buffer_target` (default 3) approved videos ready. A slot that cannot be filled safely is **skipped with
+the reason** (no catch-up bursts after downtime). The automatic global circuit breaker pauses autopilot
+when providers keep failing.
+
+## 5. Costs and capacity for 12 videos a day
+
+**Method** (also shown on Budget & learning, and used for the per-video reservation before work starts):
+
+```
+per video = script LLM calls (input tokens × in-price + output tokens × out-price)
+          + voices (spoken minutes × TTS price; or characters × ElevenLabs price)
+          + alignment ASR (spoken minutes × ASR price)
+          + QA (final-mix minutes × ASR price + vision images × image price + review tokens)
+          + generative seconds × Runway price (0 for Blender shots)
+          + repair allowance (repair_share × voice and generative cost)
+per day   = per video × videos per day (12 at a 2-hour cadence)
+```
+
+Prices live in an editable table (Settings → Budget) because providers change them. The defaults are
+planning figures; **check them against each provider's current pricing**. Each paid call reserves its
+estimate atomically against the per-video, daily and monthly caps; afterwards the ledger records the
+measured cost when the provider reports usage (tokens), otherwise the estimate, and shows both.
+
+Worked example with the default price table and the built-in 30-second demo story (29 spoken words;
+a 45-second story with ~100 words roughly triples the voice part):
+
+| Configuration | Estimated per video | × 12 per day | × 30 days |
+|---|---|---|---|
+| Blender shots + OpenAI voices | ≈ $0.07 | ≈ $0.85 | ≈ $26 |
+| Blender shots + ElevenLabs voices | ≈ $0.11 | ≈ $1.36 | ≈ $41 |
+| Three Runway shots (12 s) + OpenAI voices | ≈ $2.23 | ≈ $27 | ≈ $800 |
+
+These figures come from `pipeline.estimate_video` plus the script-call estimates; they exclude your
+server, YouTube (free within quota) and failed/ambiguous calls held for review.
+
+**Compute is the real constraint.** Blender renders run on the worker's CPU unless you give it a GPU.
+Measured on this development machine (4 vCPU, software EGL, no GPU): about 3.8 s per frame at
+540×960 with EEVEE. 1080×1920 has four times the pixels, so a 30-second, 900-frame video takes
+several CPU-hours on such a machine. **Twelve full-resolution videos per day need a GPU render
+worker or several CPU render workers** (`docker compose up -d --scale worker-render=N`), or a lower
+render resolution; Blox will otherwise skip the slots it cannot fill and say why. See
+[docs/OPERATIONS.md](docs/OPERATIONS.md#capacity-planning).
+
+## 6. What is implemented and verified
+
+Verified here means exercised end to end in this environment with real tools, not just unit-tested.
+
+| Area | Implemented | Verified how |
+|---|---|---|
+| Database, migrations, legacy upgrade | SQLite and PostgreSQL, forward-only migrations, non-destructive import of old projects | Unit tests on both engines (PostgreSQL 16); legacy upgrade test |
+| Durable queue | leases, heartbeats, idempotency, retries, dead letters, concurrency keys, leader lock | Concurrency and crash-recovery tests on both engines |
+| Paid-call safety and budgets | exactly-once ledger, ambiguous-call holds with owner reconciliation, reservations, breakers, global auto-pause | Unit tests with simulated provider failures |
+| Research | YouTube Data API v3 client, quota ledger (Pacific-midnight reset), caching, Shorts signals, explainable ranking, emerging topics, watchlist, references | Fake-API tests seeded with a real, dated sample of 12 Roblox story Shorts ([docs/RESEARCH_SNAPSHOT.md](docs/RESEARCH_SNAPSHOT.md)). **Not run against your API key.** |
+| Transcripts and analysis | upload with rights confirmation, authorised provider contract, ASR of your own media, metadata-only labelling | Unit tests; no provider configured |
+| Stories and originality | pattern extraction, concepts, manifest generation with validation and repair, originality screening | Request construction and validation tested with mocked OpenAI; **no live generation was run** |
+| Manifest and director's script | authoring plan → frame-indexed manifest, 1-second beats with full start/end poses, validator, script | Unit tests on the demo story and invalid variants |
+| Deterministic animation | joint-hierarchy rig, analytic + iterative IK, footstep planning, springs, expressions, visemes, amplitude-driven jaw, camera solver, Blender scene build with telemetry | Real Blender renders; solver tests (planted feet, facepalm contact, jump landing, determinism); full demo rendered through the queued pipeline |
+| Voices | OpenAI TTS with direction, ElevenLabs with timestamps, local test voice, alignment, pronunciation overrides, gentle fitting | Local test voice end to end; OpenAI/ElevenLabs request code **not run live** |
+| Assembly | captions in the safe area (face-aware placement), ducking, loudness normalisation, transitions, cover and thumbnails | Real FFmpeg tests; full demo assembly |
+| QA and repairs | technical, motion, lip-sync, caption, story, optional vision checks; verdicts; bounded repair loop | Real QA on the rendered demo (it correctly blocks the test voice); repair-limit tests |
+| Scheduling and autopilot | slots, DST, rolling cap, buffer, skips, pause, emergency stop | Unit tests including Adelaide DST dates |
+| YouTube publishing | OAuth (PKCE, state, encrypted tokens), resumable upload with resume and reconciliation, scheduled private uploads, processing/scheduled/published verification, restriction detection | Tests against a simulated YouTube; **no upload to a real channel was performed** |
+| Analytics learning | YouTube Analytics reports, retention, findings with bootstrap intervals labelled finding vs hypothesis | Unit-level only; needs your channel |
+| Studio UI | dashboard, research, director's editor with beat inspector and pose editing, QC, calendar, characters, library, queue, budget & learning, connections, settings | Every view driven in headless Chromium against a running server, no console errors, phone width checked |
+| Deployment | Dockerfile (non-root, health checks), compose with PostgreSQL and role workers, backups | Image built here (Ubuntu 24.04, Python 3.12, Blender 4.0.2); the test suite passes inside it; the full compose stack (PostgreSQL + migrate + web + 5 workers) came up healthy and created slots |
+
+**Not done / incomplete**
+
+* No live call to any paid provider or to your YouTube channel was made (no credentials or spending
+  authorisation were provided). The first live run should be the opt-in live tests in `tests/live`.
+* No GPU rendering was available here; full-resolution throughput for 12/day is unproven (see §5).
+* Generative (Runway) shots are implemented but untested live; the continuity they achieve depends on
+  the model and is reviewed as *uncertain* by QA unless the vision review passes.
+* Thumbnail upload to YouTube is off by default (Shorts may ignore custom thumbnails).
+* The vision-model review is optional and its judgements are probabilistic.
+* Analytics learning needs weeks of published videos before any comparison becomes a *finding*.
+
+## 7. Live versus mocked integrations
+
+| Integration | In this repository's tests | Live code path exists | Run live by |
+|---|---|---|---|
+| Blender 4.0 (headless) | **Live** (integration test + demo render) | yes | `pytest tests/integration` |
+| FFmpeg 6 (assembly, loudness, QA, test voice) | **Live** | yes | default test run |
+| PostgreSQL 16 | **Live** when `BLOX_TEST_DATABASE_URL` is set | yes | see §9 |
+| OpenAI (chat, TTS, ASR, vision, embeddings) | Mocked HTTP | yes | `LIVE_TESTS=1 OPENAI_API_KEY=… pytest tests/live -k openai` |
+| YouTube Data API v3 | Mocked HTTP (real sample data) | yes | `LIVE_TESTS=1 YOUTUBE_API_KEY=… pytest tests/live -k research` |
+| Google OAuth + YouTube upload | Mocked HTTP (simulated resumable server) | yes | `LIVE_TESTS=1 LIVE_UPLOAD=1 … pytest tests/live -k upload` (private test video) |
+| YouTube Analytics | Not exercised | yes | after connecting with the analytics scope |
+| Runway, ElevenLabs, transcript provider | Not exercised (request code reviewed) | yes | connect the key and produce one video in review mode |
+
+## 8. Limits of animation and QA
+
+* **Animation is deterministic keyframe/procedural animation of simple block characters**, not motion
+  capture and not captured gameplay. Supported actions are a fixed vocabulary
+  (`GET /api/vocabulary`); anything else is rejected by the validator and listed as *unsupported*,
+  never silently approximated. Expressions are shape-key faces (brows, lids, pupils, mouth shapes).
+* **Lip sync** is viseme timing from word alignment plus an audio-amplitude-driven jaw. It reads as
+  speech on simple faces; it is not phoneme-accurate facial animation. When a line has no
+  measured alignment, timing is estimated and labelled so, and QA checks the result.
+* Contacts (feet, hand-to-face, props) are solved with IK and checked in the evaluated Blender scene to
+  centimetre tolerances; collisions between characters are only checked at positions, not full meshes.
+* **Generative shots** (Runway) do not follow second-by-second directions exactly; identity and costume
+  continuity are reviewed, and uncertain results are held rather than published. Upscaled generative
+  output is labelled as upscaled.
+* **QA** measures the actual file: decode, dimensions, frame rate, duration, A/V drift, loudness, true
+  peak, silences, black frames and freezes, foot sliding, action completion, expression visibility,
+  lip-sync correlation, camera jumps, prop contact, caption placement and timing, dialogue versus
+  script (ASR), and claim screening. It cannot judge humour, emotional impact or whether a story is
+  good; the optional vision review is probabilistic. Uncertain important checks **hold** the video for
+  you. A skipped slot is preferred to publishing a known defect.
+
+## 9. Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest                                    # mocked unit tests + local Blender/FFmpeg integration (no network, no cost)
+BLOX_TEST_DATABASE_URL=postgresql://user@host/db pytest   # also run the database tests on PostgreSQL
+LIVE_TESTS=1 pytest tests/live            # real provider calls with your credentials; see tests/live/README.md
+```
+
+The unit suite blocks all outbound network access; any unexpected request fails the test.
+
+## 10. Layout and further docs
+
+```
+blox/            application package
+  web/           Flask app, security, uploads          migrations/  forward-only schema migrations
+  research/      Data API client, ranking, transcripts  story/       patterns, concepts, originality
+  manifest/      schema, compiler, validator, script    animation/   rig, solver, Blender scene, Runway
+  voice/         TTS, audio, synthesised SFX/music      qa/          technical, motion, story, vision
+  youtube/       OAuth, publisher, analytics            pipeline.py  production steps
+  orchestrator.py  slots, buffer, autopilot             worker.py    queue worker
+templates/, static/   studio UI (no external scripts)
+tests/unit, tests/integration, tests/live
+```
+
+* [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): components, state machine, manifest, data model
+* [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): Docker, reverse proxy, Google setup, upgrades
+* [docs/OPERATIONS.md](docs/OPERATIONS.md): daily operation, backups, incidents, capacity
+* [docs/AUDIT.md](docs/AUDIT.md): defects found in the supplied version and how they were fixed
+* [docs/RESEARCH_SNAPSHOT.md](docs/RESEARCH_SNAPSHOT.md): the real research sample used in tests

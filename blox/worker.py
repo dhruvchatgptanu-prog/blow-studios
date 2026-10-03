@@ -12,7 +12,7 @@ import socket
 import threading
 import time
 
-from . import breaker, db as dbmod, jobs, orchestrator, prefs as prefsmod, runtime, store, videos
+from . import breaker, db as dbmod, jobs, orchestrator, prefs as prefsmod, runtime, videos
 from .http import ProviderError
 from .media import MediaError
 from .tasks import HANDLERS, Ctx, LeaseLost, ensure_loaded
@@ -117,6 +117,15 @@ def heartbeat_loop(worker_id, roles):
         _stop.wait(15)
 
 
+def orchestrator_loop(worker_id, every_s=20):
+    while not _stop.is_set():
+        try:
+            orchestrator.tick(worker_id)
+        except Exception:
+            log.exception('orchestrator tick failed')
+        _stop.wait(every_s)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description='Blox Studio worker')
     ap.add_argument('--roles', default='all', help='comma list of: ' + ','.join(jobs.ROLES) + ' or all')
@@ -130,19 +139,18 @@ def main(argv=None):
     d = dbmod.get()
     d.execute('INSERT INTO workers(id, roles, host, pid, started_at, heartbeat_at, status) VALUES (?,?,?,?,?,?,?)',
               (worker_id, ','.join(roles), socket.gethostname(), os.getpid(), now(), now(), 'running'))
-    store.put('worker_heartbeat', now(), d)
     signal.signal(signal.SIGTERM, lambda *_: _stop.set())
     signal.signal(signal.SIGINT, lambda *_: _stop.set())
     threading.Thread(target=heartbeat_loop, args=(worker_id, roles), daemon=True).start()
+    if 'orchestrate' in roles and args.once:
+        orchestrator.tick(worker_id)
+    elif 'orchestrate' in roles:
+        # Own thread so slot handling continues while this process runs a long render.
+        threading.Thread(target=orchestrator_loop, args=(worker_id,), daemon=True).start()
     log.info('worker started', extra={'worker': worker_id, 'roles': roles})
-    last_tick = 0.0
     while not _stop.is_set():
         try:
             p = prefsmod.get(d)
-            store.put('worker_heartbeat', now(), d)
-            if 'orchestrate' in roles and time.time() - last_tick > 20:
-                last_tick = time.time()
-                orchestrator.tick(worker_id)
             task = jobs.claim(worker_id, roles, kinds_blocked=blocked_kinds(p))
             if not task:
                 if args.once:

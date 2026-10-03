@@ -441,7 +441,6 @@ class CharacterSolver:
     # -- per-frame targets
     def body_targets(self, f, pose):
         """Spine/neck/head angles and pelvis offset (before springs)."""
-        sc = self.scale
         lean = pose['torso']['lean_forward']
         side = pose['torso']['lean_side']
         twist = pose['torso']['twist']
@@ -857,7 +856,6 @@ class CharacterSolver:
         return None
 
     def face(self, f, pose, fkres, eye_target, over):
-        fps = self.fps
         F = R.FACE
         brows = pose['brows']
         eyes_open = max(pose['eyes']['open'], over.get('eyes_open', 0))

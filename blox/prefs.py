@@ -236,7 +236,10 @@ def validate(p):
     text(a.get('pause_reason', ''), 300, 'pause reason')
 
     s = p['schedule']
-    ZoneInfo(s['timezone'])
+    try:
+        ZoneInfo(str(s['timezone']))
+    except (KeyError, ValueError, OSError):
+        raise ValueError(f'Unknown timezone {str(s["timezone"])[:60]!r}; use an IANA name such as Australia/Adelaide')
     s['interval_minutes'] = integer(s['interval_minutes'], 30, 7 * 24 * 60, 'interval minutes')
     if not re.fullmatch(r'([01]\d|2[0-3]):[0-5]\d', str(s['anchor_local'])):
         raise ValueError('anchor time must be HH:MM')

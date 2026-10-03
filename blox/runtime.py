@@ -61,6 +61,7 @@ def init():
 
 
 def reset_for_tests():
+    """Forget initialisation and the cached database handle (tests, and CLI commands that switch databases)."""
     global _done
     _done = False
     dbmod.reset()

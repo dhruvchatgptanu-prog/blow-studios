@@ -7,6 +7,7 @@
     python -m blox.cli backup [--dest data/backups]
     python -m blox.cli restore <backup.tar.gz>
     python -m blox.cli hash-password
+    python -m blox.cli healthcheck [--worker]   (container health checks)
 """
 import argparse
 import copy
@@ -76,13 +77,18 @@ def cmd_qa_demo(a):
 
 
 def cmd_copy_to_postgres(a):
-    """Copy every table from the SQLite database into an empty PostgreSQL database."""
-    src_path = str(config.DATA_DIR / 'studio.db')
+    """Copy every table from a SQLite database into an empty PostgreSQL database."""
+    src_path = a.source or str(config.DATA_DIR / 'studio.db')
     if not os.path.exists(src_path):
         sys.exit('No SQLite database at ' + src_path)
-    runtime.init()  # migrates the SQLite source first
+    if not a.to.startswith('postgresql://'):
+        sys.exit('--to must be a postgresql:// URL')
+    # Bring the SQLite source up to the current schema first (whatever DATABASE_URL says).
+    os.environ['DATABASE_URL'] = 'sqlite:///' + src_path
+    runtime.reset_for_tests()
+    runtime.init()
     os.environ['DATABASE_URL'] = a.to
-    dbmod.reset()
+    runtime.reset_for_tests()
     dst = dbmod.get()
     migrations.migrate(dst)
     src = sqlite3.connect(src_path)
@@ -103,6 +109,14 @@ def cmd_copy_to_postgres(a):
     print(json.dumps({'copied': copied, 'note': 'Set DATABASE_URL to the PostgreSQL URL and restart all services.'}))
 
 
+def _skip_scratch(info):
+    """Leave out rendered frame folders and partial downloads; keep shots, voices and finals."""
+    parts = info.name.split('/')
+    if 'frames' in parts or info.name.endswith('.part'):
+        return None
+    return info
+
+
 def cmd_backup(a):
     runtime.init()
     d = dbmod.get()
@@ -113,7 +127,7 @@ def cmd_backup(a):
     tmp = os.path.join(dest, f'.db-{stamp}')
     os.makedirs(tmp, exist_ok=True)
     if d.dialect == 'sqlite':
-        src = sqlite3.connect(str(config.DATA_DIR / 'studio.db'))
+        src = sqlite3.connect(d.path)  # the database actually in use (DATABASE_URL or data/studio.db)
         bk = sqlite3.connect(os.path.join(tmp, 'studio.db'))
         src.backup(bk)
         bk.close()
@@ -126,36 +140,69 @@ def cmd_backup(a):
         if (config.DATA_DIR / 'vault.key').exists() and a.include_key:
             tar.add(str(config.DATA_DIR / 'vault.key'), arcname='vault.key')
         tar.add(str(config.MEDIA_DIR), arcname='files')
+        if not a.no_work and config.WORK_DIR.exists():
+            tar.add(str(config.WORK_DIR), arcname='work', filter=_skip_scratch)
     shutil.rmtree(tmp)
     os.chmod(out, 0o600)
-    print(json.dumps({'backup': out, 'includes_vault_key': bool(a.include_key),
+    print(json.dumps({'backup': out, 'database': d.dialect, 'includes_vault_key': bool(a.include_key),
+                      'includes_work': not a.no_work,
                       'note': 'Store the vault key separately unless --include-key was used.'}))
 
 
+def _merge_tree(src, dst):
+    """Move files from src into dst, keeping any file that already exists in dst."""
+    n = 0
+    for root, _dirs, files in os.walk(src):
+        target = dst / os.path.relpath(root, src)
+        target.mkdir(parents=True, exist_ok=True)
+        for f in files:
+            if not (target / f).exists():
+                shutil.move(os.path.join(root, f), str(target / f))
+                n += 1
+    return n
+
+
 def cmd_restore(a):
+    """Restore files, work and (for SQLite) the database from a backup archive.
+
+    The current SQLite database is moved aside, never deleted. For PostgreSQL restore the
+    database with pg_restore (docs/OPERATIONS.md); files and work are still restored here."""
     if not os.path.exists(a.archive):
         sys.exit('Archive not found')
-    if (config.DATA_DIR / 'studio.db').exists() and not a.force:
-        sys.exit('A database already exists in BLOX_DATA. Use --force to replace it (it is moved aside, not deleted).')
+    url = config.database_url()
+    db_path = url[len('sqlite:///'):] if url.startswith('sqlite:///') else None
+    if db_path and os.path.exists(db_path) and not a.force:
+        sys.exit('A database already exists. Use --force to replace it (it is moved aside, not deleted).')
     config.ensure_dirs()
+    r = config.DATA_DIR / '.restore'
+    shutil.rmtree(r, ignore_errors=True)
     with tarfile.open(a.archive) as tar:
         for m in tar.getmembers():
-            if m.name.startswith('/') or '..' in m.name.split('/') or m.issym() or m.islnk():
+            if m.name.startswith('/') or '..' in m.name.split('/') or m.issym() or m.islnk() or m.isdev():
                 sys.exit('Unsafe path in archive: ' + m.name)
-        if (config.DATA_DIR / 'studio.db').exists():
-            os.replace(config.DATA_DIR / 'studio.db', config.DATA_DIR / f'studio.db.before-restore-{int(time.time())}')
-        tar.extractall(config.DATA_DIR / '.restore')
-    r = config.DATA_DIR / '.restore'
+        try:
+            tar.extractall(r, filter='data')
+        except TypeError:  # Python without extraction filters
+            tar.extractall(r)
+    restored = []
     if (r / 'db' / 'studio.db').exists():
-        shutil.move(str(r / 'db' / 'studio.db'), str(config.DATA_DIR / 'studio.db'))
-    if (r / 'vault.key').exists():
+        if db_path:
+            if os.path.exists(db_path):
+                os.replace(db_path, f'{db_path}.before-restore-{int(time.time())}')
+            shutil.move(str(r / 'db' / 'studio.db'), db_path)
+            restored.append('database')
+        else:
+            print('Archive holds a SQLite database but DATABASE_URL is PostgreSQL; use copy-to-postgres after '
+                  'restoring it into data/studio.db.', file=sys.stderr)
+    if (r / 'vault.key').exists() and not (config.DATA_DIR / 'vault.key').exists():
         shutil.move(str(r / 'vault.key'), str(config.DATA_DIR / 'vault.key'))
-    if (r / 'files').exists():
-        for f in os.listdir(r / 'files'):
-            if not (config.MEDIA_DIR / f).exists():
-                shutil.move(str(r / 'files' / f), str(config.MEDIA_DIR / f))
+        restored.append('vault.key')
+    for sub, target in (('files', config.MEDIA_DIR), ('work', config.WORK_DIR)):
+        if (r / sub).exists():
+            n = _merge_tree(r / sub, target)
+            restored.append(f'{sub} ({n} files)')
     shutil.rmtree(r, ignore_errors=True)
-    print(json.dumps({'restored': a.archive}))
+    print(json.dumps({'restored': a.archive, 'parts': restored}))
 
 
 def cmd_hash_password(a):
@@ -164,6 +211,22 @@ def cmd_hash_password(a):
     if len(pw) < 12:
         sys.exit('Use at least 12 characters')
     print(generate_password_hash(pw, method='scrypt'))
+
+
+def cmd_healthcheck(a):
+    """Exit 0 when the database answers (and, with --worker, this host's worker heartbeat is fresh)."""
+    import socket
+    try:
+        d = dbmod.get()
+        d.scalar('SELECT 1 AS x')
+    except Exception as e:
+        sys.exit(f'database unreachable: {type(e).__name__}')
+    if a.worker:
+        row = d.one("SELECT MAX(heartbeat_at) AS t FROM workers WHERE host=? AND status='running'",
+                    (socket.gethostname(),))
+        if not row or not row['t'] or time.time() - row['t'] > a.max_age:
+            sys.exit('no fresh worker heartbeat on this host')
+    print('ok')
 
 
 def main(argv=None):
@@ -182,16 +245,22 @@ def main(argv=None):
     s.set_defaults(fn=cmd_qa_demo)
     s = sub.add_parser('copy-to-postgres')
     s.add_argument('--to', required=True)
+    s.add_argument('--from', dest='source', help='SQLite file (default data/studio.db)')
     s.set_defaults(fn=cmd_copy_to_postgres)
     s = sub.add_parser('backup')
     s.add_argument('--dest')
     s.add_argument('--include-key', action='store_true')
+    s.add_argument('--no-work', action='store_true', help='skip data/work (renders, shots, voices)')
     s.set_defaults(fn=cmd_backup)
     s = sub.add_parser('restore')
     s.add_argument('archive')
     s.add_argument('--force', action='store_true')
     s.set_defaults(fn=cmd_restore)
     sub.add_parser('hash-password').set_defaults(fn=cmd_hash_password)
+    s = sub.add_parser('healthcheck')
+    s.add_argument('--worker', action='store_true')
+    s.add_argument('--max-age', type=float, default=90)
+    s.set_defaults(fn=cmd_healthcheck)
     a = ap.parse_args(argv)
     a.fn(a)
 

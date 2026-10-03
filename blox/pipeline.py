@@ -384,11 +384,12 @@ def solved_for(vid, mid, m, d):
         with open(path) as f:
             return json.load(f), path
     cast = _cast(m, d)
-    solved = production.solve(m, cast, results)
     if repair['shots'] or repair['characters']:
         from .animation import solver as SV
         solved = SV.solve(m, {cid: c['bible'] for cid, c in cast.items()}, production.alignments(results), repair,
                           envelopes=production.envelopes(m, results))
+    else:
+        solved = production.solve(m, cast, results)
     with open(path, 'w') as f:
         json.dump(solved, f)
     return solved, path
@@ -492,7 +493,6 @@ def qa(ctx):
     report = run_qa(m, solved, tele, repo.line_results(mid, d), assembly_from_render(r), p, vid, rid)
     qid = repo.save_qa(vid, rid, report, d)
     verdict = report['verdict']
-    v = videos.get(vid, d)
     if verdict == 'approved':
         videos.transition(vid, 'approved', 'QA passed: ' + json.dumps(report['summary']), d=d)
     elif verdict == 'repair':
@@ -503,7 +503,6 @@ def qa(ctx):
         videos.hold(vid, 'needs_review', 'QA is uncertain about: ' + ', '.join(report['reasons'][:6]), d=d)
     else:
         videos.hold(vid, 'blocked', 'QA blocked publishing: ' + ', '.join(report['reasons'][:6]), d=d)
-    _ = v
     return {'verdict': verdict, 'qa_report': qid}
 
 
@@ -548,6 +547,20 @@ def repair(ctx):
             lines_to_voice.add(rp['line'])
         elif act in ('remix', 'rebuild_captions', 're_assemble', 're_encode'):
             reassemble = True
+    voice_rows = {}
+    for lid in lines_to_voice:
+        row = next(x for x in repo.lines(mid, d) if x['line_key'] == lid)
+        if row['repair_attempts'] >= limit:
+            videos.hold(vid, 'blocked', f'Line {lid} still fails after {limit} re-voicing attempts', d=d)
+            return {'blocked': lid}
+        voice_rows[lid] = row
+    if not (shots_to_render or voice_rows or reassemble):
+        videos.hold(vid, 'needs_review', 'QA asked for a repair that Blox cannot perform automatically: ' +
+                    ', '.join(c['name'] for c in fails[:5]), d=d)
+        return {'held': 'no automatic repair'}
+    # Change state before queuing work so a fast worker never sees the old state.
+    videos.transition(vid, 'generating' if (shots_to_render or voice_rows) else 'rendering',
+                      f'Repair round {rounds}: {len(shots_to_render)} shot(s), {len(voice_rows)} line(s)', d=d)
     for key, (sh, params, c) in shots_to_render.items():
         repo.upsert_shot(vid, mid, key, sh['renderer'], d, status='pending', repair_attempts=sh['repair_attempts'] + 1,
                          detail=dict(sh['detail'] or {}, repair_params=params))
@@ -555,23 +568,17 @@ def repair(ctx):
                        {'check': c['id'], 'params': params})
         jobs.enqueue('shot.render', {'manifest_id': mid, 'shot': key}, video_id=vid,
                      idempotency_key=f'shot:{mid}:{key}:{sh["repair_attempts"] + 1}', ckey='blender', d=d)
-    for lid in lines_to_voice:
-        row = next(x for x in repo.lines(mid, d) if x['line_key'] == lid)
-        if row['repair_attempts'] >= limit:
-            videos.hold(vid, 'blocked', f'Line {lid} still fails after {limit} re-voicing attempts', d=d)
-            return {'blocked': lid}
+    for lid, row in voice_rows.items():
         ln = next(x for x in repo.manifest(mid, d)['body']['lines'] if x['id'] == lid)
         repo.upsert_line(vid, mid, ln, d, status='pending', repair_attempts=row['repair_attempts'] + 1)
         _record_repair(d, vid, ctx.payload['qa_report_id'], f'line:{lid}', 'revoice_line', row['repair_attempts'] + 1, {})
-    if lines_to_voice:
+    if voice_rows:
         jobs.enqueue('video.voice', {'manifest_id': mid, 'rerender': True}, video_id=vid,
                      idempotency_key=f'voice:{mid}:repair{rounds}', d=d)
-    if reassemble and not shots_to_render and not lines_to_voice:
+    if reassemble and not shots_to_render and not voice_rows:
         _record_repair(d, vid, ctx.payload['qa_report_id'], 'mix', 're_assemble', rounds, {})
         jobs.enqueue('video.assemble', {'manifest_id': mid}, video_id=vid, idempotency_key=f'assemble:{mid}:repair{rounds}',
                      d=d)
-    videos.transition(vid, 'generating' if (shots_to_render or lines_to_voice) else 'rendering',
-                      f'Repair round {rounds}: {len(shots_to_render)} shot(s), {len(lines_to_voice)} line(s)', d=d)
     return {'round': rounds}
 
 

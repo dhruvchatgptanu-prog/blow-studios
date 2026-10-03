@@ -23,7 +23,8 @@ def password_configured():
 
 
 def check_password(candidate):
-    h = os.environ.get('ADMIN_PASSWORD_HASH', '')
+    # Compose env files need "$" written as "$$"; a real hash never contains "$$".
+    h = os.environ.get('ADMIN_PASSWORD_HASH', '').replace('$$', '$')
     if h:
         try:
             return check_password_hash(h, candidate)

@@ -22,9 +22,11 @@ class UnsafeURL(ValueError):
 
 
 def _public(ip):
-    a = ipaddress.ip_address(ip)
-    return not (a.is_private or a.is_loopback or a.is_link_local or a.is_multicast or a.is_reserved
-                or a.is_unspecified or (a.version == 6 and a.ipv4_mapped and not _public(str(a.ipv4_mapped))))
+    """Globally routable unicast only (rejects private, loopback, link-local, CGNAT, reserved, documentation...)."""
+    a = ipaddress.ip_address(ip.split('%', 1)[0])
+    if a.version == 6 and a.ipv4_mapped:
+        return _public(str(a.ipv4_mapped))
+    return a.is_global and not a.is_multicast
 
 
 def check_url(url, allow_hosts=None):

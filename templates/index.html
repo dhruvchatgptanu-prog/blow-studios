@@ -1,9 +1,40 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{ csrf }}"><title>Blox Studio</title><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head><body>
-<aside><div class="brand">▣ <span>BLOX<span class="thin">STUDIO</span></span></div><p class="eyebrow">PRODUCTION WORKSPACE</p><nav><button data-tab="studio" class="active">◫ <span>Studio</span></button><button data-tab="library">▧ <span>Media library</span></button><button data-tab="queue">≡ <span>Production queue</span></button><button data-tab="autopilot">↻ <span>Autopilot</span></button><button data-tab="connections">⌘ <span>Connections</span></button></nav><div class="side-bottom"><div id="worker-status">Checking worker…</div><p>Original stories.<br>One scene at a time.</p><button id="logout" class="quiet">Sign out</button></div></aside>
-<main><header><div><p class="eyebrow">BLOX STUDIO / WORKSPACE</p><h1 id="page-title">Your next story starts here.</h1></div><button id="new-project" class="primary">＋ New video</button></header><div id="setup-banner" class="notice"></div><div id="toast" role="status" aria-live="polite" hidden></div>
-<section id="studio" class="view"><div class="studio-layout"><div class="projects panel"><div class="section-title"><h2>Projects</h2><span id="project-count" class="tag">0</span></div><div id="project-list"></div></div><div id="editor" class="panel empty"><span class="empty-icon">▣</span><h2>Make a story worth watching.</h2><p>Create a project, direct your characters,<br>then bring every scene to life.</p><button class="primary" id="empty-create">Create your first video</button><p class="muted">AI animation or your own gameplay clips.</p></div></div></section>
-<section id="library" class="view" hidden><div class="panel"><h2>Your production assets</h2><p>Upload a character reference, gameplay clip or music track.</p><form id="upload-form"><label>File<input type="file" name="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/quicktime,video/webm,audio/mpeg,audio/wav,audio/mp4" required></label><label class="check"><input type="checkbox" name="rights" value="yes" required> I own this asset or have permission to use it.</label><button class="primary">Upload asset</button></form></div><div id="asset-list" class="asset-grid"></div></section>
-<section id="queue" class="view" hidden><div class="notice">Jobs continue while the worker is running, even after you close this page. Cancel stops future steps; a provider request already in progress may still finish and be charged.</div><div id="job-list"></div></section>
-<section id="autopilot" class="view" hidden><div class="two-col"><div class="panel"><div class="section-title"><h2>Autopilot</h2><span id="auto-status" class="tag">Paused</span></div><p>Turn one creative brief into a continuing series of original animated stories.</p><form id="auto-form"><label>Use project as creative brief<select name="template_id" id="template-select"></select></label><div class="field-row"><label>Run every (hours)<input type="number" name="interval_hours" min="1" max="168" required></label><label>Timezone<input name="timezone" required></label></div><label>Publishing mode<select name="mode"><option value="review">Create, then wait for my review</option><option value="autopilot">Create and upload automatically</option></select></label><div class="field-row"><label>YouTube visibility<select name="privacy"><option value="private">Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select></label><label>Made for kids?<select name="audience"><option value="">Choose audience</option><option value="true">Yes</option><option value="false">No</option></select></label></div><label>Requires YouTube altered/synthetic-content disclosure?<select name="synthetic"><option value="">Choose disclosure</option><option value="true">Yes</option><option value="false">No</option></select></label><div class="field-row"><label>Videos per day (maximum)<input name="daily_video_cap" type="number" min="1" max="20" required></label><label>Estimated budget / day (USD)<input name="daily_estimate_cap" type="number" min="0.01" step="0.01" required></label></div><label>Reserve per video (USD estimate)<input name="estimate_per_video" type="number" min="0.01" step="0.01" required></label><label class="check"><input name="enabled" type="checkbox"> Enable recurring creation</label><button class="primary">Save autopilot settings</button><button type="button" id="pause-auto">Pause autopilot</button></form></div><div><div class="panel"><p class="eyebrow">THE PRODUCTION FLOW</p><ol class="pipeline"><li><b>Write</b><span>A fresh hook, story and scene directions</span></li><li><b>Animate</b><span>Facial expressions, movement and camera work</span></li><li><b>Finish</b><span>Narration, captions, music and MP4</span></li><li><b>Publish</b><span>Your connected YouTube channel</span></li></ol></div><div class="notice">The app must run on an always-on computer or server. Pausing prevents new automatic jobs and puts automatic uploads awaiting their next step into review. It cannot retract an upload already sent.</div><div class="notice">Budget amounts are your estimates, not measured provider charges. Set billing limits with OpenAI and Runway. Each generated story reserves a full estimate, including failed jobs.</div></div></div></section>
-<section id="connections" class="view" hidden><div id="connection-cards" class="asset-grid"></div><div class="two-col"><div class="panel"><h2>Connect your services</h2><p>Keys are encrypted on the server and never returned to this page. Leave a field empty to keep its saved value.</p><form id="keys-form"><label>OpenAI API key<input name="OPENAI_API_KEY" type="password" autocomplete="off"></label><label>Runway developer API key<input name="RUNWAYML_API_SECRET" type="password" autocomplete="off"></label><label>Google OAuth client ID<input name="GOOGLE_CLIENT_ID" autocomplete="off"></label><label>Google OAuth client secret<input name="GOOGLE_CLIENT_SECRET" type="password" autocomplete="off"></label><button class="primary">Save credentials</button></form><div class="actions"><a href="/oauth/start" class="button">Connect YouTube</a><button id="disconnect-youtube">Disconnect YouTube</button></div><p id="channel-name"></p></div><div class="panel"><h2>Generation defaults</h2><form id="models-form"><label>OpenAI script model<input name="text_model" required></label><label>Runway video model<input name="video_model" value="gen4.5" readonly></label><label>Narrator voice<select name="voice"><option>alloy</option><option>echo</option><option>fable</option><option>onyx</option><option>nova</option><option>shimmer</option><option>coral</option><option>sage</option></select></label><button>Save defaults</button></form><h3>YouTube setup</h3><p>Enable YouTube Data API v3 in Google Cloud. Create a Web application OAuth client and register this exact redirect URI:</p><code id="redirect-uri"></code><p>Enable upload and read-only YouTube scopes. Add your Google account as a test user while developing. API access, quota and verification requirements apply.</p><p class="muted">Blox Studio is independent of Roblox. AI output may vary: inspect character consistency and motion before enabling public autopilot.</p></div></div></section>
-<footer>Independent creator tools · Powered by your connected services</footer></main></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="csrf-token" content="{{ csrf }}">
+<title>Blox Studio</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+<aside id="side">
+  <div class="brand">▣ <span>BLOX<span class="thin">STUDIO</span></span></div>
+  <nav id="nav">
+    <button data-view="dashboard">◉ <span>Dashboard</span></button>
+    <button data-view="research">⌕ <span>Trend research</span></button>
+    <button data-view="productions">◫ <span>Director’s editor</span></button>
+    <button data-view="quality">✓ <span>Quality control</span></button>
+    <button data-view="calendar">▦ <span>Publishing calendar</span></button>
+    <button data-view="characters">☺ <span>Characters</span></button>
+    <button data-view="library">▧ <span>Media library</span></button>
+    <button data-view="queue">≡ <span>Work queue</span></button>
+    <button data-view="budget">$ <span>Budget & learning</span></button>
+    <button data-view="connections">⌘ <span>Connections</span></button>
+    <button data-view="settings">⚙ <span>Settings</span></button>
+  </nav>
+  <div class="side-bottom">
+    <div id="ap-chip" class="chip">Autopilot …</div>
+    <div id="worker-chip" class="chip">Worker …</div>
+    <button id="estop" class="danger small">Emergency stop</button>
+    <button id="logout" class="quiet small">Sign out</button>
+  </div>
+</aside>
+<main>
+  <header><div><p class="eyebrow" id="crumb">BLOX STUDIO</p><h1 id="title">Dashboard</h1></div><div id="header-actions"></div></header>
+  <div id="banner" hidden></div>
+  <div id="toast" role="status" aria-live="polite" hidden></div>
+  <section id="view"><p class="muted">Loading…</p></section>
+</main>
+</body>
+</html>

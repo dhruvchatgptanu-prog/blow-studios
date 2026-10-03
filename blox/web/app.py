@@ -99,12 +99,15 @@ def create_app():
         except Exception:
             ok = False
             detail['database'] = 'error'
-        hb = store.get('worker_heartbeat', 0) if ok else 0
-        detail['worker_seen_seconds_ago'] = int(now() - hb) if hb else None
+        if ok:
+            lw = jobs.live_workers(120)
+            detail['worker_seen_seconds_ago'] = int(now() - lw['last_seen']) if lw['last_seen'] else None
+            detail['worker_roles_missing'] = lw['missing']
         return jsonify(ok=ok, **detail), (200 if ok else 503)
 
     # ------------------------------------------------------------ dashboard
     def readiness():
+        d = dbmod.get()
         st = vault.status()
         yt = oauth.status()
         p = prefsmod.get()
@@ -123,9 +126,14 @@ def create_app():
                          p['publishing']['synthetic_disclosure'] is not None,
                          'label': 'Audience and synthetic-content disclosure chosen'},
         }
-        hb = store.get('worker_heartbeat', 0)
-        items['worker'] = {'ok': now() - hb < 60, 'label': 'Background worker running',
-                           'detail': f'last seen {int(now() - hb)}s ago' if hb else 'never seen'}
+        lw = jobs.live_workers(60)
+        if not lw['workers']:
+            hb = d.scalar('SELECT MAX(heartbeat_at) AS t FROM workers')
+            wdetail = f'last seen {int(now() - hb)}s ago' if hb else 'never seen'
+        else:
+            wdetail = 'no live worker for: ' + ', '.join(lw['missing']) if lw['missing'] else 'all roles covered'
+        items['worker'] = {'ok': bool(lw['workers']) and not lw['missing'], 'label': 'Background workers running',
+                           'detail': wdetail}
         return items
 
     @app.get('/api/state')
@@ -353,12 +361,11 @@ def create_app():
                 jobs.enqueue('video.assemble', {'manifest_id': v['manifest_id']}, video_id=vid,
                              idempotency_key=f'assemble:{v["manifest_id"]}:cover{f}:{int(now())}', d=d)
         elif action == 'duplicate':
-            mf = repo.manifest(v['manifest_id'], d) if v['manifest_id'] else None
             plan_body = v['metadata'].get('plan')
             if not plan_body:
                 raise ValueError('Only videos with an editable plan can be duplicated')
             new = _create_from_plan(plan_body, p, d, 'duplicate')
-            _ = mf
+            store.audit('video_duplicate', {'video': vid, 'new': new}, actor='owner', d=d)
             return jsonify(id=new)
         else:
             raise ValueError('Unknown action')

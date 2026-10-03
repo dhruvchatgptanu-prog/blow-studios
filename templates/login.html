@@ -1,1 +1,22 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Blox Studio · Sign in</title><link rel="stylesheet" href="/static/style.css"></head><body class="login"><main class="login-card"><div class="brand">▣ <span>BLOX<span class="thin">STUDIO</span></span></div><h1>Your animation studio.</h1><p>Sign in to create, direct and publish your next story.</p><form method="post"><input type="hidden" name="nonce" value="{{ session.login_nonce }}"><label>Studio password<input type="password" name="password" autocomplete="current-password" required></label><button class="primary">Open studio</button></form><p class="error">{{ error }}</p><small>Single-owner edition · Keep your studio private</small></main></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Blox Studio · Sign in</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="login-body">
+<main class="login-card">
+  <div class="brand big">▣ <span>BLOX<span class="thin">STUDIO</span></span></div>
+  <p class="muted">Single-owner production studio. Sign in with the studio password from your <code>.env</code>.</p>
+  {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+  {% if nonce %}
+  <form method="post" action="/login">
+    <input type="hidden" name="nonce" value="{{ nonce }}">
+    <label>Studio password<input type="password" name="password" autocomplete="current-password" required autofocus></label>
+    <button class="primary" type="submit">Sign in</button>
+  </form>
+  {% endif %}
+</main>
+</body>
+</html>

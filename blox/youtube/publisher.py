@@ -18,6 +18,7 @@ Duplicate-upload protection:
 """
 import json
 import os
+import re
 import urllib.parse
 
 from .. import config, db as dbmod, jobs, prefs as prefsmod, store, vault, videos
@@ -147,8 +148,7 @@ def upload(ctx):
             raise
         if r.status_code in (200, 201):
             return _complete(d, up, vid, r.json())
-        rng = r.headers.get('Range')
-        offset = int(rng.split('-')[-1]) + 1 if rng else 0
+        offset = confirmed_offset(r.headers.get('Range'))
         _set(d, up['id'], bytes_confirmed=offset)
         if offset >= total:
             raise Waiting('All bytes acknowledged; waiting for YouTube to finish the upload response', delay=30)
@@ -168,6 +168,12 @@ def upload(ctx):
             raise
         if r.status_code in (200, 201):
             return _complete(d, up, vid, r.json())
+
+
+def confirmed_offset(rng):
+    """Next byte to send from a resumable-upload Range header ("bytes=0-N"); 0 when absent or malformed."""
+    m = re.fullmatch(r'\s*bytes=0-(\d+)\s*', rng or '')
+    return int(m.group(1)) + 1 if m else 0
 
 
 def _complete(d, up, vid, body):
