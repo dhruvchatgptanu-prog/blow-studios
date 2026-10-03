@@ -120,16 +120,19 @@ Migrations are forward-only; take a backup first.
 Production must stay ahead of the schedule: at 12 slots per day, about one video every two hours has to
 pass QA. The bottleneck is rendering.
 
-Measured on the development machine (4 vCPU, no GPU, EEVEE through software EGL):
+Measured on the development machine (4 vCPU, no GPU, EEVEE through software EGL), final quality,
+the same two-character frames at both sizes (2026-10-03):
 
 | Resolution | Seconds per frame | 30-second video (900 frames) |
 |---|---|---|
-| 540×960 | about 3.8 | about 57 minutes |
-| 1080×1920 | RENDER_1080_SPF | RENDER_1080_VIDEO |
+| 540×960 | 3.2 (3.0-3.8 in full pipeline runs) | about 48-57 minutes |
+| 1080×1920 | 7.4 | about 1 hour 50 minutes |
 
-Plan for repairs (a re-rendered shot costs its share again) and for the voice, assembly and QA steps
-(minutes each). With these figures, 12 full-resolution videos a day need roughly RENDER_WORKERS such
-CPU render workers, or a GPU. Options, in order of effect:
+Plan for repairs (a re-rendered shot costs its share again; the test video in this release re-rendered
+about half of its frames) and for the voice, assembly and QA steps (minutes each). At 1080×1920,
+12 videos a day need about 22 render-hours a day before repairs, so **at least two, better three,
+render machines like this one** (one `worker-render` per machine: Blender already uses every core),
+or one GPU. Options, in order of effect:
 
 1. a GPU for `worker-render` (see DEPLOYMENT.md), typically an order of magnitude faster for EEVEE;
 2. more render workers on more machines (`--scale worker-render=N` against the same PostgreSQL and a

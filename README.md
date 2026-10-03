@@ -174,11 +174,12 @@ These figures come from `pipeline.estimate_video` plus the script-call estimates
 server, YouTube (free within quota) and failed/ambiguous calls held for review.
 
 **Compute is the real constraint.** Blender renders run on the worker's CPU unless you give it a GPU.
-Measured on this development machine (4 vCPU, software EGL, no GPU): about 3.8 s per frame at
-540×960 with EEVEE. 1080×1920 has four times the pixels, so a 30-second, 900-frame video takes
-several CPU-hours on such a machine. **Twelve full-resolution videos per day need a GPU render
-worker or several CPU render workers** (`docker compose up -d --scale worker-render=N`), or a lower
-render resolution; Blox will otherwise skip the slots it cannot fill and say why. See
+Measured on this development machine (4 vCPU, software EGL, no GPU), EEVEE at final quality:
+3.2 s per frame at 540×960 and 7.4 s per frame at 1080×1920, so a 30-second, 900-frame video takes
+about 50 minutes or **about 1 hour 50 minutes** of rendering. Twelve full-resolution videos per day
+therefore need about 22 render-hours a day before repairs: **two to three such render machines, or a
+GPU render worker**, or a lower render resolution. Blox will otherwise skip the slots it cannot fill
+and say why. See
 [docs/OPERATIONS.md](docs/OPERATIONS.md#capacity-planning).
 
 ## 6. What is implemented and verified
@@ -192,7 +193,7 @@ Verified here means exercised end to end in this environment with real tools, no
 | Paid-call safety and budgets | exactly-once ledger, ambiguous-call holds with owner reconciliation, reservations, breakers, global auto-pause | Unit tests with simulated provider failures |
 | Research | YouTube Data API v3 client, quota ledger (Pacific-midnight reset), caching, Shorts signals, explainable ranking, emerging topics, watchlist, references | Fake-API tests seeded with a real, dated sample of 12 Roblox story Shorts ([docs/RESEARCH_SNAPSHOT.md](docs/RESEARCH_SNAPSHOT.md)). **Not run against your API key.** |
 | Transcripts and analysis | upload with rights confirmation, authorised provider contract, ASR of your own media, metadata-only labelling | Unit tests; no provider configured |
-| Stories and originality | story backlog (import, validation, de-duplication, oldest-first claiming); LLM path: pattern extraction, concepts, manifest generation with validation and repair; originality screening against references and recent own videos | Backlog: a backlog story produced through the queued pipeline here. 12 original stories written in this session, all valid and mutually distinct. LLM path tested with mocked OpenAI; **no live generation was run** |
+| Stories and originality | story backlog (import, validation, de-duplication, oldest-first claiming); LLM path: pattern extraction, concepts, manifest generation with validation and repair; originality screening against references and recent own videos | Backlog: a backlog story produced end to end through the queued pipeline here with Piper voices (render, QA, three automatic repair rounds). 12 original stories written in this session, all valid and mutually distinct. LLM path tested with mocked OpenAI; **no live generation was run** |
 | Manifest and director's script | authoring plan → frame-indexed manifest, 1-second beats with full start/end poses, validator, script | Unit tests on the demo story and invalid variants |
 | Deterministic animation | joint-hierarchy rig, analytic + iterative IK, footstep planning, springs, expressions, visemes, amplitude-driven jaw, camera solver, Blender scene build with telemetry | Real Blender renders; solver tests (planted feet, facepalm contact, jump landing, determinism); full demo rendered through the queued pipeline |
 | Voices | free offline Piper voices (default), OpenAI TTS with direction, ElevenLabs with timestamps, local test voice, alignment, pronunciation overrides, gentle fitting | Piper run for real (checksum-verified install, CLI, inside the Docker image, in the pipeline); OpenAI/ElevenLabs request code **not run live** |
@@ -208,6 +209,10 @@ Verified here means exercised end to end in this environment with real tools, no
 
 * No live call to any paid provider or to your YouTube channel was made (no credentials or spending
   authorisation were provided). The first live run should be the opt-in live tests in `tests/live`.
+* **No video has reached QA approval in this environment yet.** The free-voice test video ended with 66
+  of 68 checks passing and was blocked after three repair rounds on one borderline lip-sync check (a
+  line spoken while the character looks down, so the mouth is small on screen). Expect some videos
+  to be held or blocked; that costs a slot, not a defective upload.
 * Piper voices are clear but calmer and less expressive than instruction-following cloud voices;
   emotion is approximated through pace and variation.
 * The story backlog needs refilling: about one batch of 12 stories per day at the default cadence.
