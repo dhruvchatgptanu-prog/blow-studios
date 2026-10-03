@@ -323,8 +323,25 @@ def _expressions(ck, m, cid, recs, gray, prefs):
                        'params': {'camera_tighter': True, 'face_camera': cid}} if status == 'fail' else None)
 
 
+def _hand_over_mouth(rec, aspect):
+    """True when a hand is in front of the face, across it (forehead to just below the mouth) and within
+    its width: the hand or forearm then likely covers part of the mouth. A hand on the chest does not count."""
+    mouth = rec.get('mouth2d')
+    if not mouth:
+        return False
+    fh = rec.get('face_height_frac', 0.1)
+    for side in ('l', 'r'):
+        palm = rec.get('palm2d_' + side)
+        if not palm or len(palm) < 3 or palm[2] > mouth[2] + 0.05:
+            continue
+        dx = (palm[0] - mouth[0]) * aspect  # in units of image height
+        dy = palm[1] - mouth[1]             # image y grows downward
+        if abs(dx) < 0.75 * fh and -1.2 * fh < dy < 0.25 * fh:
+            return True
+    return False
+
+
 def _lipsync(ck, m, cid, recs, gray, dialog_by_line):
-    fps = m['fps']
     for ln in m['lines']:
         if ln['speaker'] != cid:
             continue
@@ -353,29 +370,49 @@ def _lipsync(ck, m, cid, recs, gray, dialog_by_line):
                     if c > best[0]:
                         best = (c, L)
             corr, lag = round(best[0], 3), best[1]
-        pix_ratio = None
-        if gray is not None:
-            act, rest = [], []
-            for f in range(max(1, a - int(0.6 * fps)), min(len(gray), b + int(0.6 * fps))):
+        # Pixel evidence, independent of telemetry: how much of the mouth crop is dark (mouth interior
+        # against skin) in each frame, tracked at that frame's mouth position, correlated with the voice.
+        pix_corr, pix_frames, occluded = None, 0, 0
+        if gray is not None and env is not None and len(env):
+            opening = []
+            for f in range(a, b):
                 r = recs.get(f)
-                if not r or shot_at(m, f) is not shot or not on_screen(r):
+                crop = None
+                if r and _hand_over_mouth(r, m['width'] / m['height']):
+                    occluded += 1
+                    opening.append(np.nan)
                     continue
-                hw = max(0.015, r['mouth_width_px'] / max(1, 1080) * 0.9)
-                c1 = _crop(gray, f, r['mouth2d'][0], r['mouth2d'][1], hw, hw * 0.9)
-                c0 = _crop(gray, f - 1, r['mouth2d'][0], r['mouth2d'][1], hw, hw * 0.9)
-                if c1 is None or c0 is None or c1.shape != c0.shape:
+                if r and on_screen(r) and r['face_dot'] > 0.2:
+                    hw = max(0.012, r['mouth_width_px'] / max(1, m['width']) * 0.75)
+                    crop = _crop(gray, f, r['mouth2d'][0], r['mouth2d'][1], hw, hw * 0.8)
+                if crop is None or crop.size < 30:
+                    opening.append(np.nan)
                     continue
-                d = float(np.mean(np.abs(c1 - c0)))
-                (act if a <= f < b else rest).append(d)
-            if act and rest:
-                pix_ratio = round((np.mean(act) + 0.05) / (np.mean(rest) + 0.05), 2)
-        ev = {'mouth_envelope_correlation': corr, 'best_lag_frames': lag, 'mouth_pixel_activity_ratio': pix_ratio,
-              'visible_frames': len(vis)}
+                ref = float(np.percentile(crop, 75))
+                opening.append(float(np.mean(crop < 0.6 * ref)) if ref > 0.05 else np.nan)
+            o = np.array(opening)
+            ok_idx = ~np.isnan(o)
+            pix_frames = int(ok_idx.sum())
+            if pix_frames >= max(8, 0.5 * len(o)) and np.nanstd(o) <= 1e-4 and mouth.std() > 0.05:
+                pix_corr = 0.0  # the scene says the mouth moves, but the rendered pixels never change
+            elif pix_frames >= max(8, 0.5 * len(o)) and np.nanstd(o) > 1e-4:
+                e = np.interp(np.arange(len(o)), np.linspace(0, len(o) - 1, len(env)), env)
+                best = -1.0
+                for L in range(-4, 5):
+                    x = o[max(0, L):len(o) + min(0, L)]
+                    y = e[max(0, -L):len(e) - max(0, L)]
+                    k = ~np.isnan(x)
+                    if k.sum() > 5 and x[k].std() > 1e-6 and y[k].std() > 1e-6:
+                        best = max(best, float(np.corrcoef(x[k], y[k])[0, 1]))
+                pix_corr = round(best, 3)
+        ev = {'mouth_envelope_correlation': corr, 'best_lag_frames': lag, 'pixel_mouth_voice_correlation': pix_corr,
+              'pixel_frames_measured': pix_frames, 'frames_mouth_covered_by_hand': occluded, 'visible_frames': len(vis),
+              'method': 'scene mouth opening vs voice envelope, and rendered mouth darkness vs voice envelope'}
         if corr is None:
             status, conf = 'uncertain', 0.4
         else:
-            ok = corr >= 0.3 and abs(lag) <= 2 and (pix_ratio is None or pix_ratio >= 1.15)
-            status, conf = ('pass' if ok else 'fail'), 0.8 if pix_ratio is not None else 0.65
+            ok = corr >= 0.3 and abs(lag) <= 2 and (pix_corr is None or pix_corr >= 0.25)
+            status, conf = ('pass' if ok else 'fail'), 0.8 if pix_corr is not None else 0.6
         ck.add(f'lipsync:{ln["id"]}', f'Lip sync for line {ln["id"]} ({cid})', 'visual', status, 'major', ev, conf,
                'telemetry+pixel+audio', frames=(a, b), target={'kind': 'shot', 'id': shot['id'] if shot else None},
                repair={'action': 're_render_shot', 'shot': shot['id'], 'params': {'realign_line': ln['id']}}

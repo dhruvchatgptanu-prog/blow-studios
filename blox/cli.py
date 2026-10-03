@@ -8,6 +8,8 @@
     python -m blox.cli restore <backup.tar.gz>
     python -m blox.cli hash-password
     python -m blox.cli healthcheck [--worker]   (container health checks)
+    python -m blox.cli install-voice [--model en-us-libritts-high]   (free offline Piper voices)
+    python -m blox.cli import-stories stories.json [--source claude]   (story backlog)
 """
 import argparse
 import copy
@@ -26,7 +28,7 @@ TABLES_ORDER = ['settings', 'projects', 'jobs', 'assets', 'reservations', 'schem
                 'workers', 'locks', 'paid_calls', 'budget_ledger', 'breakers', 'quota_ledger', 'api_cache',
                 'research_runs', 'ref_channels', 'ref_videos', 'ref_snapshots', 'transcripts', 'ref_analyses', 'patterns',
                 'characters', 'concepts', 'videos', 'video_events', 'manifests', 'shots', 'audio_lines', 'renders',
-                'qa_reports', 'repairs', 'slots', 'uploads', 'analytics_snapshots', 'learning_findings']
+                'qa_reports', 'repairs', 'slots', 'uploads', 'analytics_snapshots', 'learning_findings', 'story_backlog']
 
 
 def cmd_migrate(a):
@@ -213,6 +215,29 @@ def cmd_hash_password(a):
     print(generate_password_hash(pw, method='scrypt'))
 
 
+def cmd_install_voice(a):
+    """Download and verify a free Piper voice model (checksum-pinned, from the Piper releases on GitHub)."""
+    config.ensure_dirs()
+    from .voice import piper
+    path = piper.install(a.model)
+    spec = piper.VOICES[a.model]
+    print(json.dumps({'installed': str(path), 'license': spec['license'], 'dataset': spec['dataset'],
+                      'speakers': spec['speakers'], 'engine_available': piper.engine_available()}))
+
+
+def cmd_import_stories(a):
+    """Validate and add story plans (a JSON list, or {"plans": [...]}) to the backlog."""
+    runtime.init()
+    from .story import backlog
+    with open(a.file, encoding='utf-8') as f:
+        data = json.load(f)
+    plans = data.get('plans') if isinstance(data, dict) else data
+    res = backlog.add(plans, a.source, prefsmod.get())
+    for r in res:
+        print(f"{r['status']:9} {r['title']}" + (f"  ({r['reason']})" if r.get('reason') else ''))
+    print(json.dumps(backlog.summary(prefsmod.get())))
+
+
 def cmd_healthcheck(a):
     """Exit 0 when the database answers (and, with --worker, this host's worker heartbeat is fresh)."""
     import socket
@@ -257,6 +282,13 @@ def main(argv=None):
     s.add_argument('--force', action='store_true')
     s.set_defaults(fn=cmd_restore)
     sub.add_parser('hash-password').set_defaults(fn=cmd_hash_password)
+    s = sub.add_parser('install-voice')
+    s.add_argument('--model', default='en-us-libritts-high')
+    s.set_defaults(fn=cmd_install_voice)
+    s = sub.add_parser('import-stories')
+    s.add_argument('file')
+    s.add_argument('--source', default='owner')
+    s.set_defaults(fn=cmd_import_stories)
     s = sub.add_parser('healthcheck')
     s.add_argument('--worker', action='store_true')
     s.add_argument('--max-age', type=float, default=90)

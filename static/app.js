@@ -45,7 +45,7 @@ function setView(html) { $('#view').innerHTML = html; widths(); }
 function widths() { $$('[data-w]').forEach(el => { el.style.width = Math.max(0, Math.min(100, Number(el.dataset.w) || 0)) + '%'; }); }
 function bind(sel, ev, fn) { $$(sel).forEach(el => el.addEventListener(ev, guard(fn))); }
 
-const TITLES = {dashboard: 'Dashboard', research: 'Trend research', productions: 'Director’s editor', quality: 'Quality control',
+const TITLES = {dashboard: 'Dashboard', research: 'Trend research', productions: 'Director’s editor', stories: 'Story backlog', quality: 'Quality control',
   calendar: 'Publishing calendar', characters: 'Characters', library: 'Media library', queue: 'Work queue',
   budget: 'Budget & learning', connections: 'Connections', settings: 'Settings'};
 
@@ -319,6 +319,33 @@ function renderEditor(d) {
   bind('#save-plan', 'click', async () => { const r = await api(`videos/${S.videoId}/plan`, 'PUT', {plan: S.plan}); showVal(r); toast(r.validation.ok ? 'Saved; ready to produce' : 'Saved with errors (held for review)'); });
 }
 
+/* ------------------------------------------------------------------ story backlog */
+async function stories() {
+  const b = await api('backlog');
+  const s = b.summary;
+  setView(`<div class="grid g3"><div class="panel"><h2>Ready</h2><div class="stat">${s.ready} <small>stories</small></div><p class="small muted">about ${s.days_left} days at ${s.per_day} per day</p></div>
+    <div class="panel"><h2>Used</h2><div class="stat">${s.used}</div><p class="small muted">${s.rejected} rejected</p></div>
+    <div class="panel"><h2>Story source</h2><div class="stat">${esc(b.source === 'backlog' ? 'Backlog' : 'LLM API')}</div><p class="small muted">Setting: ${esc(b.setting)} (Settings → Production)</p></div></div>
+    <div class="panel"><p class="small">${esc(b.note)}</p>
+      <form id="import"><label>Paste story plans (a JSON list of plans, or {"plans": [...]}); the format is the plan JSON in the Director’s editor<textarea name="json" class="tall" placeholder='[{"title": "…", "cast": […], "shots": […], …}]'></textarea></label>
+      <div class="actions"><button class="primary">Validate and add</button></div></form><div id="import-out"></div></div>
+    <div class="panel tablewrap">${b.stories.length ? `<table><tr><th>Story</th><th>Status</th><th>Source</th><th>Added</th><th>Notes</th><th></th></tr>${b.stories.map(x => `<tr><td><b>${esc(x.title)}</b><br><span class="small muted">${esc(x.logline)}</span></td>
+      <td>${chip(x.status === 'ready' ? 'pass' : x.status === 'used' ? 'info' : 'fail', x.status)}${x.video_id ? `<br><a href="#" data-video="${esc(x.video_id)}" class="small">video</a>` : ''}</td><td class="small">${esc(x.source)}</td><td class="small">${when(x.created_at, {timeStyle: undefined})}</td>
+      <td class="small muted">${esc(x.note || (x.validation.warnings || []).slice(0, 2).join('; '))}</td>
+      <td>${x.status === 'ready' ? `<button class="small" data-story="${esc(x.id)}" data-sact="reject">Reject</button>` : x.status === 'rejected' ? `<button class="small" data-story="${esc(x.id)}" data-sact="restore">Restore</button>` : ''}</td></tr>`).join('')}</table>` : empty('No stories yet. Paste plans above, or ask Claude for a batch written in the plan format.')}</div>`);
+  bind('#import', 'submit', async e => {
+    let data;
+    try { data = JSON.parse(e.target.json.value); } catch (x) { throw Error('That is not valid JSON'); }
+    const plans = Array.isArray(data) ? data : (data.plans || [data]);
+    const r = await api('backlog', 'POST', {plans, source: 'owner'});
+    $('#import-out').innerHTML = r.results.map(x => `<p class="small">${chip(x.status === 'ready' ? 'pass' : x.status === 'duplicate' ? 'uncertain' : 'fail', x.status)} ${esc(x.title)} ${x.reason ? '<span class="muted">' + esc(x.reason) + '</span>' : ''}</p>`).join('');
+    toast(r.results.filter(x => x.status === 'ready').length + ' stories added');
+    setTimeout(stories, 2500);
+  });
+  bind('[data-story]', 'click', async e => { await api(`backlog/${e.target.dataset.story}/${e.target.dataset.sact}`, 'POST', {}); stories(); });
+  bindCommon();
+}
+
 /* ------------------------------------------------------------------ quality */
 async function quality() {
   const list = (await api('videos')).videos.filter(v => v.render_id);
@@ -369,7 +396,8 @@ async function characters() {
       <label>Hat<select name="hat">${r.vocab.hats.map(x => `<option value="${x || ''}" ${x === c.bible.costume.hat ? 'selected' : ''}>${x || 'none'}</option>`).join('')}</select></label>
       <label>Badge<select name="badge">${r.vocab.badges.map(x => `<option value="${x || ''}" ${x === c.bible.costume.badge ? 'selected' : ''}>${x || 'none'}</option>`).join('')}</select></label></div>
     <label>Visual rules (one per line)<textarea name="rules">${esc((c.bible.visual_rules || []).join('\n'))}</textarea></label>
-    <h3>Voice</h3><div class="row"><label>OpenAI voice<input name="openai_voice" value="${esc(c.voice.openai_voice || '')}"></label><label>ElevenLabs voice id<input name="elevenlabs_voice_id" value="${esc(c.voice.elevenlabs_voice_id || '')}"></label><label>Local test voice<input name="local_test_voice" value="${esc(c.voice.local_test_voice || '')}"></label></div>
+    <h3>Voice</h3><div class="row"><label>Free voice (Piper) speaker 0–903<input name="piper_speaker" type="number" min="0" max="903" value="${c.voice.piper_speaker ?? ''}"></label><label>&nbsp;<button type="button" data-hear="${esc(id)}">Hear free voice</button></label></div><div id="hear-${esc(id)}"></div>
+    <div class="row"><label>OpenAI voice<input name="openai_voice" value="${esc(c.voice.openai_voice || '')}"></label><label>ElevenLabs voice id<input name="elevenlabs_voice_id" value="${esc(c.voice.elevenlabs_voice_id || '')}"></label><label>Local test voice<input name="local_test_voice" value="${esc(c.voice.local_test_voice || '')}"></label></div>
     <label>Voice direction<input name="openai_instructions" value="${esc(c.voice.openai_instructions || '')}"></label>
     <label>Voice rights note<input name="rights_note" value="${esc(c.voice.rights_note || '')}" placeholder="e.g. provider catalogue voice"></label>
     <div class="actions"><button class="primary">Save</button><button type="button" data-preview="${esc(id)}">Render preview</button></div><div id="pv-${esc(id)}"></div></form></div>`).join('')}</div>`);
@@ -380,9 +408,16 @@ async function characters() {
       bible: {summary: f.summary.value, personality: f.personality.value, scale: Number(f.scale.value), palette: pal,
         costume: {top: f.top.value, hair: f.hair.value || null, hat: f.hat.value || null, badge: f.badge.value || null},
         visual_rules: f.rules.value.split('\n').filter(Boolean)},
-      voice: {openai_voice: f.openai_voice.value, elevenlabs_voice_id: f.elevenlabs_voice_id.value, local_test_voice: f.local_test_voice.value,
+      voice: {piper_speaker: f.piper_speaker.value === '' ? null : Number(f.piper_speaker.value),
+        openai_voice: f.openai_voice.value, elevenlabs_voice_id: f.elevenlabs_voice_id.value, local_test_voice: f.local_test_voice.value,
         openai_instructions: f.openai_instructions.value, rights_note: f.rights_note.value}});
     toast('Character saved');
+  });
+  bind('[data-hear]', 'click', async e => {
+    const id = e.target.dataset.hear, f = e.target.closest('form');
+    $('#hear-' + id).innerHTML = '<p class="muted small">Generating with the free offline voice…</p>';
+    const r = await api('characters/' + id + '/voice-preview', 'POST', {piper_speaker: f.piper_speaker.value});
+    $('#hear-' + id).innerHTML = `<audio controls autoplay src="${r.preview}?t=${Date.now()}"></audio><p class="small muted">Speaker ${r.speaker} · ${esc(r.license)} · save the character to keep it</p>`;
   });
   bind('[data-preview]', 'click', async e => { const id = e.target.dataset.preview; $('#pv-' + id).innerHTML = '<p class="muted">Rendering with Blender…</p>'; const p = await api('characters/' + id + '/preview', 'POST', {}); $('#pv-' + id).innerHTML = `<img src="${p.preview}?t=${Date.now()}" alt="Preview" class="preview-still">`; });
 }
@@ -473,11 +508,12 @@ async function settings() {
     <label>Game names (comma separated)<input data-sec="channel" data-key="game_names" data-list="1" value="${esc(p.channel.game_names.join(', '))}"></label>
     <label>Negative keywords<input data-sec="channel" data-key="negative_keywords" data-list="1" value="${esc(p.channel.negative_keywords.join(', '))}"></label>
     <label>Audience note<input data-sec="channel" data-key="audience_note" value="${esc(p.channel.audience_note)}"></label></div>
-  <div class="panel"><h2>Production</h2><div class="row">${sel('production', 'renderer', pr.renderer, vocab.renderers.map(x => [x, x]))}${sel('production', 'tts_provider', pr.tts_provider, vocab.tts.map(x => [x, x === 'local_test' ? 'local test voice (not for publishing)' : x]))}${sel('production', 'blender_engine', pr.blender_engine, [['BLENDER_EEVEE', 'EEVEE'], ['CYCLES', 'Cycles'], ['BLENDER_WORKBENCH', 'Workbench (fast, flat)']])}</div>
+  <div class="panel"><h2>Production</h2><div class="row">${sel('production', 'renderer', pr.renderer, vocab.renderers.map(x => [x, x]))}${sel('production', 'tts_provider', pr.tts_provider, vocab.tts.map(x => [x, {local_test: 'local test voice (not for publishing)', piper: 'Piper (free, offline)', openai: 'OpenAI (paid)', elevenlabs: 'ElevenLabs (paid)'}[x] || x]))}${sel('production', 'blender_engine', pr.blender_engine, [['BLENDER_EEVEE', 'EEVEE'], ['CYCLES', 'Cycles'], ['BLENDER_WORKBENCH', 'Workbench (fast, flat)']])}</div>
     <div class="row">${inp('production', 'min_seconds', pr.min_seconds, 'number')}${inp('production', 'target_seconds', pr.target_seconds, 'number')}${inp('production', 'max_seconds', pr.max_seconds, 'number')}${inp('production', 'fps', pr.fps, 'number')}${inp('production', 'width', pr.width, 'number')}${inp('production', 'height', pr.height, 'number')}</div>
     <div class="row">${inp('production', 'text_model', pr.text_model)}${inp('production', 'vision_model', pr.vision_model)}${inp('production', 'tts_model', pr.tts_model)}${inp('production', 'asr_model', pr.asr_model)}${inp('production', 'runway_model', pr.runway_model)}</div>
     <div class="row">${sel('production', 'music', pr.music, [['generated', 'Generated original music'], ['asset', 'My licensed track'], ['none', 'No music']])}${inp('production', 'music_asset', pr.music_asset)}${inp('production', 'music_gain_db', pr.music_gain_db, 'number')}${inp('production', 'duck_db', pr.duck_db, 'number')}</div>
     <label class="check"><input type="checkbox" data-sec="production" data-key="captions" ${pr.captions ? 'checked' : ''}> Burn in captions</label>
+    ${sel('production', 'story_source', pr.story_source || 'auto', [['auto', 'Automatic: LLM API if connected, otherwise the story backlog'], ['backlog', 'Story backlog only (no AI API cost)'], ['llm', 'LLM API only (paid)']])}
     <label class="check"><input type="checkbox" data-sec="production" data-key="allow_template_stories" ${pr.allow_template_stories ? 'checked' : ''}> Allow offline template stories (dry runs)</label>
     <label>Pronunciations (JSON object)<textarea data-sec="production" data-key="pronunciations" data-json="1">${esc(JSON.stringify(pr.pronunciations, null, 1))}</textarea></label></div></div>
   <div class="grid g2"><div class="panel"><h2>Research</h2><label class="check"><input type="checkbox" data-sec="research" data-key="enabled" ${r.enabled ? 'checked' : ''}> Research enabled</label>
@@ -512,7 +548,7 @@ async function settings() {
   bind('#ap-off', 'click', async () => { await api('autopilot/disable', 'POST', {}); toast('Autopilot off'); settings(); });
 }
 
-const VIEWS = {dashboard, research, productions, quality, calendar, characters, library, queue, budget, connections, settings};
+const VIEWS = {dashboard, research, productions, stories, quality, calendar, characters, library, queue, budget, connections, settings};
 
 async function sidebar() {
   try {

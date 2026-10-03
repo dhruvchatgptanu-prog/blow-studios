@@ -106,19 +106,42 @@ def create_app():
         return jsonify(ok=ok, **detail), (200 if ok else 503)
 
     # ------------------------------------------------------------ dashboard
+    def _voice_readiness(p):
+        prov = p['production']['tts_provider']
+        if prov == 'piper':
+            from ..voice import piper
+            ok = piper.installed(p['production'].get('piper_model', piper.DEFAULT_MODEL))
+            return {'ok': ok, 'label': 'Free voices (Piper) installed',
+                    'detail': None if ok else 'run: python -m blox.cli install-voice'}
+        if prov == 'local_test':
+            return {'ok': False, 'label': 'Natural voices', 'detail': 'the local test voice cannot be published'}
+        key = 'OPENAI_API_KEY' if prov == 'openai' else 'ELEVENLABS_API_KEY'
+        return {'ok': vault.configured(key), 'label': f'Voices ({prov})'}
+
     def readiness():
         d = dbmod.get()
         st = vault.status()
         yt = oauth.status()
         p = prefsmod.get()
+        from ..pipeline import story_source
+        from ..story import backlog
+        src = story_source(p)
+        bl = backlog.summary(p)
+        needs_openai = src == 'llm' or p['production']['tts_provider'] == 'openai'
         items = {
-            'openai': {'ok': st['OPENAI_API_KEY'], 'label': 'OpenAI (scripts, voices, QA review)'},
+            'openai': {'ok': st['OPENAI_API_KEY'], 'label': 'OpenAI API (AI story writing, paid voices, QA review)',
+                       'optional': not needs_openai},
+            'stories': {'ok': src == 'llm' or bl['ready'] > 0 or p['production']['allow_template_stories'],
+                        'label': 'Stories to produce',
+                        'detail': ('written by the LLM API' if src == 'llm' else
+                                   f"{bl['ready']} in the backlog, about {bl['days_left']} days at {bl['per_day']}/day")},
             'youtube_data': {'ok': st['YOUTUBE_API_KEY'], 'label': 'YouTube Data API key (research)'},
             'google_oauth': {'ok': yt['oauth_client'], 'label': 'Google OAuth client'},
             'youtube_channel': {'ok': yt['connected'] and bool(yt['channel'].get('confirmed')),
                                 'label': 'YouTube channel connected and confirmed', 'detail': yt['channel'].get('title')},
             'blender': {'ok': BL.available(), 'label': 'Blender renderer'},
             'ffmpeg': {'ok': bool(shutil.which(config.FFMPEG_BIN)), 'label': 'FFmpeg'},
+            'voices': _voice_readiness(p),
             'runway': {'ok': st['RUNWAYML_API_SECRET'], 'label': 'Runway (optional generative shots)',
                        'optional': True},
             'elevenlabs': {'ok': st['ELEVENLABS_API_KEY'], 'label': 'ElevenLabs (optional voices)', 'optional': True},
@@ -322,6 +345,9 @@ def create_app():
             if v['status'] not in videos.TERMINAL:
                 videos.transition(vid, 'cancelled', 'Cancelled by owner (provider work already submitted may still '
                                                     'finish and be charged)', actor='owner', d=d)
+                if v['status'] not in videos.UPLOADED:
+                    from ..story import backlog
+                    backlog.release_for_video(vid, d)
         elif action == 'regenerate_shot':
             key = str(body.get('shot', ''))
             sh = next((x for x in repo.shots(v['manifest_id'], d) if x['shot_key'] == key), None)
@@ -439,6 +465,44 @@ def create_app():
             an['findings'] = json.loads(an['findings'])
         v['analysis'] = an
         return jsonify(v)
+
+    # ------------------------------------------------------------ story backlog
+    @app.get('/api/backlog')
+    def backlog_view():
+        from ..pipeline import story_source
+        from ..story import backlog
+        p = prefsmod.get()
+        return jsonify(summary=backlog.summary(p), stories=backlog.listing(), source=story_source(p),
+                       setting=p['production'].get('story_source', 'auto'),
+                       note=('Stories here are produced in order when the story source is the backlog (automatic '
+                             'when no LLM API key is connected). Each is validated on import and screened for '
+                             'originality before production.'))
+
+    @app.post('/api/backlog')
+    def backlog_import():
+        from ..story import backlog
+        body = request.get_json(force=True) or {}
+        plans = body.get('plans') if isinstance(body.get('plans'), list) else [body.get('plan')]
+        res = backlog.add(plans, str(body.get('source') or 'owner'), prefsmod.get())
+        return jsonify(results=res, summary=backlog.summary(prefsmod.get()))
+
+    @app.get('/api/backlog/<sid>')
+    def backlog_item(sid):
+        from ..story import backlog
+        row = backlog.get(sid)
+        if not row:
+            abort(404)
+        return jsonify(row)
+
+    @app.post('/api/backlog/<sid>/<action>')
+    def backlog_action(sid, action):
+        from ..story import backlog
+        if action not in ('reject', 'restore'):
+            raise ValueError('Unknown action')
+        backlog.set_status(sid, 'rejected' if action == 'reject' else 'ready',
+                           str((request.get_json(silent=True) or {}).get('note', ''))[:300])
+        store.audit('story_' + action, {'story': sid}, actor='owner')
+        return jsonify(ok=True)
 
     # ------------------------------------------------------------ calendar
     @app.get('/api/calendar')
@@ -582,6 +646,17 @@ def create_app():
                               'tops': ['hoodie', 'tee'], 'hair': ['messy_block', 'short_block', None],
                               'hats': ['cap', None], 'badges': ['star', None]})
 
+    def _speaker(v):
+        if v in (None, ''):
+            return None
+        try:
+            n = int(v)
+        except (TypeError, ValueError):
+            raise ValueError('Free voice speaker must be a number')
+        if not 0 <= n < 904:
+            raise ValueError('Free voice speaker must be between 0 and 903')
+        return n
+
     @app.put('/api/characters/<cid>')
     def put_character(cid):
         import re as _re
@@ -608,6 +683,7 @@ def create_app():
                        'openai_instructions': str(voice.get('openai_instructions', ''))[:600],
                        'elevenlabs_voice_id': str(voice.get('elevenlabs_voice_id', ''))[:64],
                        'local_test_voice': str(voice.get('local_test_voice', 'kal16'))[:10],
+                       'piper_speaker': _speaker(voice.get('piper_speaker')),
                        'rights_note': str(voice.get('rights_note', ''))[:300]}
         repo.save_character(cid, name, clean_bible, clean_voice, bool(body.get('active', True)))
         store.audit('character_saved', {'id': cid}, actor='owner')
@@ -639,6 +715,27 @@ def create_app():
         rel = repo.rel(res['preview'])
         store.put('character_preview:' + cid, rel)
         return jsonify(preview='/media/' + rel)
+
+    @app.post('/api/characters/<cid>/voice-preview')
+    def character_voice_preview(cid):
+        """Speak a sample line with a free voice (Piper speaker or the test voice). Paid providers are not used."""
+        chars = repo.characters(active_only=False)
+        if cid not in chars:
+            abort(404)
+        body = request.get_json(silent=True) or {}
+        from ..voice import piper, tts
+        voice = dict(chars[cid]['voice'])
+        if body.get('piper_speaker') not in (None, ''):
+            voice['piper_speaker'] = _speaker(body.get('piper_speaker'))
+        text = str(body.get('text') or f"Hi, I'm {chars[cid]['name']}. Wait... where's the next platform?!")[:200]
+        out_dir = config.WORK_DIR / 'character_previews' / cid
+        out_dir.mkdir(parents=True, exist_ok=True)
+        speaker = piper.speaker_for(cid, voice)
+        out = out_dir / f'voice_{speaker}.wav'
+        line = {'id': 'preview', 'text': text, 'emotion': 'happy', 'pace': 'normal', 'volume': 'normal'}
+        piper.synthesize(tts.spoken_text(text, prefsmod.get()['production']['pronunciations']), str(out), speaker, line)
+        return jsonify(preview='/media/' + repo.rel(str(out)), speaker=speaker,
+                       license=piper.VOICES[piper.DEFAULT_MODEL]['license'])
 
     # ------------------------------------------------------------ queue, budget, analytics, audit
     @app.get('/api/tasks')

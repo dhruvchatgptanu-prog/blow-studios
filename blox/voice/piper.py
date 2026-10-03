@@ -1,0 +1,152 @@
+"""Free, offline voices with Piper (no account, no per-use cost).
+
+Piper (piper-tts, GPL-3.0) runs as a separate process; Blox never imports it, and the audio it
+produces is not covered by its licence. Only voice models whose training data allows commercial use
+are listed in ``VOICES``; their licence and attribution are recorded with every line and added to
+the video description.
+
+Piper has no word timestamps, so alignment is estimated from the audio's voiced regions (labelled
+``estimated``) unless a speech-recognition provider is connected. Emotion is approximated through
+pace and variation only: these are calm reading voices, less expressive than instruction-following
+cloud voices.
+"""
+import hashlib
+import json
+import os
+import shutil
+import sys
+import tarfile
+import tempfile
+from pathlib import Path
+
+from .. import config, media, netsafe
+from ..util import Blocked
+
+VOICES = {
+    'en-us-libritts-high': {
+        'url': 'https://github.com/rhasspy/piper/releases/download/v0.0.2/voice-en-us-libritts-high.tar.gz',
+        'sha256': '328e3e9cb573a43a6c5e1aeca386e971232bdb1418a74d4674cf726c973a0ea8',
+        'files': ['en-us-libritts-high.onnx', 'en-us-libritts-high.onnx.json', 'MODEL_CARD'],
+        'speakers': 904,
+        'license': 'CC BY 4.0',
+        'dataset': 'LibriTTS (openslr.org/60)',
+        'attribution': 'Voices generated with Piper TTS using a model trained on LibriTTS (CC BY 4.0, '
+                       'openslr.org/60).',
+    },
+}
+DEFAULT_MODEL = 'en-us-libritts-high'
+# Defaults chosen by pitch for the built-in cast; change them on the Characters page.
+DEFAULT_SPEAKERS = {'ch_bloxy': 60, 'ch_pip': 288}
+
+PACE = {'slow': 1.12, 'normal': 1.0, 'fast': 0.9}
+LIVELY = {'excited', 'startled', 'angry', 'laughing', 'scared', 'happy', 'proud'}
+SUBDUED = {'sad', 'bored', 'embarrassed', 'tired', 'worried', 'disappointed'}
+
+
+def voices_dir():
+    return Path(os.environ.get('BLOX_VOICES_DIR') or (config.DATA_DIR / 'voices'))
+
+
+def model_paths(name=DEFAULT_MODEL):
+    if name not in VOICES:
+        raise Blocked(f'Unknown Piper voice model {name!r}', state='needs_review')
+    base = voices_dir() / name
+    return base / f'{name}.onnx', base / f'{name}.onnx.json'
+
+
+def installed(name=DEFAULT_MODEL):
+    onnx, cfg = model_paths(name)
+    return onnx.exists() and cfg.exists()
+
+
+def engine_available():
+    try:
+        media.run([sys.executable, '-m', 'piper', '--help'], timeout=60)
+        return True
+    except media.MediaError:
+        return False
+
+
+def install(name=DEFAULT_MODEL):
+    """Download a listed voice model, verify its checksum and unpack only the expected files."""
+    spec = VOICES[name]
+    dest = voices_dir() / name
+    if installed(name):
+        return dest
+    dest.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=dest) as tmp:
+        archive = os.path.join(tmp, 'voice.tar.gz')
+        netsafe.fetch(spec['url'], 'piper_voices', dest=archive, allow_hosts=['github.com', 'githubusercontent.com'],
+                      max_bytes=400 * 1024 * 1024)
+        h = hashlib.sha256()
+        with open(archive, 'rb') as f:
+            for chunk in iter(lambda: f.read(1 << 20), b''):
+                h.update(chunk)
+        if h.hexdigest() != spec['sha256']:
+            raise Blocked(f'Checksum mismatch for voice model {name}; not installed', state='blocked')
+        with tarfile.open(archive) as tar:
+            for member in tar.getmembers():
+                base = os.path.basename(member.name)
+                if member.isfile() and base in spec['files']:
+                    with tar.extractfile(member) as src, open(dest / base, 'wb') as out:
+                        shutil.copyfileobj(src, out)
+    if not installed(name):
+        raise Blocked(f'Voice model {name} archive did not contain the expected files', state='blocked')
+    return dest
+
+
+def speaker_for(character_id, voice):
+    sp = voice.get('piper_speaker')
+    if sp is None or sp == '':
+        sp = DEFAULT_SPEAKERS.get(character_id, int(hashlib.sha256(str(character_id).encode()).hexdigest(), 16) % 904)
+    return int(sp)
+
+
+def delivery(line):
+    """Map the line's direction onto Piper's controls (pace and variation)."""
+    length = PACE.get(line.get('pace', 'normal'), 1.0)
+    emo = line.get('emotion', 'neutral')
+    if emo in LIVELY:
+        noise, noise_w = 0.75, 0.9
+    elif emo in SUBDUED:
+        noise, noise_w = 0.5, 0.6
+        length *= 1.04
+    else:
+        noise, noise_w = 0.667, 0.8
+    return round(length, 3), noise, noise_w
+
+
+def synthesize(text, out_path, speaker, line, model=DEFAULT_MODEL):
+    onnx, cfg = model_paths(model)
+    if not installed(model):
+        raise Blocked('The free Piper voice model is not installed. Run: python -m blox.cli install-voice',
+                      state='blocked')
+    n = VOICES[model]['speakers']
+    if not 0 <= speaker < n:
+        raise Blocked(f'Piper speaker {speaker} is outside 0-{n - 1}', state='needs_review')
+    length, noise, noise_w = delivery(line)
+    config.WORK_DIR.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile('w', suffix='.txt', delete=False, dir=config.WORK_DIR, encoding='utf-8') as tf:
+        tf.write(text)
+        tpath = tf.name
+    try:
+        media.run([sys.executable, '-m', 'piper', '-m', str(onnx), '-c', str(cfg), '-s', str(speaker),
+                   '--length-scale', str(length), '--noise-scale', str(noise), '--noise-w-scale', str(noise_w),
+                   '-i', tpath, '-f', out_path], timeout=300)
+    finally:
+        os.unlink(tpath)
+    if not os.path.exists(out_path) or os.path.getsize(out_path) < 2000:
+        raise media.MediaError('Piper produced no audio')
+    return {'path': out_path, 'model': model, 'speaker': speaker,
+            'license': VOICES[model]['license'], 'attribution': VOICES[model]['attribution'],
+            'controls': {'length_scale': length, 'noise_scale': noise, 'noise_w': noise_w}}
+
+
+def status():
+    return {'models': {k: {'installed': installed(k), 'license': v['license'], 'dataset': v['dataset'],
+                           'speakers': v['speakers']} for k, v in VOICES.items()},
+            'dir': str(voices_dir())}
+
+
+def describe():
+    return json.dumps(status())

@@ -917,9 +917,10 @@ class CharacterSolver:
         in_line = bool(getattr(self, 'line_frames', None)) and f in self.line_frames
         if vis or in_line or (e is not None and e > 0.12):
             # While speaking, the jaw follows the real audio amplitude; text
-            # visemes choose the mouth shape; expressions keep the corners.
+            # visemes choose the mouth shape; expressions keep only a hint of the
+            # corners (a strong smile/frown shape would hold the mouth closed).
             for k in list(w):
-                w[k] = round(w[k] * 0.55, 3)
+                w[k] = round(w[k] * 0.3, 3)
             gain = 1.0 if e is None else (0.08 + 0.92 * e)
             for v, amt in vis.items():
                 if v != 'rest':

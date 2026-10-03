@@ -57,7 +57,9 @@ def build_metadata(v, slot_at, p):
     title = (md.get('title') or v['title'])[:100]
     desc = (md.get('description') or '').strip()
     footer = pub['description_footer'].strip()
-    description = (desc + '\n\n' + footer + '\n\n#Shorts').strip()[:4900]
+    # Licence attributions for the voices actually used in this video (for example CC BY voice models).
+    credits = '\n'.join(v['metadata'].get('voice_credits') or [])
+    description = '\n\n'.join(x for x in (desc, footer, credits, '#Shorts') if x).strip()[:4900]
     tags = list(dict.fromkeys([t for t in (md.get('tags') or []) + pub['tags'] if t]))
     while sum(len(t) + 2 for t in tags) > 450:
         tags.pop()

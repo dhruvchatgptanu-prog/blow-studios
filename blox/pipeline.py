@@ -11,7 +11,7 @@ from .animation import blender as BL
 from .manifest import compile as C, director, validate as V
 from .qa.run import run_all as run_qa
 from .research import service as research
-from .story import generate as G, originality, template
+from .story import backlog, generate as G, originality, template
 from .tasks import handler
 from .util import Blocked, Waiting, new_id, now, stable_hash
 
@@ -58,17 +58,21 @@ def build_brief(p, d=None):
                      'No research data yet; the brief uses only the channel niche and identity.')}
 
 
-def _recent_own(d, limit=30):
-    rows = d.query('SELECT premise, ending FROM concepts ORDER BY created_at DESC LIMIT ?', (limit,))
-    scripts = d.query('''SELECT m.body FROM manifests m JOIN videos v ON v.manifest_id=m.id
-                         ORDER BY m.created_at DESC LIMIT ?''', (limit,))
+def _recent_own(d, exclude=None, limit=30):
+    """Recent own stories (premise, ending, script) per video, excluding ``exclude`` and cancelled videos."""
+    rows = d.query('''SELECT v.id, c.premise, c.ending, m.body FROM videos v
+                      LEFT JOIN concepts c ON c.id = v.concept_id
+                      LEFT JOIN manifests m ON m.id = v.manifest_id
+                      WHERE v.id <> ? AND v.status <> 'cancelled'
+                        AND (v.concept_id IS NOT NULL OR v.manifest_id IS NOT NULL)
+                      ORDER BY v.created_at DESC LIMIT ?''', (exclude or '', limit))
     own = []
-    for r, s in zip(rows, scripts + [None] * len(rows)):
-        script = ''
-        if s:
-            body = json.loads(s['body'])
-            script = ' '.join(ln['text'] for ln in body.get('lines', []))
-        own.append({'premise': r['premise'], 'ending': r['ending'], 'script': script})
+    for r in rows:
+        body = json.loads(r['body']) if r['body'] else {}
+        story = body.get('story') or {}
+        own.append({'id': r['id'], 'premise': r['premise'] or story.get('premise', ''),
+                    'ending': r['ending'] or story.get('ending', ''),
+                    'script': ' '.join(ln['text'] for ln in body.get('lines', []))})
     return own
 
 
@@ -89,6 +93,25 @@ def develop_step(v, p, d, chars):
         return True
     if st == 'researched':
         brief = meta.get('brief') or build_brief(p, d)
+        if story_source(p) == 'backlog':
+            item = backlog.take(vid, d)
+            if item:
+                plan = item['plan']
+                story = plan.get('story') or {}
+                cid = new_id('cn_')
+                d.execute('''INSERT INTO concepts(id, created_at, status, premise, hook, ending, features, inspiration,
+                             originality, method) VALUES (?,?,?,?,?,?,?,?,?,?)''',
+                          (cid, now(), 'selected', story.get('premise') or plan.get('logline', ''),
+                           (plan.get('hook') or {}).get('text', ''), story.get('ending', ''),
+                           json.dumps({'source': 'backlog', 'backlog_id': item['id'], 'written_by': item['source']}),
+                           json.dumps(plan.get('inspiration') or {}), json.dumps({}), 'backlog'))
+                videos.merge_metadata(vid, {'backlog_id': item['id']}, d)
+                videos.transition(vid, 'concept_selected', f'Story "{item["title"]}" taken from the backlog',
+                                  expect='researched', concept_id=cid, title=item['title'][:100], d=d)
+                return True
+            if not p['production']['allow_template_stories']:
+                raise Blocked('The story backlog is empty. Add stories on the Story backlog page, or connect an '
+                              'LLM API key and set the story source to automatic.', state='blocked')
         if not llm.available():
             if not p['production']['allow_template_stories']:
                 raise Blocked('Connect OpenAI to write original stories (or allow template stories for dry runs)',
@@ -116,7 +139,7 @@ def develop_step(v, p, d, chars):
             store.put('patterns_cache', {'hash': src_hash, 'at': now(), 'patterns': patterns}, d)
             d.execute('INSERT INTO patterns(id, created_at, sources, method, body) VALUES (?,?,?,?,?)',
                       (new_id('pt_'), now(), json.dumps([s['id'] for s in srcs]), 'llm', json.dumps(patterns)))
-        own = _recent_own(d)
+        own = _recent_own(d, exclude=vid)
         recent = [{'premise': o['premise'], 'ending': o['ending']} for o in own]
         from .learning import brief_notes
         attempt = int(meta.get('concept_attempt', 0))
@@ -154,7 +177,24 @@ def develop_step(v, p, d, chars):
         return True
     if st == 'concept_selected':
         pr = p['production']
-        if meta.get('template_seed') is not None:
+        if meta.get('backlog_id'):
+            item = backlog.get(meta['backlog_id'], d)
+            m = C.compile_plan(item['plan'], fps=pr['fps'], width=pr['width'], height=pr['height'])
+            rep = V.validate(m, p)
+            if not rep['ok']:
+                raise Blocked('Backlog story no longer validates with the current settings: ' +
+                              rep['errors'][0]['message'], state='needs_review')
+            refs = [{'id': s['id'], 'text': ' '.join(filter(None, [s['title'], s['description'], s.get('transcript')]))}
+                    for s in (meta.get('brief') or {}).get('sources', [])]
+            orep = originality.check({'premise': m['story']['premise'], 'hook': m['hook']['text'],
+                                      'ending': m['story']['ending'], 'script': ' '.join(ln['text'] for ln in m['lines'])},
+                                     refs, _recent_own(d, exclude=vid), _embedder(vid))
+            videos.merge_metadata(vid, {'originality_script': orep}, d)
+            if orep['decision'] != 'pass':
+                raise Blocked('This backlog story is too close to a reference or a recent video; review it or reject '
+                              'it in the backlog.', state='needs_review')
+            source = 'backlog'
+        elif meta.get('template_seed') is not None:
             plan = template.make(meta['template_seed'])
             m = C.compile_plan(plan, fps=pr['fps'], width=pr['width'], height=pr['height'])
             rep = V.validate(m, p)
@@ -178,7 +218,7 @@ def develop_step(v, p, d, chars):
                     for s in (meta.get('brief') or {}).get('sources', [])]
             script_text = ' '.join(ln['text'] for ln in m['lines'])
             orep = originality.check({'premise': m['story']['premise'], 'hook': m['hook']['text'],
-                                      'ending': m['story']['ending'], 'script': script_text}, refs, _recent_own(d),
+                                      'ending': m['story']['ending'], 'script': script_text}, refs, _recent_own(d, exclude=vid),
                                      _embedder(vid))
             videos.merge_metadata(vid, {'originality_script': orep}, d)
             if orep['decision'] == 'rewrite' and attempt < 1:
@@ -195,13 +235,21 @@ def develop_step(v, p, d, chars):
         videos.merge_metadata(vid, {'publish_metadata': {'title': meta_md.get('title') or m['title'],
                                                          'description': meta_md.get('description', ''),
                                                          'tags': meta_md.get('tags', [])}}, d)
-        videos.transition(vid, 'scripted', f'Production manifest v{mid} validated', expect='concept_selected',
+        videos.transition(vid, 'scripted', f'Production manifest validated ({source})', expect='concept_selected',
                           manifest_id=mid, title=(meta_md.get('title') or m['title'])[:100], d=d)
         return True
     if st == 'scripted':
         storyboard(v, p, d)
         return False
     return False
+
+
+def story_source(p):
+    """'backlog' when configured, or automatically when no LLM API is connected; otherwise 'llm'."""
+    src = p['production'].get('story_source', 'auto')
+    if src == 'backlog' or (src == 'auto' and not llm.available()):
+        return 'backlog'
+    return 'llm'
 
 
 def estimate_video(m, p):
@@ -220,8 +268,9 @@ def estimate_video(m, p):
     local_min = sum((s['end_frame'] - s['start_frame']) for s in m['shots'] if s['renderer'] == 'blender') * 2.0 / 60
     est['local_render'] = local_min * prices['local_render_per_min']
     dur_min = m['duration_frames'] / m['fps'] / 60
-    est['qa'] = dur_min * prices['openai_asr_per_min'] + 10 * prices['openai_vision_per_image'] + \
-        (3000 / 1e6 * prices['openai_text_out_per_mtok'])
+    # QA uses paid speech recognition and vision review only when an OpenAI key is connected.
+    est['qa'] = (dur_min * prices['openai_asr_per_min'] + 10 * prices['openai_vision_per_image'] +
+                 (3000 / 1e6 * prices['openai_text_out_per_mtok'])) if llm.available() else 0.0
     est['repairs_allowance'] = (est['tts'] + est['animation']) * min(1.0, p['budget']['repair_share'])
     est['total'] = round(sum(est.values()), 4)
     return {k: round(v, 4) for k, v in est.items()}
@@ -296,7 +345,11 @@ def voice(ctx):
                          text=ln['text'], voice=res['voice'],
                          alignment={'words': res['words'], 'provider': res['provider'], 'test_voice': res['test_voice'],
                                     'asr_text': res['asr_text'], 'voiced_regions': res['voiced_regions'],
-                                    'peak_dbfs': res['peak_dbfs'], 'internal_silence_s': res['internal_silence_s']})
+                                    'peak_dbfs': res['peak_dbfs'], 'internal_silence_s': res['internal_silence_s'],
+                                    'voice_meta': res.get('voice_meta')})
+    credits = sorted({(r['alignment'] or {}).get('voice_meta', {}).get('attribution')
+                      for r in repo.lines(mid, d) if ((r['alignment'] or {}).get('voice_meta') or {}).get('attribution')})
+    videos.merge_metadata(vid, {'voice_credits': credits}, d)
     results = repo.line_results(mid, d)
     m2, fitted, report = production.retime(m, results, p)
     too_long = [r for r in report if r['action'] == 'rewrite_needed']

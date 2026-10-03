@@ -141,6 +141,9 @@ def test_buffer_kept_ahead_and_respects_limits(db, clock):
     p = ready_to_publish(db)
     p['schedule'].update(buffer_target=3, max_in_production=2)
     prefs.put(p, db)
+    from blox.story import backlog
+    from .test_backlog import short_lines_story
+    backlog.add([short_lines_story(i) for i in range(5)], 'test', p, db)  # no LLM key: stories come from the backlog
     created = orchestrator.maintain_buffer(db, prefs.get(db), clock())
     assert created == 2
     assert orchestrator.maintain_buffer(db, prefs.get(db), clock()) == 0

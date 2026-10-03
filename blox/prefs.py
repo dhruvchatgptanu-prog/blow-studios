@@ -119,7 +119,9 @@ DEFAULTS = {
         'vision_model': 'gpt-5-mini',
         'asr_model': 'whisper-1',
         'embedding_model': 'text-embedding-3-small',
-        'tts_provider': 'openai',
+        # piper: free offline voices (no account). openai / elevenlabs: paid, more expressive.
+        'tts_provider': 'piper',
+        'piper_model': 'en-us-libritts-high',
         'tts_model': 'gpt-4o-mini-tts',
         'elevenlabs_model': 'eleven_multilingual_v2',
         'runway_model': 'gen4.5',
@@ -135,6 +137,10 @@ DEFAULTS = {
         'max_tempo': 1.06,
         'min_expression_frames': 8,
         'allow_template_stories': False,
+        # auto: the LLM writes stories when an API key is connected, otherwise the story backlog is used.
+        # backlog: always use the backlog (stories written by you or by Claude in a chat session).
+        # llm: always write with the LLM API.
+        'story_source': 'auto',
     },
     'qa': {
         'max_repairs_per_target': 2,
@@ -183,7 +189,7 @@ DEFAULTS = {
 }
 
 RENDERERS = {'blender', 'runway', 'clips'}
-TTS_PROVIDERS = {'openai', 'elevenlabs', 'local_test'}
+TTS_PROVIDERS = {'openai', 'elevenlabs', 'piper', 'local_test'}
 ENGINES = {'BLENDER_EEVEE', 'CYCLES', 'BLENDER_WORKBENCH'}
 
 
@@ -322,6 +328,8 @@ def validate(p):
     for k in ('text_model', 'vision_model', 'asr_model', 'embedding_model', 'tts_model', 'elevenlabs_model', 'runway_model'):
         if not re.fullmatch(r'[A-Za-z0-9._:\-]{1,64}', str(pr[k])):
             raise ValueError(f'Invalid model name for {k}')
+    if pr.get('story_source', 'auto') not in ('auto', 'backlog', 'llm'):
+        raise ValueError('story source must be auto, backlog or llm')
     if pr['tts_provider'] not in TTS_PROVIDERS:
         raise ValueError('Unknown TTS provider')
     if pr['music'] not in ('generated', 'asset', 'none'):

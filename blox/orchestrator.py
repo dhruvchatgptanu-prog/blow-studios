@@ -153,7 +153,17 @@ def maintain_buffer(d, p, t):
     created = 0
     summary = budget.summary(p, d)
     per_video = p['budget']['per_video_usd']
+    from .pipeline import story_source
+    from .story import backlog
+    stories_left = None
+    if story_source(p) == 'backlog' and not p['production']['allow_template_stories']:
+        # Videos already started hold their story; only count what is still free to take.
+        stories_left = backlog.summary(p, d)['ready'] - int(d.scalar(
+            "SELECT COUNT(*) AS n FROM videos WHERE status IN ('discovered','researched') AND origin='autopilot'") or 0)
     while approved + in_prod < s['buffer_target'] and in_prod < s['max_in_production']:
+        if stories_left is not None and stories_left <= 0:
+            store.put('buffer_note', {'at': t, 'note': 'The story backlog is empty; add stories to keep producing.'}, d)
+            break
         if summary['daily_remaining'] < min(per_video, 0.05) or summary['monthly_remaining'] < min(per_video, 0.05):
             store.put('buffer_note', {'at': t, 'note': 'Budget remaining is too low to start another video today.'}, d)
             break
@@ -161,6 +171,8 @@ def maintain_buffer(d, p, t):
         jobs.enqueue('video.develop', {}, video_id=vid, idempotency_key=f'develop:{vid}', ckey='openai', d=d)
         in_prod += 1
         created += 1
+        if stories_left is not None:
+            stories_left -= 1
     return created
 
 

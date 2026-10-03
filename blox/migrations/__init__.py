@@ -13,6 +13,7 @@ VERSIONS = [
     '0001_legacy_baseline',
     '0002_core_schema',
     '0003_seed_and_legacy',
+    '0004_story_backlog',
 ]
 
 

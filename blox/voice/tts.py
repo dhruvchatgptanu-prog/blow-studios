@@ -94,6 +94,7 @@ def _elevenlabs_tts(text, voice_id, line, model, out_path):
 
 def _local_tts(text, voice, out_path):
     voice = voice if voice in FLITE_VOICES else 'kal16'
+    config.WORK_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile('w', suffix='.txt', delete=False, dir=config.WORK_DIR) as tf:
         # textfile= avoids putting user text inside the filter graph string.
         tf.write(re.sub(r'[^\w\s.,!?\'-]', ' ', text))
@@ -187,12 +188,19 @@ def synthesize_line(line, character, prefs, work_dir, video_id, attempt=0, use_a
     spec = {'p': provider, 'text': say, 'voice': voice, 'emotion': line['emotion'], 'pace': line['pace'],
             'volume': line['volume'], 'delivery': line.get('delivery', ''), 'model': pr['tts_model'],
             'attempt': attempt}
+    voice_meta = None
+    if provider == 'piper':
+        from . import piper
+        spec['piper'] = [pr.get('piper_model', piper.DEFAULT_MODEL),
+                         piper.speaker_for((character or {}).get('id'), voice)]
     h = stable_hash(spec)
     os.makedirs(work_dir, exist_ok=True)
     raw = os.path.join(work_dir, f'{line["id"]}_{h}_raw' + ('.mp3' if provider == 'elevenlabs' else '.wav'))
     char_al = None
     if provider == 'local_test':
         _local_tts(say, voice.get('local_test_voice', 'kal16'), raw)
+    elif provider == 'piper':
+        voice_meta = piper.synthesize(say, raw, spec['piper'][1], line, model=spec['piper'][0])
     else:
         est = estimate_cost(say, provider, prefs['budget']['prices'], line['pace'])
         key = f'tts:{video_id}:{line["id"]}:{h}'
@@ -253,6 +261,7 @@ def synthesize_line(line, character, prefs, work_dir, video_id, attempt=0, use_a
         'voiced_regions': regions,
         'internal_silence_s': round(max([b[0] - a[1] for a, b in zip(regions, regions[1:])] or [0.0]), 3),
         'test_voice': provider == 'local_test',
+        'voice_meta': voice_meta,
     }
 
 

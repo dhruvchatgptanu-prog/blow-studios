@@ -21,6 +21,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m venv /opt/venv
+
+# Free offline voice model (Piper, LibriTTS, CC BY 4.0), checksum-pinned. Kept outside the data volume.
+ENV BLOX_VOICES_DIR=/opt/blox-voices
+RUN mkdir -p /opt/blox-voices/en-us-libritts-high \
+    && curl -fsSL -o /tmp/voice.tar.gz \
+       https://github.com/rhasspy/piper/releases/download/v0.0.2/voice-en-us-libritts-high.tar.gz \
+    && echo "328e3e9cb573a43a6c5e1aeca386e971232bdb1418a74d4674cf726c973a0ea8  /tmp/voice.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/voice.tar.gz -C /opt/blox-voices/en-us-libritts-high \
+         en-us-libritts-high.onnx en-us-libritts-high.onnx.json MODEL_CARD \
+    && rm /tmp/voice.tar.gz
+
 WORKDIR /app
 COPY requirements.lock requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.lock

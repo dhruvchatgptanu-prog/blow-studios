@@ -24,7 +24,8 @@ CHARACTERS = [
         },
         'voice': {'openai_voice': 'verse',
                   'openai_instructions': 'Young, bright, energetic adventurer. Expressive, natural, not cartoonish.',
-                  'elevenlabs_voice_id': '', 'local_test_voice': 'kal16', 'pitch_semitones': 0},
+                  'elevenlabs_voice_id': '', 'local_test_voice': 'kal16', 'pitch_semitones': 0,
+                  'piper_speaker': 60, 'rights_note': 'Piper LibriTTS model (CC BY 4.0) / provider catalogue voices'},
     },
     {
         'id': 'ch_pip',
@@ -41,7 +42,8 @@ CHARACTERS = [
         },
         'voice': {'openai_voice': 'sage',
                   'openai_instructions': 'Calm, dry, gently teasing friend. Natural conversational timing.',
-                  'elevenlabs_voice_id': '', 'local_test_voice': 'slt', 'pitch_semitones': 0},
+                  'elevenlabs_voice_id': '', 'local_test_voice': 'slt', 'pitch_semitones': 0,
+                  'piper_speaker': 288, 'rights_note': 'Piper LibriTTS model (CC BY 4.0) / provider catalogue voices'},
     },
 ]
 

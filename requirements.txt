@@ -7,3 +7,5 @@ Pillow==12.3.0
 gunicorn==23.0.0
 numpy==2.3.3
 psycopg[binary]==3.2.10
+# Free offline voices. GPL-3.0; run as a separate process (python -m piper), never imported by Blox.
+piper-tts==1.8.0

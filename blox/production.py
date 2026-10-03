@@ -20,7 +20,8 @@ def cast_characters(m, characters):
     out = {}
     for c in m['cast']:
         ch = characters.get(c['character_id']) or {}
-        out[c['id']] = {'name': ch.get('name', c['id']), 'voice': ch.get('voice', {}), 'bible': ch.get('bible', {})}
+        out[c['id']] = {'id': c['character_id'], 'name': ch.get('name', c['id']), 'voice': ch.get('voice', {}),
+                        'bible': ch.get('bible', {})}
     return out
 
 
