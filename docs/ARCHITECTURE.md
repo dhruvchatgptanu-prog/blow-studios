@@ -7,12 +7,15 @@ research (YouTube Data API, watchlist, references)            ┐
   → ranked candidates in the monitored sample (explained)      │  research worker
   → transcripts/analysis only from authorised sources          ┘
 brief (top sources, metadata-only flagged)                     ┐
-  → abstract patterns (LLM, sources as untrusted data)         │
-  → original concepts → originality screen                     │  orchestrate worker
-  → authoring plan (LLM, strict schema) → compile → validate   │  (video.develop)
+  → story source: LLM API (if connected) or story backlog      │
+  LLM: abstract patterns (sources as untrusted data)           │
+       → original concepts → originality screen                │  orchestrate worker
+       → authoring plan (strict schema) → compile → validate   │  (video.develop)
+  backlog: oldest validated story → compile → validate         │
+  → originality screen vs references and own recent videos     │
   → director's script + publish metadata                       ┘
 storyboard: cost estimate + budget check                       ┐
-voices (TTS) → alignment → fit/retime/rewrite → manifest timing│
+voices (Piper offline / OpenAI / ElevenLabs) → alignment → fit │
 motion solve (rig, IK, feet, face, visemes, camera)            │  render worker
 Blender shots (or Runway / footage) with telemetry             │
 assembly: concat, captions, mix + ducking, loudness, cover     ┘
@@ -112,5 +115,5 @@ output, and public error responses without internal details.
 `slots`, `uploads`, `tasks`, `workers`, `locks`, `paid_calls`, `budget_ledger`, `breakers`,
 `quota_ledger`, `api_cache`, `research_runs`, `ref_channels`, `ref_videos`, `ref_snapshots`,
 `transcripts`, `ref_analyses`, `patterns`, `concepts`, `characters`, `analytics_snapshots`,
-`learning_findings`, `audit_log`, `settings` (preferences and encrypted secrets), plus the original
+`learning_findings`, `story_backlog`, `audit_log`, `settings` (preferences and encrypted secrets), plus the original
 release's `projects`, `jobs`, `assets`, `reservations` (kept).

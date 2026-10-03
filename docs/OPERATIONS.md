@@ -23,6 +23,32 @@ overview lists *Paid requests awaiting reconciliation*. Check the provider's das
 * not there → **Not submitted (retry)**: the reservation is released and the step runs again;
 * charged → **Charged — discard**: the cost is kept and the step continues under a new request.
 
+## Story backlog
+
+With no LLM API key (or with Settings → Production → story source set to *backlog*), every new video
+takes the oldest *ready* story from **Story backlog**. The page and the dashboard show how many stories
+are left and how many days they last at your cadence.
+
+* **Add stories:** paste a JSON list of plans (format: the Director's editor *Plan JSON*) and press
+  *Validate and add*, or run `python -m blox.cli import-stories file.json --source claude`. Invalid
+  plans are rejected with the validator's reasons; exact duplicates are skipped.
+* **Get more without API costs:** ask Claude in a normal chat with the prompt in `stories/README.md`.
+* **Reject** a story you do not want; **Restore** brings it back. A story whose video is cancelled
+  before upload returns to the backlog automatically.
+* At production time each story is screened for originality against research references and your
+  recent videos; a near-duplicate is held for review instead of produced.
+* When the backlog is empty, autopilot starts no new videos and the dashboard says why. Slots without a
+  ready video are skipped with the reason.
+
+## Voices
+
+The default voice engine is Piper (free, offline). The Docker image includes the LibriTTS model; on
+other installs run `python -m blox.cli install-voice` (downloads from the Piper releases on GitHub
+and verifies the checksum). Choose each character's speaker number on **Characters** and listen with
+*Hear free voice*. Every video that uses it credits the voice model's licence (CC BY 4.0) in its
+description. To use OpenAI or ElevenLabs voices instead, connect the key and change Settings →
+Production → voice provider.
+
 ## Autopilot controls
 
 * **Pause** (dashboard): no new paid generation or uploads; running renders stop at a safe point;

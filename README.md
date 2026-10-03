@@ -65,9 +65,30 @@ python -m blox.cli qa-demo --dir data/demo
 Everything is entered on **Connections** in the studio (stored encrypted with `data/vault.key` or
 `BLOX_VAULT_KEY`; values are never shown again). Nothing paid runs without these.
 
+### Zero-cost setup (no paid AI services)
+
+Blox can run with **no paid API at all**:
+
+* **Voices:** the default voice engine is **Piper**, which is free and runs offline. It uses a
+  LibriTTS voice model (CC BY 4.0, credited automatically in each video description) and is bundled
+  in the Docker image; elsewhere run `python -m blox.cli install-voice`. Pick each character's voice
+  (0–903) and listen on **Characters → Hear free voice**.
+* **Stories:** with no LLM API key, autopilot takes stories from the **Story backlog**. The
+  repository includes 12 original, validated stories (`stories/`). You can write your own in the
+  editor, or ask Claude in a normal chat for a new batch using the prompt in `stories/README.md`
+  (covered by your existing Claude plan). Note that a ChatGPT or Claude *subscription* does not
+  include API access, so the studio cannot call those services automatically.
+* **Research and publishing:** the YouTube Data API and uploads are free within Google's daily
+  quota.
+
+What you need then is: a YouTube Data API key, a Google OAuth client, your channel connected and
+confirmed, and the audience and disclosure choices. At 12 videos a day, a backlog of 12 stories lasts
+one day; the dashboard shows how many days are left. If it runs out, Blox stops starting new videos
+and tells you, rather than publishing anything unfinished.
+
 | Credential | Used for | Required for autopilot | How to get it |
 |---|---|---|---|
-| OpenAI API key | concept + script generation, line rewrites, TTS voices (`gpt-4o-mini-tts`), transcription for alignment and QA (`whisper-1`), optional vision QA, embeddings for originality | Yes | platform.openai.com → API keys. Set a monthly budget limit there too. |
+| OpenAI API key (paid) | automatic story writing, line rewrites, OpenAI voices (`gpt-4o-mini-tts`), measured alignment and dialogue checks (`whisper-1`), optional vision QA, embeddings | Only if you choose AI-written stories or OpenAI voices | platform.openai.com → API keys. Set a monthly budget limit there too. |
 | YouTube Data API key | trend research (search, video and channel statistics) | Yes | Google Cloud Console → enable *YouTube Data API v3* → Credentials → API key (restrict it to that API). |
 | Google OAuth client (ID + secret) | uploading to and reading your channel | Yes | Same project → OAuth consent screen → Credentials → *OAuth client ID*, type **Web application**, authorised redirect URI exactly `<PUBLIC_URL>/oauth/callback` (shown on Connections). Enable *YouTube Analytics API* for analytics. |
 | YouTube channel authorisation | upload as your channel | Yes | Connections → *Connect YouTube* → choose the channel → **confirm** it in the studio. Scopes: `youtube.upload`, `youtube.readonly`, optional `yt-analytics.readonly`. |
@@ -94,6 +115,8 @@ disclosure. Autopilot refuses to start until both are chosen.
    jump the player there.
 4. If the verdict is *approved*, **Approve for publishing** (review mode) assigns it to the next
    slot; nothing is uploaded unless YouTube is connected and confirmed.
+5. **Story backlog** → paste `stories/batch-2026-10-03-claude.json` → *Validate and add*. Autopilot
+   (or **New researched video**) then produces those stories in order when no LLM key is connected.
 
 **New researched video** does the full autonomous path (research brief → patterns → original concepts
 → originality screen → manifest with validation → production).
@@ -102,7 +125,7 @@ disclosure. Autopilot refuses to start until both are chosen.
 
 | Action | Where | Effect |
 |---|---|---|
-| **Enable** | Settings → *Autopilot activation*: choose a mode, type `ENABLE` | Refused with a precise list until OpenAI, YouTube Data API, OAuth client, a *confirmed* channel, Blender, FFmpeg, audience + disclosure and a live worker are all in place. |
+| **Enable** | Settings → *Autopilot activation*: choose a mode, type `ENABLE` | Refused with a precise list until stories (backlog or LLM), voices, YouTube Data API, OAuth client, a *confirmed* channel, Blender, FFmpeg, audience + disclosure and live workers are all in place. OpenAI is required only if you chose AI-written stories or OpenAI voices. |
 | Mode *review* | same | Production runs ahead; each QA-approved video waits for **Approve for publishing**. |
 | Mode *autopilot* | same | QA-approved videos are scheduled without per-video approval. *Hold*/*blocked* videos are never published, and demo videos always wait for your approval. |
 | **Pause** / Resume | Dashboard | No new paid generation or uploads start; running steps stop at the next safe checkpoint; research and verification continue. Slots that pass while paused are skipped with the reason. |
@@ -142,8 +165,9 @@ a 45-second story with ~100 words roughly triples the voice part):
 
 | Configuration | Estimated per video | × 12 per day | × 30 days |
 |---|---|---|---|
-| Blender shots + OpenAI voices | ≈ $0.07 | ≈ $0.85 | ≈ $26 |
-| Blender shots + ElevenLabs voices | ≈ $0.11 | ≈ $1.36 | ≈ $41 |
+| Backlog stories + Blender shots + Piper voices (default without keys) | $0 in API fees | $0 | $0 |
+| AI-written stories + Blender shots + OpenAI voices | ≈ $0.07 | ≈ $0.85 | ≈ $26 |
+| AI-written stories + Blender shots + ElevenLabs voices | ≈ $0.11 | ≈ $1.36 | ≈ $41 |
 | Three Runway shots (12 s) + OpenAI voices | ≈ $2.23 | ≈ $27 | ≈ $800 |
 
 These figures come from `pipeline.estimate_video` plus the script-call estimates; they exclude your
@@ -168,12 +192,12 @@ Verified here means exercised end to end in this environment with real tools, no
 | Paid-call safety and budgets | exactly-once ledger, ambiguous-call holds with owner reconciliation, reservations, breakers, global auto-pause | Unit tests with simulated provider failures |
 | Research | YouTube Data API v3 client, quota ledger (Pacific-midnight reset), caching, Shorts signals, explainable ranking, emerging topics, watchlist, references | Fake-API tests seeded with a real, dated sample of 12 Roblox story Shorts ([docs/RESEARCH_SNAPSHOT.md](docs/RESEARCH_SNAPSHOT.md)). **Not run against your API key.** |
 | Transcripts and analysis | upload with rights confirmation, authorised provider contract, ASR of your own media, metadata-only labelling | Unit tests; no provider configured |
-| Stories and originality | pattern extraction, concepts, manifest generation with validation and repair, originality screening | Request construction and validation tested with mocked OpenAI; **no live generation was run** |
+| Stories and originality | story backlog (import, validation, de-duplication, oldest-first claiming); LLM path: pattern extraction, concepts, manifest generation with validation and repair; originality screening against references and recent own videos | Backlog: a backlog story produced through the queued pipeline here. 12 original stories written in this session, all valid and mutually distinct. LLM path tested with mocked OpenAI; **no live generation was run** |
 | Manifest and director's script | authoring plan → frame-indexed manifest, 1-second beats with full start/end poses, validator, script | Unit tests on the demo story and invalid variants |
 | Deterministic animation | joint-hierarchy rig, analytic + iterative IK, footstep planning, springs, expressions, visemes, amplitude-driven jaw, camera solver, Blender scene build with telemetry | Real Blender renders; solver tests (planted feet, facepalm contact, jump landing, determinism); full demo rendered through the queued pipeline |
-| Voices | OpenAI TTS with direction, ElevenLabs with timestamps, local test voice, alignment, pronunciation overrides, gentle fitting | Local test voice end to end; OpenAI/ElevenLabs request code **not run live** |
+| Voices | free offline Piper voices (default), OpenAI TTS with direction, ElevenLabs with timestamps, local test voice, alignment, pronunciation overrides, gentle fitting | Piper run for real (checksum-verified install, CLI, inside the Docker image, in the pipeline); OpenAI/ElevenLabs request code **not run live** |
 | Assembly | captions in the safe area (face-aware placement), ducking, loudness normalisation, transitions, cover and thumbnails | Real FFmpeg tests; full demo assembly |
-| QA and repairs | technical, motion, lip-sync, caption, story, optional vision checks; verdicts; bounded repair loop | Real QA on the rendered demo (it correctly blocks the test voice); repair-limit tests |
+| QA and repairs | technical, motion, lip-sync (scene and rendered-pixel evidence, hand occlusion), caption, story, optional vision checks; verdicts; bounded repair loop | Real QA on the rendered demo: it blocks the robotic test voice as designed, and its lip-sync findings were checked frame by frame; repair-limit tests |
 | Scheduling and autopilot | slots, DST, rolling cap, buffer, skips, pause, emergency stop | Unit tests including Adelaide DST dates |
 | YouTube publishing | OAuth (PKCE, state, encrypted tokens), resumable upload with resume and reconciliation, scheduled private uploads, processing/scheduled/published verification, restriction detection | Tests against a simulated YouTube; **no upload to a real channel was performed** |
 | Analytics learning | YouTube Analytics reports, retention, findings with bootstrap intervals labelled finding vs hypothesis | Unit-level only; needs your channel |
@@ -184,6 +208,9 @@ Verified here means exercised end to end in this environment with real tools, no
 
 * No live call to any paid provider or to your YouTube channel was made (no credentials or spending
   authorisation were provided). The first live run should be the opt-in live tests in `tests/live`.
+* Piper voices are clear but calmer and less expressive than instruction-following cloud voices;
+  emotion is approximated through pace and variation.
+* The story backlog needs refilling: about one batch of 12 stories per day at the default cadence.
 * No GPU rendering was available here; full-resolution throughput for 12/day is unproven (see §5).
 * Generative (Runway) shots are implemented but untested live; the continuity they achieve depends on
   the model and is reviewed as *uncertain* by QA unless the vision review passes.

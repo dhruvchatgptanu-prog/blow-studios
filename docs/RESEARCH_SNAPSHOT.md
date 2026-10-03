@@ -48,3 +48,13 @@ sequence, characters, voice or branding.
 **Suggested next step.** Add the channels you consider relevant to the research watchlist (Trend
 research → Add a reference), connect a YouTube Data API key, and let snapshots accumulate for a few days
 so velocity becomes *measured* instead of estimated.
+
+## Addendum: vidIQ breakout search (2026-10-03)
+
+One vidIQ "outliers" query (5 credits from the owner's existing plan): English Shorts matching "roblox
+story animation" published this month, ranked by how far each video exceeds its channel's usual views.
+Only titles, durations and counts were seen (no video content). Observed themes, as hypotheses: betrayal
+or scam stories with a twist ("He Stole Everything", "He Scammed Me", 75-89 s), animal-hospital
+role-play, very short game-mechanic gags (6-30 s), game-versus-game comparison humour and "red flags"
+memes. These informed only the broad themes of the first story batch (`stories/`); no specific
+video's plot, dialogue, characters or thumbnails were used.

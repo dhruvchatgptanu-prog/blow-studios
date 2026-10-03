@@ -33,6 +33,14 @@ docker compose ps                        # all services should become "healthy"
 `SESSION_SECRET`, `POSTGRES_PASSWORD`. Docker Compose treats `$` in env files as interpolation, so the
 password hash is stored with `$$`; Blox accepts either form.
 
+The image includes the free Piper voice model (about 140 MB, checksum-verified at build time). If you
+build behind a TLS-inspecting proxy, pass its CA bundle as a build secret; it is used only for that
+download and is not stored in the image:
+
+```bash
+docker build --secret id=proxy_ca,src=/path/to/proxy-ca.pem -t blox-studio:local .
+```
+
 ## HTTPS and a public address
 
 Keep port 8000 on localhost and put a TLS-terminating reverse proxy in front, for example Caddy:
@@ -107,7 +115,8 @@ enable it again.
 ## Running without Docker
 
 Ubuntu 24.04 packages: `python3-venv ffmpeg fonts-dejavu-core blender libegl1 libegl-mesa0
-libgl1-mesa-dri libgles2`. Then `pip install -r requirements.lock`, set the environment variables from
+libgl1-mesa-dri libgles2`. Then `pip install -r requirements.lock`, `python -m blox.cli install-voice`
+(free voices), set the environment variables from
 `.env.example`, and run `python -m blox.cli migrate`, `gunicorn app:app` and `python worker.py --roles all`
 under a process supervisor (systemd units restarting on failure). A systemd `EnvironmentFile=` can read
 the `.env` written by `setup.py` as is. Do not `source` that file in a shell: `$$` would expand to the
