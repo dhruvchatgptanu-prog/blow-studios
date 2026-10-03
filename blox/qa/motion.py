@@ -517,6 +517,77 @@ def _sightlines(ck, m, tele, solved):
                'fail' if bad else 'pass', 'critical', ev, 0.9, 'telemetry',
                frames=(blocked[0][0], blocked[-1][0] + 1) if bad else None, target={'kind': 'shot', 'id': s['id']},
                repair={'action': 're_render_shot', 'shot': s['id'], 'params': {'camera_clear': True}} if bad else None)
+    _scenery_sightlines(ck, m, tele, solved)
+
+
+def _scenery_sightlines(ck, m, tele, solved):
+    """The camera is never inside scenery, and scenery never hides the shot subject's face.
+
+    Scenery is the set layout the solver used (solved['set'], recomputed deterministically from the
+    manifest for older solved files) plus the big static story props, as the same boxes the camera solver
+    avoids. Camera and face positions come from the evaluated scene (telemetry). The Blender ray test
+    toward each subject face (telemetry 'face_blocker') is reported alongside.
+    """
+    from ..animation import sets as SETS
+    lay = solved.get('set')
+    if lay is None and (m.get('setting') or {}).get('preset') and m.get('tracks'):
+        lay = SETS.layout(m, solved.get('scales'))
+    if lay is None:
+        return
+    set_boxes = SETS.piece_boxes(lay)
+    face_boxes = SETS.box_arrays(set_boxes + SETS.prop_boxes(m))
+    prop_boxes_only = SETS.box_arrays(set_boxes)
+    for s in m['shots']:
+        subj = s['camera']['subject']
+        frames = [f for f in range(s['start_frame'], s['end_frame']) if tele.get(f)]
+        if not frames:
+            continue
+        faces = subj in tele[frames[0]]['characters'] or subj == 'two_shot'
+        boxes = face_boxes if faces else prop_boxes_only
+        if boxes is None:
+            continue
+        cams = np.array([tele[f]['camera']['location'] for f in frames], dtype=float)
+        inside = SETS.inside(boxes, cams).any(axis=1)
+        p0, p1, owner = [], [], []
+        for i, f in enumerate(frames):
+            chars = tele[f]['characters']
+            if subj in chars:
+                targets = [chars[subj]['face']]
+            elif subj == 'two_shot':
+                targets = [c['face'] for c in chars.values()]
+            elif isinstance(subj, str) and subj.startswith('prop:') and subj[5:] in tele[f].get('props', {}):
+                loc = tele[f]['props'][subj[5:]]['location']
+                targets = [[loc[0], loc[1], loc[2] + 0.15]]
+            else:
+                targets = []
+            for t in targets:
+                t = np.array(t, dtype=float)
+                d = t - cams[i]
+                n = float(np.linalg.norm(d))
+                if n > 0.1:
+                    p0.append(cams[i])
+                    p1.append(t - d / n * 0.05)
+                    owner.append(i)
+        hidden = np.zeros(len(frames), dtype=bool)
+        if p0:
+            for i, h in zip(owner, SETS.segment_hits(boxes, np.array(p0), np.array(p1)).any(axis=1)):
+                hidden[i] |= bool(h)
+        rays = sum(1 for f in frames if str((tele[f]['characters'].get(subj) or {}).get('face_blocker') or '')
+                   .startswith('set:'))
+        n_inside, n_hidden = int(inside.sum()), int(hidden.sum())
+        # Scenery is laid out around the camera reach, so any frame inside it or hidden by it is a layout
+        # or solver defect; a couple of frames are tolerated only where a face grazes a box edge.
+        tol = int(max(3, 0.05 * len(frames)))
+        bad = n_inside > 0 or n_hidden > tol
+        hit = [frames[i] for i in np.nonzero(inside | hidden)[0].tolist()]
+        ev = {'subject': subj, 'frames_camera_inside': n_inside, 'frames_face_hidden': n_hidden,
+              'shot_frames': len(frames), 'tolerance_frames': tol, 'rendered_ray_hits': rays,
+              'scenery_boxes': len(boxes[0]),
+              'method': 'camera point and camera-to-face segment vs set piece and static prop boxes'}
+        ck.add(f'scenery:{s["id"]}', f'Shot {s["id"]}: scenery never swallows the camera or hides {subj}', 'visual',
+               'fail' if bad else 'pass', 'critical', ev, 0.9, 'telemetry',
+               frames=(hit[0], hit[-1] + 1) if bad else None, target={'kind': 'shot', 'id': s['id']},
+               repair={'action': 're_render_shot', 'shot': s['id'], 'params': {'camera_clear': True}} if bad else None)
 
 
 def _props(ck, m, tele, solved):

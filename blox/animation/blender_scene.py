@@ -12,7 +12,6 @@ screen projections, face visibility, part inventory) for QA.
 import json
 import math
 import os
-import random
 import sys
 import time
 
@@ -186,20 +185,246 @@ def child(ob, parent, loc=(0, 0, 0), rot=(0, 0, 0)):
     return ob
 
 
-# ------------------------------------------------------------------ world
-SKIES = {
-    ('sky_obby', 'noon'): ((0.55, 0.78, 1.0), (0.12, 0.38, 0.95)),
-    ('sky_obby', 'morning'): ((1.0, 0.82, 0.68), (0.25, 0.48, 0.92)),
-    ('sky_obby', 'sunset'): ((1.0, 0.55, 0.32), (0.22, 0.24, 0.62)),
-    ('sky_obby', 'night'): ((0.08, 0.1, 0.25), (0.01, 0.015, 0.06)),
-}
-SUN = {'noon': (62, 3.2, (1.0, 0.97, 0.92)), 'morning': (24, 2.8, (1.0, 0.85, 0.7)),
-       'sunset': (14, 3.0, (1.0, 0.62, 0.38)), 'night': (40, 0.5, (0.55, 0.65, 1.0))}
+# ------------------------------------------------------------------ set (built from the host layout)
+# The host (animation/sets.py) decides every piece: templates of primitive parts, where each piece
+# stands, the sky and the lights. This builder only turns them into geometry. All set pieces share a
+# handful of materials whose colour comes from a per-face colour attribute, so a busy set compiles a
+# few shaders, and every piece of the same template is a linked duplicate of one mesh.
+_SET_MATS = {}
+SET_ROUGH = {'matte': 0.78, 'gloss': 0.25, 'glow': 0.5, 'emit': 0.5, 'stud': 0.62, 'cloud': 0.95, 'lava': 0.5,
+             'pane': 0.4}
+SET_EMIT = {'glow': 1.6, 'emit': 5.0, 'cloud': 0.35, 'lava': 3.0, 'pane': 1.0}
 
 
-def build_world(setting):
-    preset = setting.get('preset', 'sky_obby')
-    tod = setting.get('time_of_day', 'noon')
+def _socket(node, *names):
+    for nm in names:
+        if nm in node.inputs:
+            return node.inputs[nm]
+    return None
+
+
+def set_material(kind, haze, cast_shadow=True):
+    key = (kind, cast_shadow)
+    if key in _SET_MATS:
+        return _SET_MATS[key]
+    m = bpy.data.materials.new(f'set_{kind}' + ('' if cast_shadow else '_noshadow'))
+    m.use_nodes = True
+    nt = m.node_tree
+    bsdf = nt.nodes.get('Principled BSDF')
+    bsdf.inputs['Roughness'].default_value = SET_ROUGH.get(kind, 0.7)
+    attr = nt.nodes.new('ShaderNodeAttribute')
+    attr.attribute_name = 'Col'
+    col = attr.outputs['Color']
+    # Aerial perspective: far pieces fade toward the horizon colour (cheap fog, no volumetrics).
+    camd = nt.nodes.new('ShaderNodeCameraData')
+    fog = nt.nodes.new('ShaderNodeMapRange')
+    fog.inputs['From Min'].default_value = haze.get('start', 22.0)
+    fog.inputs['From Max'].default_value = haze.get('end', 150.0)
+    fog.inputs['To Max'].default_value = haze.get('max', 0.0)
+    nt.links.new(camd.outputs['View Distance'], fog.inputs['Value'])
+    hcol = (*hex_rgb(haze.get('color', '#D8EDFF')), 1.0)
+    if kind == 'lava':
+        tc = nt.nodes.new('ShaderNodeTexCoord')
+        noise = nt.nodes.new('ShaderNodeTexNoise')
+        noise.inputs['Scale'].default_value = 0.35
+        noise.inputs['Detail'].default_value = 3.0
+        nt.links.new(tc.outputs['Object'], noise.inputs['Vector'])
+        ramp = nt.nodes.new('ShaderNodeValToRGB')
+        ramp.color_ramp.elements[0].position = 0.35
+        ramp.color_ramp.elements[0].color = (0.45, 0.04, 0.0, 1.0)
+        ramp.color_ramp.elements[1].position = 0.7
+        ramp.color_ramp.elements[1].color = (1.0, 0.42, 0.03, 1.0)
+        nt.links.new(noise.outputs['Fac'], ramp.inputs['Fac'])
+        col = ramp.outputs['Color']
+    mixn = nt.nodes.new('ShaderNodeMixRGB')
+    nt.links.new(fog.outputs['Result'], mixn.inputs['Fac'])
+    nt.links.new(col, mixn.inputs['Color1'])
+    mixn.inputs['Color2'].default_value = hcol
+    nt.links.new(mixn.outputs['Color'], bsdf.inputs['Base Color'])
+    ecol = _socket(bsdf, 'Emission Color', 'Emission')
+    estr = bsdf.inputs['Emission Strength']
+    if kind in SET_EMIT:
+        nt.links.new(mixn.outputs['Color'], ecol)
+        estr.default_value = SET_EMIT[kind]
+    else:
+        ecol.default_value = hcol
+        nt.links.new(fog.outputs['Result'], estr)
+    if kind == 'stud':
+        # Round studs on upward faces (0.4 m grid): a bump pattern, not geometry, so it costs nothing.
+        tc = nt.nodes.new('ShaderNodeTexCoord')
+        mp = nt.nodes.new('ShaderNodeMapping')
+        mp.inputs['Scale'].default_value = (2.5, 2.5, 2.5)
+        nt.links.new(tc.outputs['Object'], mp.inputs['Vector'])
+        fr = nt.nodes.new('ShaderNodeVectorMath')
+        fr.operation = 'FRACTION'
+        nt.links.new(mp.outputs['Vector'], fr.inputs[0])
+        sub = nt.nodes.new('ShaderNodeVectorMath')
+        sub.operation = 'SUBTRACT'
+        sub.inputs[1].default_value = (0.5, 0.5, 0.0)
+        nt.links.new(fr.outputs['Vector'], sub.inputs[0])
+        sep = nt.nodes.new('ShaderNodeSeparateXYZ')
+        nt.links.new(sub.outputs['Vector'], sep.inputs['Vector'])
+        comb = nt.nodes.new('ShaderNodeCombineXYZ')
+        nt.links.new(sep.outputs['X'], comb.inputs['X'])
+        nt.links.new(sep.outputs['Y'], comb.inputs['Y'])
+        ln = nt.nodes.new('ShaderNodeVectorMath')
+        ln.operation = 'LENGTH'
+        nt.links.new(comb.outputs['Vector'], ln.inputs[0])
+        disc_ = nt.nodes.new('ShaderNodeMapRange')
+        disc_.inputs['From Min'].default_value = 0.30
+        disc_.inputs['From Max'].default_value = 0.26
+        nt.links.new(ln.outputs['Value'], disc_.inputs['Value'])
+        geo = nt.nodes.new('ShaderNodeNewGeometry')
+        gz = nt.nodes.new('ShaderNodeSeparateXYZ')
+        nt.links.new(geo.outputs['Normal'], gz.inputs['Vector'])
+        up = nt.nodes.new('ShaderNodeMath')
+        up.operation = 'GREATER_THAN'
+        up.inputs[1].default_value = 0.7
+        nt.links.new(gz.outputs['Z'], up.inputs[0])
+        mask = nt.nodes.new('ShaderNodeMath')
+        mask.operation = 'MULTIPLY'
+        nt.links.new(disc_.outputs['Result'], mask.inputs[0])
+        nt.links.new(up.outputs['Value'], mask.inputs[1])
+        bump = nt.nodes.new('ShaderNodeBump')
+        bump.inputs['Strength'].default_value = 0.55
+        bump.inputs['Distance'].default_value = 0.05
+        nt.links.new(mask.outputs['Value'], bump.inputs['Height'])
+        nt.links.new(bump.outputs['Normal'], bsdf.inputs['Normal'])
+    if not cast_shadow:
+        try:
+            m.shadow_method = 'NONE'
+        except (AttributeError, TypeError):
+            pass
+    m.diffuse_color = (0.8, 0.8, 0.8, 1.0)
+    _SET_MATS[key] = m
+    return m
+
+
+def _newell(pts):
+    nx = ny = nz = 0.0
+    for i in range(len(pts)):
+        x0, y0, z0 = pts[i]
+        x1, y1, z1 = pts[(i + 1) % len(pts)]
+        nx += (y0 - y1) * (z0 + z1)
+        ny += (z0 - z1) * (x0 + x1)
+        nz += (x0 - x1) * (y0 + y1)
+    return nx, ny, nz
+
+
+def shape_geom(shape, sx, sy, sz, bevel):
+    """Vertices and faces of a convex primitive centred at the origin, faces wound outward."""
+    hx, hy, hz = sx / 2, sy / 2, sz / 2
+    if shape == 'box':
+        # Thin parts (window glass, trims, rails) skip the chamfer: it would be under a pixel and would
+        # quadruple their triangles.
+        w = min(bevel, 0.45 * min(sx, sy, sz)) if bevel and min(sx, sy, sz) >= 0.1 else 0.0
+        if w <= 1e-4:
+            verts = [(x * hx, y * hy, z * hz) for x in (-1, 1) for y in (-1, 1) for z in (-1, 1)]
+            faces = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)]
+        else:
+            # Chamfered box: each corner splits into one vertex per adjacent face.
+            verts, idx = [], {}
+            h = (hx, hy, hz)
+            for s in ((a, b, c) for a in (-1, 1) for b in (-1, 1) for c in (-1, 1)):
+                for ax in range(3):
+                    p = [s[i] * (h[i] - w) for i in range(3)]
+                    p[ax] = s[ax] * h[ax]
+                    idx[(s, ax)] = len(verts)
+                    verts.append(tuple(p))
+            faces = []
+            for ax in range(3):
+                o = [a for a in range(3) if a != ax]
+                for sgn in (-1, 1):
+                    quad = []
+                    for u, v in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+                        s = [0, 0, 0]
+                        s[ax], s[o[0]], s[o[1]] = sgn, u, v
+                        quad.append(idx[(tuple(s), ax)])
+                    faces.append(quad)
+            for a in range(3):
+                for b in range(a + 1, 3):
+                    c = 3 - a - b
+                    for sa in (-1, 1):
+                        for sb in (-1, 1):
+                            q = []
+                            for sc, ax in ((-1, a), (1, a), (1, b), (-1, b)):
+                                s = [0, 0, 0]
+                                s[a], s[b], s[c] = sa, sb, sc
+                                q.append(idx[(tuple(s), ax)])
+                            faces.append(q)
+            for s in ((a, b, c) for a in (-1, 1) for b in (-1, 1) for c in (-1, 1)):
+                faces.append([idx[(s, ax)] for ax in range(3)])
+    elif shape == 'wedge':
+        verts = [(-hx, -hy, -hz), (hx, -hy, -hz), (hx, hy, -hz), (-hx, hy, -hz), (-hx, 0, hz), (hx, 0, hz)]
+        faces = [(0, 1, 2, 3), (0, 1, 5, 4), (3, 2, 5, 4), (0, 3, 4), (1, 2, 5)]
+    elif shape == 'pyr':
+        verts = [(-hx, -hy, -hz), (hx, -hy, -hz), (hx, hy, -hz), (-hx, hy, -hz), (0, 0, hz)]
+        faces = [(0, 1, 2, 3), (0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4)]
+    elif shape == 'cyl':
+        n = 8 if max(sx, sy) < 0.6 else 12
+        ring = [(hx * math.cos(2 * math.pi * i / n), hy * math.sin(2 * math.pi * i / n)) for i in range(n)]
+        verts = [(x, y, -hz) for x, y in ring] + [(x, y, hz) for x, y in ring]
+        faces = [list(range(n)), list(range(n, 2 * n))] + [(i, (i + 1) % n, n + (i + 1) % n, n + i) for i in range(n)]
+    else:  # ball: low-poly UV sphere
+        u, v = 10, 6
+        verts = [(0, 0, -hz)]
+        for j in range(1, v):
+            ph = -math.pi / 2 + math.pi * j / v
+            for i in range(u):
+                th = 2 * math.pi * i / u
+                verts.append((hx * math.cos(ph) * math.cos(th), hy * math.cos(ph) * math.sin(th), hz * math.sin(ph)))
+        verts.append((0, 0, hz))
+        top = len(verts) - 1
+        faces = [(0, 1 + (i + 1) % u, 1 + i) for i in range(u)]
+        for j in range(v - 2):
+            a, b = 1 + j * u, 1 + (j + 1) * u
+            faces += [(a + i, a + (i + 1) % u, b + (i + 1) % u, b + i) for i in range(u)]
+        last = 1 + (v - 2) * u
+        faces += [(last + i, last + (i + 1) % u, top) for i in range(u)]
+    out = []
+    for f in faces:
+        pts = [verts[i] for i in f]
+        n = _newell(pts)
+        c = [sum(p[k] for p in pts) / len(pts) for k in range(3)]
+        out.append(tuple(f) if n[0] * c[0] + n[1] * c[1] + n[2] * c[2] >= 0 else tuple(reversed(f)))
+    return verts, out
+
+
+def _rotm(rx, ry, rz):
+    return Euler((rx * D2R, ry * D2R, rz * D2R), 'XYZ').to_matrix()
+
+
+def template_mesh(key, tpl, haze):
+    verts, faces, cols, mats, slots = [], [], [], [], []
+    for shape, x, y, z, sx, sy, sz, rx, ry, rz, col, mat, bev in tpl['parts']:
+        v, f = shape_geom(shape, sx, sy, sz, bev)
+        M = _rotm(rx, ry, rz) if (rx or ry or rz) else None
+        base = len(verts)
+        for p in v:
+            q = M @ Vector(p) if M is not None else p
+            verts.append((q[0] + x, q[1] + y, q[2] + z))
+        if mat not in slots:
+            slots.append(mat)
+        mi, rgb = slots.index(mat), hex_rgb(col)
+        for face in f:
+            faces.append(tuple(base + i for i in face))
+            cols.append(rgb)
+            mats.append(mi)
+    me = bpy.data.meshes.new('set:' + key)
+    me.from_pydata(verts, [], faces)
+    me.update()
+    for s in slots:
+        me.materials.append(set_material(s, haze, tpl.get('shadow', True)))
+    me.polygons.foreach_set('material_index', mats)
+    ca = me.color_attributes.new('Col', 'FLOAT_COLOR', 'CORNER')
+    flat = []
+    for poly, rgb in zip(me.polygons, cols):
+        flat.extend((rgb[0], rgb[1], rgb[2], 1.0) * poly.loop_total)
+    ca.data.foreach_set('color', flat)
+    return me
+
+
+def build_sky(sky):
     w = bpy.data.worlds.new('blox_world')
     bpy.context.scene.world = w
     w.use_nodes = True
@@ -213,93 +438,106 @@ def build_world(setting):
     out = nt.nodes.new('ShaderNodeOutputWorld')
     nt.links.new(tex.outputs['Generated'], sep.inputs['Vector'])
     nt.links.new(sep.outputs['Z'], mr.inputs['Value'])
-    mr.inputs['From Min'].default_value = -0.15
-    mr.inputs['From Max'].default_value = 0.8
+    mr.inputs['From Min'].default_value = -0.2
+    mr.inputs['From Max'].default_value = 1.0
     nt.links.new(mr.outputs['Result'], ramp.inputs['Fac'])
-    horizon, zenith = SKIES.get((preset, tod), SKIES.get(('sky_obby', tod), SKIES[('sky_obby', 'noon')]))
-    if preset == 'lava_obby':
-        horizon, zenith = (0.9, 0.35, 0.15), (0.15, 0.05, 0.08)
-    if preset in ('classroom', 'bedroom', 'studio'):
-        horizon, zenith = (0.85, 0.85, 0.9), (0.6, 0.65, 0.75)
-    ramp.color_ramp.elements[0].color = (*horizon, 1.0)
-    ramp.color_ramp.elements[1].color = (*zenith, 1.0)
-    nt.links.new(ramp.outputs['Color'], bg.inputs['Color'])
-    bg.inputs['Strength'].default_value = 1.0 if tod != 'night' else 0.6
+    below, horizon, mid, zenith = [(*hex_rgb(h), 1.0) for h in sky['stops']]
+    els = ramp.color_ramp.elements
+    els[0].position, els[0].color = 0.0, below
+    els[1].position, els[1].color = 1.0, zenith
+    for pos, c in ((0.165, horizon), (0.42, mid)):
+        e = els.new(pos)
+        e.color = c
+    color = ramp.outputs['Color']
+    if sky.get('sun_glow'):
+        # A soft glow around the sun direction.
+        dot = nt.nodes.new('ShaderNodeVectorMath')
+        dot.operation = 'DOT_PRODUCT'
+        nt.links.new(tex.outputs['Generated'], dot.inputs[0])
+        dot.inputs[1].default_value = sky['sun_dir']
+        g = nt.nodes.new('ShaderNodeMapRange')
+        g.inputs['From Min'].default_value = 0.9
+        g.inputs['From Max'].default_value = 1.0
+        g.inputs['To Max'].default_value = 0.55
+        nt.links.new(dot.outputs['Value'], g.inputs['Value'])
+        add = nt.nodes.new('ShaderNodeMixRGB')
+        add.blend_type = 'ADD'
+        nt.links.new(g.outputs['Result'], add.inputs['Fac'])
+        nt.links.new(color, add.inputs['Color1'])
+        add.inputs['Color2'].default_value = (*hex_rgb(sky['sun_glow']), 1.0)
+        color = add.outputs['Color']
+    if sky.get('stars'):
+        vor = nt.nodes.new('ShaderNodeTexVoronoi')
+        vor.inputs['Scale'].default_value = 160.0
+        nt.links.new(tex.outputs['Generated'], vor.inputs['Vector'])
+        st = nt.nodes.new('ShaderNodeMapRange')
+        st.inputs['From Min'].default_value = 0.05
+        st.inputs['From Max'].default_value = 0.0
+        nt.links.new(vor.outputs['Distance'], st.inputs['Value'])
+        hor = nt.nodes.new('ShaderNodeMapRange')
+        hor.inputs['From Min'].default_value = 0.04
+        hor.inputs['From Max'].default_value = 0.2
+        nt.links.new(sep.outputs['Z'], hor.inputs['Value'])
+        mul = nt.nodes.new('ShaderNodeMath')
+        mul.operation = 'MULTIPLY'
+        nt.links.new(st.outputs['Result'], mul.inputs[0])
+        nt.links.new(hor.outputs['Result'], mul.inputs[1])
+        add = nt.nodes.new('ShaderNodeMixRGB')
+        add.blend_type = 'ADD'
+        nt.links.new(mul.outputs['Value'], add.inputs['Fac'])
+        nt.links.new(color, add.inputs['Color1'])
+        add.inputs['Color2'].default_value = (0.9, 0.92, 1.0, 1.0)
+        color = add.outputs['Color']
+    nt.links.new(color, bg.inputs['Color'])
+    bg.inputs['Strength'].default_value = sky.get('strength', 1.0)
     nt.links.new(bg.outputs['Background'], out.inputs['Surface'])
 
-    elev, strength, col = SUN.get(tod, SUN['noon'])
-    sun_data = bpy.data.lights.new('sun', 'SUN')
-    sun_data.energy = strength
-    sun_data.color = col
-    sun_data.angle = 0.12
-    sun = link(bpy.data.objects.new('sun', sun_data))
-    sun.rotation_euler = Euler(((90 - elev) * D2R, 0, 35 * D2R), 'XYZ')
-    fill_data = bpy.data.lights.new('fill', 'SUN')
-    fill_data.energy = strength * 0.28
-    fill_data.color = (0.55, 0.7, 1.0)
-    fill = link(bpy.data.objects.new('fill', fill_data))
-    fill.rotation_euler = Euler((60 * D2R, 0, -150 * D2R), 'XYZ')
-    try:
-        fill_data.use_shadow = False
-    except AttributeError:
-        pass
-    rnd = random.Random(7)
-    if preset in ('sky_obby', 'lava_obby'):
-        sea_col = (1.0, 0.8, 0.78) if tod == 'sunset' else (0.95, 0.97, 1.0)
-        if preset == 'lava_obby':
-            lava = box('lava', (120, 120, 0.2), material('lava', (1.0, 0.25, 0.02), 0.4, emission=3.0))
-            lava.location = (0, 0, -5)
+
+def build_lights(lights):
+    for i, L in enumerate(lights):
+        if L['type'] == 'SUN':
+            ld = bpy.data.lights.new(f'sun{i}', 'SUN')
+            ld.angle = L.get('angle', 0.12)
+            for attr, val in (('shadow_cascade_max_distance', 35.0), ('shadow_cascade_count', 3)):
+                try:
+                    setattr(ld, attr, val)
+                except AttributeError:
+                    pass
+            ob = link(bpy.data.objects.new(f'sun{i}', ld))
+            ob.rotation_euler = Euler(((90 - L['elev']) * D2R, 0, L['az'] * D2R), 'XYZ')
         else:
-            sea = box('cloud_sea', (160, 160, 0.2), material('cloud_sea', sea_col, 0.9, emission=0.25))
-            sea.location = (0, 0, -6)
-            cmat = material('cloud', sea_col, 0.95, emission=0.35)
-            for i in range(26):
-                a = rnd.uniform(0, 2 * math.pi)
-                r = rnd.uniform(14, 40)
-                cx, cy, cz = r * math.cos(a), r * math.sin(a) + 8, rnd.uniform(-5.5, -1.5)
-                for j in range(rnd.randint(3, 6)):
-                    s = sphere(f'cloud_{i}_{j}', rnd.uniform(1.0, 2.4), cmat, 16, 10)
-                    s.location = (cx + rnd.uniform(-2, 2), cy + rnd.uniform(-1.5, 1.5), cz + rnd.uniform(-0.4, 0.6))
-                    s.scale = (1.3, 1.0, 0.65)
-        # Distant platforms give depth and say "obby".
-        for i in range(10):
-            a = rnd.uniform(0.15 * math.pi, 0.85 * math.pi)
-            r = rnd.uniform(14, 30)
-            col = hex_rgb(rnd.choice(['#4CAF50', '#2196F3', '#FF9800', '#E91E63', '#9C27B0', '#FFEB3B']))
-            b = box(f'far_platform_{i}', (rnd.uniform(1.5, 3), rnd.uniform(1.5, 3), 0.6), material(f'far{i}', col, 0.6), 0.04)
-            b.location = (r * math.cos(a), r * math.sin(a), rnd.uniform(-2.5, 2.5))
-    else:
-        ground_col = {'town_street': '#5DAA4A', 'night_forest': '#2E4A2A', 'classroom': '#C8A27A',
-                      'bedroom': '#B88A5E', 'studio': '#D9DCE3'}.get(preset, '#7FB069')
-        g = box('ground', (80, 80, 0.2), material('ground', hex_rgb(ground_col), 0.85))
-        g.location = (0, 0, -0.1)
-        if preset == 'town_street':
-            road = box('road', (80, 3.2, 0.02), material('road', hex_rgb('#3B3B44'), 0.8))
-            road.location = (0, 6.0, 0.005)
-            for i in range(6):
-                x = -12 + i * 5
-                h = box(f'house_{i}', (3.5, 3.0, 2.8), material(f'house{i}', hex_rgb(['#F2E8CF', '#A7C957', '#BC4749', '#6A994E', '#F4A259', '#5BC0EB'][i]), 0.7), 0.05)
-                h.location = (x, 11, 1.4)
-                roof = cone(f'roof_{i}', 2.7, 0.0, 1.4, material('roof', hex_rgb('#7A3E2E'), 0.7), 4)
-                roof.location = (x, 11, 3.5)
-                roof.rotation_euler = Euler((0, 0, 45 * D2R), 'XYZ')
-        if preset in ('classroom', 'bedroom', 'studio'):
-            wall = box('wall', (40, 0.3, 12), material('wall', hex_rgb('#EDE6D6' if preset != 'studio' else '#D9DCE3'), 0.9))
-            wall.location = (0, 6, 6)
-        if preset == 'night_forest':
-            moon = sphere('moon', 1.4, material('moon', (1.0, 0.97, 0.85), 0.5, emission=6.0))
-            moon.location = (-12, 40, 14)
-            for i in range(18):
-                a = rnd.uniform(0, 2 * math.pi)
-                r = rnd.uniform(5, 20)
-                tx, ty = r * math.cos(a), abs(r * math.sin(a)) + 3
-                tr = box(f'trunk_{i}', (0.4, 0.4, 2.2), material('trunk', hex_rgb('#6B4226'), 0.8), 0.03)
-                tr.location = (tx, ty, 1.1)
-                lv = box(f'leaves_{i}', (1.8, 1.8, 1.8), material('leaves', hex_rgb('#1F5130'), 0.8), 0.08)
-                lv.location = (tx, ty, 2.8)
-    sc = bpy.context.scene
-    sc.render.film_transparent = False
-    return {'preset': preset, 'time_of_day': tod}
+            ld = bpy.data.lights.new(f'light{i}', 'POINT')
+            ld.shadow_soft_size = 0.3
+            ob = link(bpy.data.objects.new(f'light{i}', ld))
+            ob.location = L['pos']
+        ld.energy = L['energy']
+        ld.color = hex_rgb(L['color'])
+        try:
+            ld.use_shadow = bool(L.get('shadow', False))
+        except AttributeError:
+            pass
+
+
+def build_set(lay):
+    """Sky, lights and every set piece of the host layout. Returns {template: mesh} counts for the log."""
+    sky = lay.get('sky') or {'stops': ['#C9DDEB', '#D8EDFF', '#8CC4F2', '#3F86E0'], 'haze': {}}
+    build_sky(sky)
+    build_lights(lay.get('lights') or [{'type': 'SUN', 'elev': 62, 'az': 35, 'energy': 3.2, 'color': '#FFF7EB',
+                                        'shadow': True}])
+    haze = sky.get('haze') or {}
+    meshes = {}
+    for p in lay.get('pieces', []):
+        key = p['template']
+        if key not in meshes:
+            meshes[key] = template_mesh(key, lay['templates'][key], haze)
+        ob = link(bpy.data.objects.new('set:' + p['id'], meshes[key]))
+        ob.location = p['pos']
+        ob.rotation_euler = Euler((0, 0, p['rot'] * D2R), 'XYZ')
+        s = p.get('scale', 1.0)
+        ob.scale = (s, s, s)
+        ob['blox_set'] = p['kind']
+    bpy.context.scene.render.film_transparent = False
+    return {'pieces': len(lay.get('pieces', [])), 'meshes': len(meshes)}
 
 
 # ------------------------------------------------------------------ props
@@ -613,15 +851,51 @@ class Character:
 
 
 # ------------------------------------------------------------------ camera
-def build_camera():
+def build_camera(fstop=None):
     cd = bpy.data.cameras.new('cam')
     cd.sensor_fit = 'HORIZONTAL'
     cd.sensor_width = 36.0
     cd.clip_start = 0.05
     cd.clip_end = 400
+    if fstop:
+        # Subtle depth of field: focus is set on the shot subject's face every frame.
+        cd.dof.use_dof = True
+        cd.dof.aperture_fstop = fstop
     cam = link(bpy.data.objects.new('cam', cd))
     bpy.context.scene.camera = cam
     return cam
+
+
+def focus_on(cam, chars, rig, subject, look_at, fstop):
+    """Focus distance (along the view axis) to the subject's face; the look-at point for props.
+
+    The f-number grows with the lens squared so longer lenses do not blur the background more.
+    """
+    cam.data.dof.aperture_fstop = max(2.8, min(11.0, fstop * (cam.data.lens / 45.0) ** 2))
+    fwd = (cam.matrix_world.to_3x3() @ Vector((0, 0, -1))).normalized()
+    pos = cam.matrix_world.translation
+    scene = bpy.context.scene
+
+    def face(ch):
+        return ch.parts['head'].matrix_world @ Vector((0, rig['face_front_y'], 0.0))
+
+    def in_frame(p):
+        v = world_to_camera_view(scene, cam, p)
+        return v.z > 0 and 0.0 <= v.x <= 1.0 and 0.0 <= v.y <= 1.0
+    if subject in chars:
+        pts = [face(chars[subject])]
+    elif subject == 'two_shot':
+        pts = [face(ch) for ch in chars.values()]
+    else:
+        pts = []
+    pts = [p for p in pts if in_frame(p)]
+    if not pts:
+        # The subject has left the frame (a jump out of shot): focus on the nearest face still in it,
+        # else on the framing target, so the picture never goes entirely soft.
+        vis = sorted((p for p in (face(ch) for ch in chars.values()) if in_frame(p)), key=lambda p: (p - pos).length)
+        pts = vis[:1] or [Vector(look_at)]
+    d = sum((p - pos).dot(fwd) for p in pts) / len(pts)
+    cam.data.dof.focus_distance = max(0.2, d)
 
 
 def apply_camera(cam, c):
@@ -643,7 +917,39 @@ def world_bbox(obj):
     return [obj.matrix_world @ Vector(c) for c in obj.bound_box]
 
 
-def telemetry(scene, cam, chars, props, rig):
+def face_blocker(scene, cam_pos, face, cid):
+    """What the rendered geometry puts between the camera and a face: 'set:<kind>', 'char:<id>', 'prop:<id>'.
+
+    A ray from the camera toward the face; the character's own head and body do not count (that is the
+    back of the head, which face_dot reports). None when the line of sight is clear.
+    """
+    d = face - cam_pos
+    dist = d.length - 0.04
+    if dist <= 0:
+        return None
+    dg = bpy.context.evaluated_depsgraph_get()
+    origin, direction = cam_pos.copy(), d.normalized()
+    for _ in range(6):
+        hit, loc, _n, _i, ob, _m = scene.ray_cast(dg, origin, direction, distance=dist)
+        if not hit:
+            return None
+        if ob.get('blox_set'):
+            return 'set:' + str(ob['blox_set'])
+        owner = ob.get('blox_char')
+        if owner and owner != cid:
+            return 'char:' + str(owner)
+        if ob.get('blox_prop'):
+            return 'prop:' + str(ob['blox_prop'])
+        if owner == cid:
+            return None
+        step = (loc - origin).length + 1e-3
+        origin, dist = loc + direction * 1e-3, dist - step
+        if dist <= 0:
+            return None
+    return None
+
+
+def telemetry(scene, cam, chars, props, rig, subjects=()):
     fwd_cam = (cam.matrix_world.to_3x3() @ Vector((0, 0, -1))).normalized()
     out = {'camera': {'location': [round(v, 4) for v in cam.matrix_world.translation],
                       'forward': [round(v, 5) for v in fwd_cam], 'lens': round(cam.data.lens, 3)},
@@ -704,6 +1010,8 @@ def telemetry(scene, cam, chars, props, rig):
         rec['root'] = [round(v, 4) for v in J['root'].matrix_world.translation]
         rec['yaw'] = round(math.degrees(J['root'].matrix_world.to_euler('XYZ').z), 3)
         rec['face_z'] = round(face_c.z, 4)
+        if cid in subjects:
+            rec['face_blocker'] = face_blocker(scene, cam_pos, face_c, cid)
         out['characters'][cid] = rec
     for pid, ob in props.items():
         out['props'][pid] = {'location': [round(v, 4) for v in ob.matrix_world.translation],
@@ -744,8 +1052,11 @@ def main():
     if plan['engine'] == 'BLENDER_EEVEE':
         e = sc.eevee
         e.taa_render_samples = plan.get('samples', 16)
+        # The depth of field is subtle (a few pixels), so the bokeh gather radius is capped to match:
+        # the default 100 px gather costs a lot of CPU for no visible difference.
         for attr, val in (('use_gtao', True), ('gtao_distance', 0.6), ('use_soft_shadows', True),
-                          ('shadow_cascade_size', '2048'), ('use_bloom', plan.get('bloom', False))):
+                          ('shadow_cascade_size', '2048'), ('use_bloom', plan.get('bloom', False)),
+                          ('bokeh_max_size', max(6.0, plan['width'] / 60.0))):
             try:
                 setattr(e, attr, val)
             except (AttributeError, TypeError):
@@ -763,11 +1074,13 @@ def main():
         sh.color_type = 'MATERIAL'
         sh.show_shadows = True
     rig = plan['rig']
-    build_world(plan['setting'])
+    info = build_set(plan.get('set') or {})
     props = {p['id']: build_prop(p) for p in plan['setting'].get('props', [])}
     chars = {c['id']: Character(c, rig) for c in plan['cast']}
-    cam = build_camera()
-    log(f'built scene in {time.time() - t0:.1f}s objects={len(bpy.data.objects)}')
+    cam = build_camera(plan.get('dof_fstop'))
+    log(f'built scene in {time.time() - t0:.2f}s objects={len(bpy.data.objects)} set_pieces={info["pieces"]} '
+        f'set_meshes={info["meshes"]}')
+    subjects = plan.get('shot_subjects') or {}
     f0, f1 = plan['frame_start'], plan['frame_end']
     out_dir = plan['out_dir']
     os.makedirs(out_dir, exist_ok=True)
@@ -788,7 +1101,10 @@ def main():
                     ob.location = prop_rest[pid]
             apply_camera(cam, plan['camera'][i])
             bpy.context.view_layer.update()
-            rec = telemetry(sc, cam, chars, props, rig)
+            subj = subjects.get(plan['camera'][i].get('shot'))
+            if cam.data.dof.use_dof:
+                focus_on(cam, chars, rig, subj, plan['camera'][i]['look_at'], plan['dof_fstop'])
+            rec = telemetry(sc, cam, chars, props, rig, list(chars) if subj == 'two_shot' else [subj])
             rec['frame'] = f
             tf.write(json.dumps(rec) + '\n')
             if not plan.get('telemetry_only'):

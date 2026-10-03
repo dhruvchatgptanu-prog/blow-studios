@@ -433,8 +433,10 @@ def solved_for(vid, mid, m, d):
                 repair['characters'].setdefault(rp['character'], {'ranges': []})['ranges'].append(
                     {'start': s['start_frame'], 'end': s['end_frame'], 'pelvis_drop_extra': rp['pelvis_drop_extra']})
     from .animation import solver as SV
+    # The setting and title decide the set layout (and so where the camera may stand), so they are part
+    # of the key too.
     key = stable_hash([m['lines'], m['tracks'], m['shots'], [(k, r['words']) for k, r in sorted(results.items())], repair,
-                       SV.code_version()])
+                       m.get('setting'), m.get('title'), SV.code_version()])
     path = os.path.join(work_dir(vid, mid), f'solved_{key}.json')
     if os.path.exists(path):
         with open(path) as f:

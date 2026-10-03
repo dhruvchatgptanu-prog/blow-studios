@@ -16,8 +16,15 @@ import shutil
 
 from .. import config, media
 from . import rig as R
+from . import sets as SETS
 
 SCRIPT = os.path.join(os.path.dirname(__file__), 'blender_scene.py')
+# Subtle camera depth of field (production preference 'depth_of_field'), focused on the subject's face
+# every frame. This is the f-number at a 45 mm lens; the renderer scales it with the lens squared so the
+# background blur stays about the same from medium to close shots. Eyes and mouth lie within a few cm of
+# the focus plane and stay sharp (well under a pixel at 1080 px); scenery several metres behind softens
+# by a few pixels. It costs about a quarter more CPU per frame in EEVEE, hence off by default.
+DOF_FSTOP = 4.0
 QUALITY = {
     'preview': {'scale': 0.5, 'samples': 4, 'engine': 'BLENDER_EEVEE'},
     'final': {'scale': 1.0, 'samples': None, 'engine': None},
@@ -47,6 +54,8 @@ def build_plan(m, cast_specs, solved, frame_start, frame_end, out_dir, telemetry
     w = int(m['width'] * q['scale']) // 2 * 2
     h = int(m['height'] * q['scale']) // 2 * 2
     frames = {cid: solved['characters'][cid][frame_start:frame_end] for cid in solved['characters']}
+    # The set layout the camera solver avoided; recomputed (deterministically) for older solved files.
+    lay = solved.get('set') or SETS.layout(m, solved.get('scales'))
     return {
         'version': 1,
         'fps': m['fps'], 'width': w, 'height': h,
@@ -56,6 +65,9 @@ def build_plan(m, cast_specs, solved, frame_start, frame_end, out_dir, telemetry
         'out_dir': str(out_dir), 'telemetry_path': str(telemetry_path),
         'rig': rig_spec(),
         'setting': m['setting'],
+        'set': lay,
+        'shot_subjects': {s['id']: s['camera']['subject'] for s in m['shots']},
+        'dof_fstop': DOF_FSTOP if pr.get('depth_of_field') else None,
         'cast': cast_specs,
         'frames': frames,
         'camera': solved['camera'][frame_start:frame_end],

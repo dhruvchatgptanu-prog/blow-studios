@@ -1003,6 +1003,7 @@ def code_version():
         h = hashlib.sha256()
         here = os.path.dirname(os.path.abspath(__file__))
         for name in (os.path.join(here, 'solver.py'), os.path.join(here, 'rig.py'), os.path.join(here, 'visemes.py'),
+                     os.path.join(here, 'sets.py'),
                      os.path.join(here, '..', 'manifest', 'compile.py'), os.path.join(here, '..', 'manifest', 'geometry.py')):
             with open(name, 'rb') as f:
                 h.update(f.read())
@@ -1045,6 +1046,48 @@ def _blocked_frames(frames, chars, subj, f0):
     return bad
 
 
+def view_targets(m, chars, subj, f):
+    """Points the camera of a shot must see at frame f: the subject's face (every face in a two-shot),
+    or a prop's rest position. Faces use the same body-axis point as _blocked_frames."""
+    def face(c):
+        return np.array([c.root_xy[f][0], c.root_xy[f][1], R.FACE_CENTER_Z * c.scale + c.root_z[f]])
+    if subj in chars:
+        return [face(chars[subj])]
+    if subj == 'two_shot':
+        return [face(c) for c in chars.values()]
+    if isinstance(subj, str) and subj.startswith('prop:'):
+        for p in m['setting'].get('props', []):
+            if p['id'] == subj[5:]:
+                return [np.array(p['position'], dtype=float) + np.array([0.0, 0.0, 0.15])]
+    return []
+
+
+def _scenery_blocked_frames(m, frames, chars, subj, f0, boxes):
+    """Frames whose camera is inside a scenery box, or whose view of the subject passes through one.
+
+    boxes: sets.box_arrays of set pieces (and, for faces, the big static story props).
+    """
+    from . import sets as SETS
+    if boxes is None or not frames:
+        return []
+    cams = np.array([fr['location'] for fr in frames], dtype=float)
+    bad = SETS.inside(boxes, cams, pad=0.08).any(axis=1)
+    p0, p1, owner = [], [], []
+    for i in range(len(frames)):
+        for t in view_targets(m, chars, subj, f0 + i):
+            d = t - cams[i]
+            n = float(np.linalg.norm(d))
+            if n > 0.1:
+                p0.append(cams[i])
+                p1.append(t - d / n * 0.05)
+                owner.append(i)
+    if p0:
+        hits = SETS.segment_hits(boxes, np.array(p0), np.array(p1)).any(axis=1)
+        for i, h in zip(owner, hits):
+            bad[i] |= bool(h)
+    return [f0 + i for i in np.nonzero(bad)[0].tolist()]
+
+
 def line_hits_others(cam, face, chars, subj, f, near_subject=0.35):
     """True when the sight line camera -> face passes through another character's body cylinder."""
     seg = face - cam
@@ -1065,9 +1108,20 @@ def line_hits_others(cam, face, chars, subj, f, near_subject=0.35):
     return False
 
 
-def solve_camera(m, chars, n, repair=None):
-    """Per-frame camera {location, look_at, lens} for the whole timeline."""
+def solve_camera(m, chars, n, repair=None, set_layout=None):
+    """Per-frame camera {location, look_at, lens} for the whole timeline.
+
+    set_layout: the sets.layout of this manifest (computed here when not given). Its pieces, plus the big
+    static story props, are scenery the camera must not sit in or look through.
+    """
     from ..manifest.compile import camera_state
+    from . import sets as SETS
+    if set_layout is None:
+        set_layout = SETS.layout(m, {cid: c.scale for cid, c in chars.items()})
+    set_boxes = SETS.piece_boxes(set_layout)
+    # Faces: set pieces and big story props. Props as subjects: set pieces only (a key may sit in a chest).
+    scenery_faces = SETS.box_arrays(set_boxes + SETS.prop_boxes(m))
+    scenery_props = SETS.box_arrays(set_boxes)
     out = [None] * n
     aspect = m['height'] / m['width']
     for shot in m['shots']:
@@ -1156,21 +1210,32 @@ def solve_camera(m, chars, n, repair=None):
                     'look_at': [round(float(v), 4) for v in look], 'lens': lens,
                     'sensor_width': SENSOR_W, 'framing': st['framing']}
 
-        # Another character standing between the camera and the subject would hide the subject (or put
-        # the camera inside that character). Swing the camera around the subject, the same for the whole
-        # shot so it does not jump: fewest blocked frames first, then the side the subject looks toward
-        # (where their eye targets are), then the smallest swing.
+        # Another character or a piece of scenery between the camera and the subject would hide the
+        # subject (or put the camera inside it). Swing the camera around the subject, the same for the
+        # whole shot so it does not jump: fewest blocked frames first, then the side the subject looks
+        # toward (where their eye targets are), then the smallest swing. The unswung camera stays a
+        # candidate (ranked last on ties) for when every swing is worse.
+        scenery = scenery_faces if (subj in chars or subj == 'two_shot') else scenery_props
+
+        def blocked(trial):
+            bad = set(_blocked_frames(trial, chars, subj, f0)) if subj in chars else set()
+            return bad | set(_scenery_blocked_frames(m, trial, chars, subj, f0, scenery))
+
         frames = frames_at(0.0)
-        if subj in chars and _blocked_frames(frames, chars, subj, f0):
+        base_blocked = blocked(frames)
+        if base_blocked:
             offsets = [35, -35, 55, -55, 80, -80] + ([110, -110, 140, -140] if shot_rp.get('camera_clear') else [])
             ranked = []
             for i, off in enumerate(offsets):
                 trial = frames_at(float(off))
-                ranked.append((len(_blocked_frames(trial, chars, subj, f0)),
-                               -round(_facing_camera_score(trial, chars, subj, f0), 2), i, off, trial))
+                score = _facing_camera_score(trial, chars, subj, f0) if subj in chars else 0.0
+                ranked.append((len(blocked(trial)), -round(score, 2), i, off, trial))
+            score0 = _facing_camera_score(frames, chars, subj, f0) if subj in chars else 0.0
+            ranked.append((len(base_blocked), -round(score0, 2), len(offsets), 0, frames))
             _, _, _, off, frames = min(ranked, key=lambda r: r[:3])
-            for fr in frames:
-                fr['occlusion_avoided_deg'] = off
+            if off:
+                for fr in frames:
+                    fr['occlusion_avoided_deg'] = off
         for i, fr in enumerate(frames):
             out[f0 + i] = fr
     for f in range(n):
@@ -1197,7 +1262,9 @@ def solve(m, bibles, alignments=None, repair=None, envelopes=None):
         chars[c['id']] = cs
     for cs in chars.values():
         cs.others = chars
-    camera = solve_camera(m, chars, n, repair)
+    from . import sets as SETS
+    set_layout = SETS.layout(m, {cid: cs.scale for cid, cs in chars.items()})
+    camera = solve_camera(m, chars, n, repair, set_layout)
     viseme_kinds = {}
     for cid, cs in chars.items():
         cs.visemes, viseme_kinds[cid] = build_visemes(m, cid, n, alignments)
@@ -1217,7 +1284,8 @@ def solve(m, bibles, alignments=None, repair=None, envelopes=None):
             viseme_kinds[cid] = viseme_kinds[cid] + ['amplitude_from_audio']
     frames = {cid: cs.solve(lambda f: camera[f]['location']) for cid, cs in chars.items()}
     return {'n': n, 'fps': m['fps'], 'camera': camera, 'characters': frames, 'viseme_timing': viseme_kinds,
-            'scales': {cid: cs.scale for cid, cs in chars.items()}, 'props': solve_props(m, frames, n)}
+            'scales': {cid: cs.scale for cid, cs in chars.items()}, 'props': solve_props(m, frames, n),
+            'set': set_layout}
 
 
 def solve_props(m, frames, n):
