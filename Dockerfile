@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Blox Studio: web app + workers in one image (the command decides the role).
 # Ubuntu 24.04 provides Blender 4.0 and an FFmpeg build with libass and flite.
 FROM ubuntu:24.04
@@ -23,9 +24,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python3 -m venv /opt/venv
 
 # Free offline voice model (Piper, LibriTTS, CC BY 4.0), checksum-pinned. Kept outside the data volume.
+# Behind a TLS-inspecting proxy, pass its CA bundle: docker build --secret id=proxy_ca,src=/path/ca.pem .
 ENV BLOX_VOICES_DIR=/opt/blox-voices
-RUN mkdir -p /opt/blox-voices/en-us-libritts-high \
-    && curl -fsSL -o /tmp/voice.tar.gz \
+RUN --mount=type=secret,id=proxy_ca,required=false \
+    mkdir -p /opt/blox-voices/en-us-libritts-high \
+    && CA="" && if [ -s /run/secrets/proxy_ca ]; then CA="--cacert /run/secrets/proxy_ca"; fi \
+    && curl -fsSL $CA -o /tmp/voice.tar.gz \
        https://github.com/rhasspy/piper/releases/download/v0.0.2/voice-en-us-libritts-high.tar.gz \
     && echo "328e3e9cb573a43a6c5e1aeca386e971232bdb1418a74d4674cf726c973a0ea8  /tmp/voice.tar.gz" | sha256sum -c - \
     && tar -xzf /tmp/voice.tar.gz -C /opt/blox-voices/en-us-libritts-high \
