@@ -1010,6 +1010,28 @@ def code_version():
     return _CODE_VERSION
 
 
+def _facing_camera_score(frames, chars, subj, f0):
+    """Mean cosine (ground plane) between where the subject looks and the direction to the camera."""
+    c = chars[subj]
+    total = 0.0
+    for i, fr in enumerate(frames):
+        f = f0 + i
+        root = np.array(c.root_xy[f], dtype=float)
+        to_cam = np.array(fr['location'][:2], dtype=float) - root
+        if np.linalg.norm(to_cam) < 1e-6:
+            continue
+        et = pose_at(c.keys, f).get('eye_target') or {}
+        if et.get('kind') == 'camera':
+            total += 1.0
+            continue
+        tgt = c.eye_target_world(et, f, None, None)
+        look = (tgt[:2] - root) if tgt is not None else None
+        if look is None or np.linalg.norm(look) < 0.05:
+            look = np.array(direction(c.yaw[f]), dtype=float)
+        total += float(np.dot(look / np.linalg.norm(look), to_cam / np.linalg.norm(to_cam)))
+    return total / max(1, len(frames))
+
+
 def _blocked_frames(frames, chars, subj, f0):
     """Frames in which another character's body is between the camera and the subject's face."""
     c = chars[subj]
@@ -1135,22 +1157,20 @@ def solve_camera(m, chars, n, repair=None):
                     'sensor_width': SENSOR_W, 'framing': st['framing']}
 
         # Another character standing between the camera and the subject would hide the subject (or put
-        # the camera inside that character). Swing the camera around the subject to the nearest angle
-        # with the fewest blocked frames, the same for the whole shot so it does not jump.
+        # the camera inside that character). Swing the camera around the subject, the same for the whole
+        # shot so it does not jump: fewest blocked frames first, then the side the subject looks toward
+        # (where their eye targets are), then the smallest swing.
         frames = frames_at(0.0)
-        if subj in chars:
-            best = _blocked_frames(frames, chars, subj, f0)
-            if best:
-                offsets = [35, -35, 55, -55, 80, -80] + ([110, -110, 140, -140] if shot_rp.get('camera_clear') else [])
-                for off in offsets:
-                    trial = frames_at(float(off))
-                    bad = _blocked_frames(trial, chars, subj, f0)
-                    if len(bad) < len(best):
-                        frames, best = trial, bad
-                        for fr in frames:
-                            fr['occlusion_avoided_deg'] = off
-                    if not best:
-                        break
+        if subj in chars and _blocked_frames(frames, chars, subj, f0):
+            offsets = [35, -35, 55, -55, 80, -80] + ([110, -110, 140, -140] if shot_rp.get('camera_clear') else [])
+            ranked = []
+            for i, off in enumerate(offsets):
+                trial = frames_at(float(off))
+                ranked.append((len(_blocked_frames(trial, chars, subj, f0)),
+                               -round(_facing_camera_score(trial, chars, subj, f0), 2), i, off, trial))
+            _, _, _, off, frames = min(ranked, key=lambda r: r[:3])
+            for fr in frames:
+                fr['occlusion_avoided_deg'] = off
         for i, fr in enumerate(frames):
             out[f0 + i] = fr
     for f in range(n):

@@ -74,3 +74,16 @@ def test_qa_flags_a_camera_inside_another_character():
     ck = Checks(30)
     motion._sightlines(ck, m, _tele((0.75, 0.8)), {'scales': {'pal': 0.9}})
     assert ck.items[0]['status'] == 'pass'
+
+
+def test_swing_goes_to_the_side_the_subject_looks_at():
+    # Shot 6: Bloxy is startled looking down at the trophy on his right; the clear angle on that side
+    # keeps his face readable (the other side shows the back of his head).
+    plan = next(p for p in _stories() if p['title'] == 'The Golden Coin Trade')
+    m = C.compile_plan(plan, fps=30, width=540, height=960)
+    solved = SV.solve(m, _bibles(m))
+    s6 = next(s for s in m['shots'] if s['id'] == 's6')
+    trophy = next(p for p in m['setting']['props'] if p['id'] == 'trophy')['position']
+    cam = solved['camera'][s6['start_frame'] + 5]
+    bloxy = solved['characters']['bloxy'][s6['start_frame'] + 5]['root']
+    assert (cam['location'][1] - bloxy[1]) * (trophy[1] - bloxy[1]) > 0

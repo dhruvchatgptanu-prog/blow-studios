@@ -243,7 +243,9 @@ Verified here means exercised end to end in this environment with real tools, no
 * Contacts (feet, hand-to-face, props) are solved with IK and checked in the evaluated Blender scene to
   centimetre tolerances; collisions between characters are only checked at positions, not full meshes.
 * **Occlusion**: cameras are kept out of other characters and QA checks the sight line to each shot's
-  subject, with bodies approximated as cylinders. Set pieces (houses, trees, walls) are not checked
+  subject, with bodies approximated as cylinders. To get a clear view the camera swings toward the side
+  the subject is looking at, which can cross the line between two characters (screen direction flips
+  for that shot). Set pieces (houses, trees, walls) are not checked
   for occlusion; that relies on the optional vision review or your own review.
 * **Generative shots** (Runway) do not follow second-by-second directions exactly; identity and costume
   continuity are reviewed, and uncertain results are held rather than published. Upscaled generative
