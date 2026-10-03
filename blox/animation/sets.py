@@ -52,6 +52,12 @@ TALL_MARGIN = 0.3    # gap between tall scenery and the camera clearance box
 LOW_CAM_GAP = 0.25   # low furniture must sit this far below every camera of a zone
 OCCLUDER_RANGE = 60.0  # pieces further than this from the action area are background only
 SHOTS_PER_ZONE_STEP = 6
+# Feet are planted at z = 0, so the walkable dressing under the action (paving, floor tiles, rugs, ground
+# patches) ends flush with z = 0, a seam, marking or rug at most a few millimetres proud. Stacked layers keep
+# 2 mm steps so they do not z-fight; under paved or tiled ground the big slab lies below them all (town
+# pieces standing on the grass sit 4 mm above it, well under a pixel at their distance).
+SLAB_TOP = -0.004
+WALK_TOP_MAX = 0.004
 
 GROUND_HEX = {'town_street': '#6DBE45', 'night_forest': '#3A6640', 'classroom': '#D9B98C',
               'bedroom': '#B98A5E', 'studio': '#D9DCE3'}
@@ -346,13 +352,18 @@ class Dresser:
         c = area['clear']
         self.cx, self.cy = (c[0] + c[2]) / 2, (c[1] + c[3]) / 2
 
-    def tpl(self, kind, parts, shadow=True, decal=False):
-        """Register a template (parts normalised to a bottom-centre origin); identical ones are shared."""
+    @staticmethod
+    def _bounds(parts):
         lo, hi = [1e9] * 3, [-1e9] * 3
         for p in parts:
             a, b = part_bounds(p)
             lo = [min(u, v) for u, v in zip(lo, a)]
             hi = [max(u, v) for u, v in zip(hi, b)]
+        return lo, hi
+
+    def tpl(self, kind, parts, shadow=True, decal=False):
+        """Register a template (parts normalised to a bottom-centre origin); identical ones are shared."""
+        lo, hi = self._bounds(parts)
         ox, oy, oz = (lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]
         norm = [[p[0], _r(p[1] - ox), _r(p[2] - oy), _r(p[3] - oz)] + p[4:] for p in parts]
         size = [_r(hi[0] - lo[0]), _r(hi[1] - lo[1]), _r(hi[2] - lo[2])]
@@ -416,6 +427,18 @@ class Dresser:
             poly = footprint(x, y, size[0] / 2, size[1] / 2, rot)
             self._solid.append((x, y, 0.5 * math.hypot(size[0], size[1]), z, z + size[2], poly))
         return True
+
+    def put_drawn(self, kind, parts, x, y, z=0.0, **tpl_kw):
+        """Register parts drawn relative to the point (x, y, z) and place them exactly where they were drawn.
+
+        tpl() re-centres every template on its bounding box, so a scattered cloud (fireflies, coins,
+        embers, ground patches) placed at its drawing origin would shift by the centre of its random
+        spread, possibly into the camera clearance; this adds that offset back. Unchecked (callers keep
+        such clouds out of the clearance box themselves).
+        """
+        lo, hi = self._bounds(parts)
+        key = self.tpl(kind, parts, **tpl_kw)
+        return self.put(kind, key, x + (lo[0] + hi[0]) / 2, y + (lo[1] + hi[1]) / 2, z + lo[2], check=False)
 
     def scatter(self, kind, keys, n, r0, r1, z=0.0, scale=(1.0, 1.0), tries=6, sectors=None, gap=0.3, rot=None,
                 zfn=None):
@@ -814,20 +837,20 @@ def town_street(dr, night):
     y_sq = c[1] + 0.2                                                   # where the road meets the square
     L = y_sq - y_end
     dr.put('ground', dr.tpl('ground', [P('box', 0, 0, -0.1, 360, 360, 0.2, GROUND_HEX['town_street'])], decal=True,
-                            shadow=False), dr.cx, dr.cy, -0.2, check=False)
+                            shadow=False), dr.cx, dr.cy, SLAB_TOP - 0.2, check=False)
     # Road along y with dashed centre line and edge lines; pavements and kerbs on both sides.
     ym = (y_sq + y_end) / 2
     dr.put('road', dr.tpl('road', [P('box', 0, 0, 0.004, 2 * road_half, L, 0.008, '#4A4E58')], decal=True,
-                          shadow=False), cx, ym, 0.0, check=False)
+                          shadow=False), cx, ym, -0.010, check=False)
     dash = [P('box', 0, -L / 2 + 1.5 + i * 4.0, 0.002, 0.16, 2.0, 0.004, '#F2C94C') for i in range(int(L / 4.0))]
     edges = [P('box', s * (road_half - 0.35), 0, 0.002, 0.1, L, 0.004, '#EDEBE4') for s in (-1, 1)]
-    dr.put('markings', dr.tpl('markings', dash + edges, decal=True, shadow=False), cx, ym, 0.008, check=False)
+    dr.put('markings', dr.tpl('markings', dash + edges, decal=True, shadow=False), cx, ym, -0.002, check=False)
     kt = dr.tpl('kerb', [P('box', 0, 0, 0.07, 0.24, 3.96, 0.14, '#A9ADB6', bevel=0.02)])
     for side in (-1, 1):
         kx = cx + side * road_half
         slabs = [P('box', 0, -L / 2 + 1.0 + i * 2.0, 0.005, pave, 1.96, 0.01, '#C9CCD3' if i % 2 else '#C2C5CC')
                  for i in range(int(L / 2.0))]
-        dr.put('pavement', dr.tpl('pavement', slabs, decal=True, shadow=False), kx + side * pave / 2, ym, 0.0,
+        dr.put('pavement', dr.tpl('pavement', slabs, decal=True, shadow=False), kx + side * pave / 2, ym, -0.010,
                check=False)
         for i in range(int(L / 4.0)):
             dr.put('kerb', kt, kx + side * 0.12, y_end + 2.0 + i * 4.0, 0.0, solid=False)
@@ -837,7 +860,8 @@ def town_street(dr, night):
              P('box', 0, 0, 0.006, sq_w - 1.2, sq_d - 1.2, 0.008, '#E3DDD0')]
     for i in range(int(sq_w / 1.5)):
         tiles.append(P('box', -sq_w / 2 + 0.75 + i * 1.5, 0, 0.009, 0.05, sq_d - 1.2, 0.006, '#CFC8BA'))
-    dr.put('square', dr.tpl('square', tiles, decal=True, shadow=False), (xw + xe) / 2, (y_sq + yn) / 2, 0.0,
+    # Border top 2 mm below the paving the characters stand on (flush with z = 0); seams 2 mm proud.
+    dr.put('square', dr.tpl('square', tiles, decal=True, shadow=False), (xw + xe) / 2, (y_sq + yn) / 2, -0.010,
            check=False)
 
     tree_keys = [dr.tpl('tree', tree_parts(s, rnd, rnd.choice(LEAVES))) for s in ('round', 'round', 'poplar', 'pine')]
@@ -873,7 +897,7 @@ def town_street(dr, night):
                         dr.put('fence', seg, fx, (s0 + s1) / 2, 0.0, facing, gap=0.05)
                     path = dr.tpl('path', [P('box', 0, 0, 0.004, 1.2, depth, 0.008, '#D8D2C4')], decal=True,
                                   shadow=False)
-                    dr.put('path', path, (front + edge) / 2, hy, 0.006, facing, check=False)
+                    dr.put('path', path, (front + edge) / 2, hy, -0.009, facing, check=False)
                     dr.put('mailbox', mail_key, edge - outward * 0.35, hy + 1.0, 0.0, facing + 90)
                 for by in (hy - 1.5, hy + 1.5):
                     dr.put('bush', rnd.choice(bush_keys), front - outward * 0.6, by, 0.0, rnd.uniform(-10, 10),
@@ -934,7 +958,7 @@ def town_street(dr, night):
         dr.put('planter' if rnd.random() < 0.6 else 'bench', planter if rnd.random() < 0.6 else bench, x, y, 0.0, r)
     # The cross street at the far end, lined with houses facing up the street.
     cross = dr.tpl('road', [P('box', 0, 0, 0.004, 90, 2 * road_half, 0.008, '#4A4E58')], decal=True, shadow=False)
-    dr.put('road', cross, cx, y_end, 0.0, check=False)
+    dr.put('road', cross, cx, y_end, -0.010, check=False)
     _row(dr, 'house', house, cx - 34, cx + 34, y_end - road_half - pave - 0.8, 'x', 180.0, rnd,
          between=gap_tree('x', y_end - road_half - pave - 0.8, -1))
     _far_ring(dr, 'town', night)
@@ -988,11 +1012,17 @@ def night_forest(dr, night):
     dr.put('ground', dr.tpl('ground', [P('box', 0, 0, -0.1, 360, 360, 0.2, GROUND_HEX['night_forest'])],
                             decal=True, shadow=False), dr.cx, dr.cy, -0.2, check=False)
     patches = []
+    spots = []
     for _ in range(40):
         a, d = rnd.uniform(0, 2 * math.pi), rnd.uniform(2, 30)
-        patches.append(P('box', d * math.cos(a), d * math.sin(a), 0.003, rnd.uniform(1.5, 4), rnd.uniform(1.5, 4),
-                         0.006, rnd.choice(['#244028', '#30552F', '#203824', '#3A4A2A']), rz=rnd.uniform(0, 90)))
-    dr.put('patches', dr.tpl('patches', patches, decal=True, shadow=False), dr.cx, dr.cy, 0.002, check=False)
+        q = P('box', d * math.cos(a), d * math.sin(a), 0.001, rnd.uniform(1.5, 4), rnd.uniform(1.5, 4), 0.002,
+              rnd.choice(['#244028', '#30552F', '#203824', '#3A4A2A']), rz=rnd.uniform(0, 90))
+        # Patches share one height, so overlapping ones would z-fight (flicker): keep them apart.
+        fp = footprint(q[1], q[2], q[4] / 2, q[5] / 2, q[9])
+        if not any(_overlap(fp, o) for o in spots):
+            spots.append(fp)
+            patches.append(q)
+    dr.put_drawn('patches', patches, dr.cx, dr.cy, 0.0, decal=True, shadow=False)
     pines = ['#2B6643', '#33774D', '#3F8A55', '#2A5E40']
     keys = [dr.tpl('tree', tree_parts(s, rnd, rnd.choice(pines), '#7A5230'))
             for s in ('pine', 'pine', 'blockpine', 'round', 'pine', 'blockpine')]
@@ -1024,7 +1054,7 @@ def night_forest(dr, night):
         edge = 1.0 / max(abs(math.cos(a)) / max(hx, 1e-3), abs(math.sin(a)) / max(hy, 1e-3))
         ff.append(P('box', math.cos(a) * (edge + d), math.sin(a) * (edge + d), rnd.uniform(0.4, 3.2), 0.05, 0.05, 0.05,
                     rnd.choice(['#E8FF8A', '#FFF59A', '#C8FF7A']), 'emit'))
-    dr.put('fireflies', dr.tpl('fireflies', ff, decal=True, shadow=False), dr.cx, dr.cy, 0.4, check=False)
+    dr.put_drawn('fireflies', ff, dr.cx, dr.cy, 0.0, decal=True, shadow=False)
     if not has_fire:
         fire = dr.tpl('campfire', [P('box', 0, 0, 0.08, 0.9, 0.16, 0.16, '#5C3A1E', bevel=0.02, rz=30),
                                    P('box', 0, 0, 0.08, 0.9, 0.16, 0.16, '#5C3A1E', bevel=0.02, rz=-30),
@@ -1152,7 +1182,7 @@ def obby(dr, night, lava):
                     rnd.choice(['#FFB03A', '#FF7A1F', '#FFD23F']), 'emit') for _ in range(60)]
         embers = [e for e in embers if not (dr.area['clear'][0] - 1 < e[1] + dr.cx < dr.area['clear'][2] + 1 and
                                             dr.area['clear'][1] - 1 < e[2] + dr.cy < dr.area['clear'][3] + 1)]
-        dr.put('embers', dr.tpl('embers', embers, decal=True, shadow=False), dr.cx, dr.cy, -3.0, check=False)
+        dr.put_drawn('embers', embers, dr.cx, dr.cy, 0.0, decal=True, shadow=False)
     else:
         _clouds(dr, 14, 14, 40, (-5.2, -2.5), k=(0.8, 1.4))
         _clouds(dr, 14, 45, 150, (-4, 30), k=(1.4, 2.6))
@@ -1169,7 +1199,7 @@ def obby(dr, night, lava):
     coins = [q for q in coins if not (dr.area['clear'][0] - 1 < q[1] + dr.cx < dr.area['clear'][2] + 1 and
                                       dr.area['clear'][1] - 1 < q[2] + dr.cy < dr.area['clear'][3] + 1)]
     if coins:
-        dr.put('coins', dr.tpl('coins', coins, decal=True, shadow=False), dr.cx, dr.cy, 0.5, check=False)
+        dr.put_drawn('coins', coins, dr.cx, dr.cy, 0.0, decal=True, shadow=False)
 
 
 # ---------------------------------------------------------------- interiors
@@ -1195,8 +1225,8 @@ def _room(dr, band, min_hx, min_hy, wall_col, low_col, floor_cols, ceiling_col, 
             tiles.append(P('box', -hx - 0.5 + i + 0.5, -hy - 0.5 + j + 0.5, 0.004, 0.99, 0.99, 0.008,
                            floor_cols[(i + j) % len(floor_cols)]))
     dr.put('floor', dr.tpl('floor', [P('box', 0, 0, -0.1, 2 * hx + 2, 2 * hy + 2, 0.2, shade(floor_cols[0], 0.8))],
-                           decal=True, shadow=False), cx, cy, -0.2, check=False)
-    dr.put('floortiles', dr.tpl('floortiles', tiles, decal=True, shadow=False), cx, cy, 0.0, check=False)
+                           decal=True, shadow=False), cx, cy, SLAB_TOP - 0.2, check=False)
+    dr.put('floortiles', dr.tpl('floortiles', tiles, decal=True, shadow=False), cx, cy, -0.008, check=False)
     t = 0.3
     for name, x, y, w, rot in (('wall_n', cx, cy + hy + t / 2, 2 * hx + 2 * t, 0.0),
                                ('wall_s', cx, cy - hy - t / 2, 2 * hx + 2 * t, 180.0),
@@ -1428,11 +1458,12 @@ def bedroom(dr, night):
     _on_wall(dr, inner, 'n', -W * 0.12, 0.95, dr.tpl('window', pane_window(1.8, 1.4, night, curtains=shade(walls[1], 0.8))),
              0.28)
     # Rug under the action area (flat), posters, shelves.
-    rug = [P('box', 0, 0, 0.004, 3.6, 2.6, 0.008, rnd.choice(['#E3A857', '#7FB3D5', '#C774A0', '#7CC4A0'])),
-           P('box', 0, 0, 0.009, 3.1, 2.1, 0.004, rnd.choice(['#F6F0E0', '#FFE7B0', '#E9F2FA']))]
+    # Thin (the characters stand on it): border 1 mm above the floor tiles, centre 3 mm.
+    rug = [P('box', 0, 0, 0.001, 3.6, 2.6, 0.002, rnd.choice(['#E3A857', '#7FB3D5', '#C774A0', '#7CC4A0'])),
+           P('box', 0, 0, 0.003, 3.1, 2.1, 0.002, rnd.choice(['#F6F0E0', '#FFE7B0', '#E9F2FA']))]
     core = dr.area['core']
     dr.put('rug', dr.tpl('rug', rug, decal=True, shadow=False), (core[0] + core[2]) / 2, (core[1] + core[3]) / 2,
-           0.0, check=False)
+           -0.001, check=False)
     for wall, along, z in (('n', W * 0.25, 1.9), ('e', 0.6, 1.8), ('w', -0.8, 1.9), ('s', 0.4, 1.9), ('s', -1.4, 1.8)):
         _on_wall(dr, inner, wall, along, z, dr.tpl('poster', poster(rnd, rnd.uniform(0.6, 0.9), rnd.uniform(0.7, 1.0)),
                                                    shadow=False), 0.03)
