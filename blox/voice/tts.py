@@ -28,6 +28,17 @@ OPENAI_VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'onyx', 'no
                  'marin', 'cedar']
 FLITE_VOICES = ['kal', 'kal16', 'awb', 'rms', 'slt']
 LOUDNESS_VOLUME = {'whisper': -6.0, 'soft': -3.0, 'normal': 0.0, 'loud': 1.5, 'shout': 3.0}
+# OpenAI models that take the native ``speed`` parameter (0.25-4.0). gpt-4o-mini-tts does not support it; for that
+# model the speech rate is asked for in the instructions instead.
+OPENAI_SPEED_MODELS = {'tts-1', 'tts-1-hd'}
+# ElevenLabs voice_settings.speed accepts 0.7-1.2; faster requests are clamped to 1.2.
+ELEVENLABS_SPEED = (0.7, 1.2)
+
+
+def line_rate(line):
+    """Native speaking speed the line was compiled for (1.0 = normal)."""
+    from .piper import speech_rate
+    return speech_rate(line)
 
 
 def spoken_text(text, pronunciations):
@@ -43,6 +54,8 @@ def instructions(line, character_name, voice):
              f'You are voicing {character_name}.' if character_name else '',
              f'Emotion: {line["emotion"]}.', f'Pace: {line["pace"]}.', f'Volume: {line["volume"]}.',
              (f'Direction: {line["delivery"]}.' if line.get('delivery') else ''),
+             (f'Speak about {line_rate(line):g} times faster than a normal conversational pace, crisp and clear.'
+              if line_rate(line) != 1.0 else ''),
              'Speak only the given words. Natural breaths and pauses. Do not add sounds or words.']
     return ' '.join(p for p in parts if p)[:TTS_INSTRUCTION_LIMIT]
 
@@ -58,14 +71,15 @@ def estimate_cost(text, provider, prices, pace='normal'):
 
 
 # ------------------------------------------------------------------ providers
-def _openai_tts(text, voice_name, instr, model, out_path):
+def _openai_tts(text, voice_name, instr, model, out_path, speed=1.0):
     key = vault.get('OPENAI_API_KEY')
     if not key:
         raise Blocked('Connect OpenAI to generate natural voices', state='needs_credentials')
+    body = {'model': model, 'voice': voice_name, 'input': text, 'instructions': instr, 'response_format': 'wav'}
+    if speed != 1.0 and model in OPENAI_SPEED_MODELS:
+        body['speed'] = round(max(0.25, min(4.0, speed)), 3)
     r = request('openai', 'POST', 'https://api.openai.com/v1/audio/speech',
-                headers={'Authorization': 'Bearer ' + key},
-                json={'model': model, 'voice': voice_name, 'input': text, 'instructions': instr,
-                      'response_format': 'wav'}, timeout=(10, 120))
+                headers={'Authorization': 'Bearer ' + key}, json=body, timeout=(10, 120))
     if not r.content or len(r.content) < 1000:
         raise Blocked('OpenAI returned empty audio', state='failed')
     with open(out_path, 'wb') as f:
@@ -82,6 +96,8 @@ def _elevenlabs_tts(text, voice_id, line, model, out_path):
     expressive = line['emotion'] not in ('neutral', 'bored')
     settings = {'stability': 0.35 if expressive else 0.55, 'similarity_boost': 0.75,
                 'style': 0.45 if expressive else 0.15, 'use_speaker_boost': True}
+    if line_rate(line) != 1.0:
+        settings['speed'] = round(max(ELEVENLABS_SPEED[0], min(ELEVENLABS_SPEED[1], line_rate(line))), 3)
     r = request('elevenlabs', 'POST', f'https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/with-timestamps',
                 headers={'xi-api-key': key}, params={'output_format': 'mp3_44100_128'},
                 json={'text': text, 'model_id': model, 'voice_settings': settings}, timeout=(10, 120))
@@ -93,6 +109,8 @@ def _elevenlabs_tts(text, voice_id, line, model, out_path):
 
 
 def _local_tts(text, voice, out_path):
+    # FFmpeg's flite source has no speaking-rate option, so the test voice always speaks at its own rate (it is
+    # not time-stretched to match speech_rate; line fitting handles it like any long line).
     voice = voice if voice in FLITE_VOICES else 'kal16'
     config.WORK_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile('w', suffix='.txt', delete=False, dir=config.WORK_DIR) as tf:
@@ -188,6 +206,8 @@ def synthesize_line(line, character, prefs, work_dir, video_id, attempt=0, use_a
     spec = {'p': provider, 'text': say, 'voice': voice, 'emotion': line['emotion'], 'pace': line['pace'],
             'volume': line['volume'], 'delivery': line.get('delivery', ''), 'model': pr['tts_model'],
             'attempt': attempt}
+    if line_rate(line) != 1.0:
+        spec['rate'] = line_rate(line)
     voice_meta = None
     if provider == 'piper':
         from . import piper
@@ -210,7 +230,8 @@ def synthesize_line(line, character, prefs, work_dir, video_id, attempt=0, use_a
                 v = voice.get('openai_voice') or 'alloy'
                 if v not in OPENAI_VOICES:
                     raise Blocked(f'Unknown OpenAI voice {v!r} for {name}', state='needs_review')
-                return _openai_tts(say, v, instructions(line, name, voice), pr['tts_model'], raw)
+                return _openai_tts(say, v, instructions(line, name, voice), pr['tts_model'], raw,
+                                   speed=line_rate(line))
             return _elevenlabs_tts(say, voice.get('elevenlabs_voice_id'), line, pr['elevenlabs_model'], raw)
 
         res = paid.run(key, provider=provider, operation='tts', category='tts', estimate=est, fn=call,
@@ -267,6 +288,9 @@ def synthesize_line(line, character, prefs, work_dir, video_id, attempt=0, use_a
 
 def fit_line(line_result, window_s, max_tempo, work_dir):
     """If a line is slightly long, apply a gentle tempo change (<= max_tempo).
+
+    Callers pass ``manifest.compile.tempo_cap`` so that native speech rate times
+    tempo never exceeds 1.5x.
 
     Returns (result, action) where action is 'fits', 'tempo' or 'too_long'.
     Aggressive stretching is never applied: callers must rewrite or retime.

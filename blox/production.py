@@ -41,7 +41,8 @@ def voice_lines(m, cast, prefs, work_dir, video_id, only=None, attempts=None, on
 def retime(m, results, prefs, max_shift_s=0.6):
     """Fit measured line durations into the timeline.
 
-    Order of preference: (1) it fits; (2) a gentle tempo change (<= max_tempo);
+    Order of preference: (1) it fits; (2) a tempo change (<= max_tempo, or at a
+    production pace up to the pace, never above 1.5x with the speech rate);
     (3) start the following line later (bounded, never past the end);
     (4) report the line as too long so it is rewritten and re-voiced.
     Returns (manifest, results, report).
@@ -51,13 +52,16 @@ def retime(m, results, prefs, max_shift_s=0.6):
     D = m['duration_frames']
     report = []
     lines = m['lines']
+    # Gentle tempo (max_tempo), or at a production pace up to the pace, never
+    # above MAX_LINE_SPEEDUP in total with the native speech rate.
+    max_tempo = C.tempo_cap(m, prefs['production']['max_tempo'])
     for i, ln in enumerate(lines):
         r = results.get(ln['id'])
         if not r:
             continue
         nxt = lines[i + 1]['start_frame'] if i + 1 < len(lines) else D
         window = (nxt - ln['start_frame']) / fps - (ln.get('pause_after_ms', 0) / 1000.0)
-        fitted, action = tts.fit_line(r, window, prefs['production']['max_tempo'], os.path.dirname(r['file']))
+        fitted, action = tts.fit_line(r, window, max_tempo, os.path.dirname(r['file']))
         if action == 'too_long' and i + 1 < len(lines):
             need = r['duration_s'] - window
             cap = lines[i + 2]['start_frame'] if i + 2 < len(lines) else D
@@ -150,7 +154,7 @@ def render_shots(m, cast, solved, prefs, work_dir, quality='final', only=None, o
 def produce_local(plan, characters, prefs, work_dir, video_id='local', quality='preview', log=print):
     """One-shot local production of a plan (used by the demo CLI and tests)."""
     pr = prefs['production']
-    m = C.compile_plan(plan, fps=pr['fps'], width=pr['width'], height=pr['height'])
+    m = C.compile_plan(plan, fps=pr['fps'], width=pr['width'], height=pr['height'], **C.pace_kwargs(prefs))
     rep = V.validate(m, prefs)
     if not rep['ok']:
         raise ValueError('Manifest invalid: ' + '; '.join(e['message'] for e in rep['errors'][:5]))

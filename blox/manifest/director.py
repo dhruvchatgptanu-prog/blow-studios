@@ -219,5 +219,9 @@ def script(m, character_names=None):
         'Timing: integer frames are authoritative; timestamps are frame/fps (MM:SS.ff).',
         '',
     ]
+    pace = m.get('pace') or {}
+    if pace.get('timeline', 1.0) != 1.0 or pace.get('speech_rate', 1.0) != 1.0:
+        head.insert(-1, f'Pace: the story plays {pace.get("timeline", 1.0):g}x faster than written (beats are one '
+                        f'second of story time each); voices speak {pace.get("speech_rate", 1.0):g}x faster.')
     body = [beat_text(m, b, names) for b in m['beats']]
     return '\n'.join(head) + '\n\n'.join(body) + '\n'

@@ -9,7 +9,19 @@ beat, the fully resolved start/end state of each character and the camera.
 Tracks (character keys, actions, camera, lines, sfx, music, prop events) are
 what the renderer executes. Beats are an explicit, per-second description of
 that same timeline used by the director's script, the editor and QA.
+
+Pace: the plan is authored in "story time". ``compile_plan(..., pace=1.5)``
+divides every authored time quantity (seconds and frame counts) by the pace
+before it becomes a frame index, so the same story plays 1.5 times faster
+(the implicit 10-frame pose blend is authored time too and is compressed).
+Perceptual minimums that are checked in real time (the readable-expression
+minimum, blink length, caption display time and the natural blink interval)
+are deliberately not scaled. A compressed walk that is now too fast for a
+walk becomes a run, and a compressed jump keeps the shortest plausible
+airtime; both are noted in the manifest. Beats stay one second of story time
+each, so every authored beat keeps its own slot.
 """
+import bisect
 import copy
 import math
 import re
@@ -101,8 +113,15 @@ def interp_pose(a, b, u):
     return out
 
 
-def pose_at(keys, frame):
-    """Resolved pose of a character track at ``frame`` (keys sorted by frame)."""
+DEFAULT_BLEND_FRAMES = 10
+
+
+def pose_at(keys, frame, default_blend=DEFAULT_BLEND_FRAMES):
+    """Resolved pose of a character track at ``frame`` (keys sorted by frame).
+
+    A key without ``blend_frames`` transitions over ``default_blend`` frames
+    (at most the gap to the previous key). Manifests compiled at a pace other
+    than 1 carry the compressed default on every key."""
     if not keys:
         return copy.deepcopy(S.DEFAULT_POSE)
     if frame <= keys[0]['frame']:
@@ -112,7 +131,7 @@ def pose_at(keys, frame):
         if k0['frame'] <= frame <= k1['frame']:
             span = max(1, k1['frame'] - k0['frame'])
             # Hold the earlier pose, then transition over the final frames.
-            blend = k1.get('blend_frames') or min(span, 10)
+            blend = k1.get('blend_frames') or min(span, default_blend)
             start = k1['frame'] - blend
             if frame <= start:
                 return copy.deepcopy(k0['pose'])
@@ -144,13 +163,90 @@ def words(text):
     return WORD_RE.findall(text or '')
 
 
-def estimate_line_frames(line, fps):
+def estimate_line_frames(line, fps, speech_rate=None):
+    """Planned length of a line. The voice speaks natively at ``speech_rate``
+    (default: the rate the line was compiled with), which shortens words and
+    their punctuation pauses alike."""
+    rate = line.get('speech_rate', 1.0) if speech_rate is None else speech_rate
+    rate = _num(rate, 1.0) or 1.0
     n = max(1, len(words(line['text'])))
     wps = S.PACE_WPS.get(line.get('pace', 'normal'), 2.7)
     punct = (len(re.findall(r'[,;:]', line['text'])) * 0.18
              + len(re.findall(r'\.\.\.|…|[.!?]+', line['text'])) * 0.25)
-    secs = n / wps + punct + 0.15
+    secs = (n / wps + punct) / rate + 0.15
     return int(math.ceil(secs * fps))
+
+
+def check_pace(pace, speech_rate):
+    """Validate the pace arguments of compile_plan. Returns (pace, speech_rate) as floats."""
+    out = []
+    for name, v, (lo, hi) in (('pace', pace, S.PACE_RANGE), ('speech_rate', speech_rate, S.SPEECH_RATE_RANGE)):
+        try:
+            x = float(v)
+        except (TypeError, ValueError):
+            raise ValueError(f'{name} must be a number') from None
+        if not math.isfinite(x) or not lo <= x <= hi:
+            raise ValueError(f'{name} {v!r} is outside {lo}-{hi}')
+        out.append(x)
+    return tuple(out)
+
+
+def pace_kwargs(prefs):
+    """compile_plan keyword arguments for the owner's production pace.
+
+    A prefs dict without pace settings (hand-built in tests or tools) compiles
+    at real time, which is the behaviour before pace existed."""
+    pr = (prefs or {}).get('production') or {}
+    return {'pace': pr.get('pace', 1.0), 'speech_rate': pr.get('speech_rate', 1.0)}
+
+
+def manifest_pace(m):
+    """Timeline pace a compiled manifest was built with (1.0 for older manifests)."""
+    return float((m.get('pace') or {}).get('timeline', 1.0))
+
+
+def line_fit_allowance(m):
+    """Extra speed-up (beyond the native speech rate) line fitting may apply to
+    a planned line so it fits a slot compressed by the pace.
+
+    A line that fitted its slot in story time fits again when voiced as fast
+    as the timeline runs, so the allowance tops the total up to the pace, but
+    never above ``MAX_LINE_SPEEDUP`` in total. At pace 1 it is 1.0 (none)."""
+    p = m.get('pace') or {}
+    pace, rate = float(p.get('timeline', 1.0)), float(p.get('speech_rate', 1.0))
+    return max(1.0, min(pace, S.MAX_LINE_SPEEDUP) / rate)
+
+
+def tempo_cap(m, max_tempo):
+    """Largest tempo change line fitting may apply to a voiced line: the
+    owner's gentle ``max_tempo`` or the pace allowance, whichever is larger,
+    so that native speech rate times tempo never exceeds MAX_LINE_SPEEDUP
+    (unless the speech rate alone already does, in which case no tempo change
+    is allowed)."""
+    rate = float((m.get('pace') or {}).get('speech_rate', 1.0))
+    return min(max(float(max_tempo), line_fit_allowance(m)), max(1.0, S.MAX_LINE_SPEEDUP / rate))
+
+
+def _phase_lengths(start_frame, start_story_frame, lengths, pace):
+    """Compress action phase lengths (story frames) by ``pace``.
+
+    ``start_frame`` is the compiled start, ``start_story_frame`` the authored
+    start in story frames. Phase boundaries are converted from their absolute
+    story frame, so they round the same way as performance keys authored at
+    the same moment. A phase that existed keeps at least one frame and the
+    main phase keeps the two frames the rig needs, unless the author gave it
+    fewer (the validator then reports it as before)."""
+    if pace == 1.0:
+        return list(lengths)
+    out, cum, pos = [], 0, start_frame
+    for i, n in enumerate(lengths):
+        cum += n
+        length = max(0, int(round((start_story_frame + cum) / pace)) - pos)
+        if n > 0:
+            length = max(length, min(n, 2 if i == 1 else 1))
+        out.append(length)
+        pos += length
+    return out
 
 
 def split_caption_groups(text, max_words=4, max_chars=26):
@@ -216,18 +312,34 @@ def captions_for(lines, fps, timings=None):
     return caps
 
 
-def compile_plan(plan, *, fps, width, height, characters=None):
+def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_rate=1.0):
     """Plan dict -> compiled manifest dict. Raises ValueError on malformed input.
 
     Semantic problems are left for ``validate`` to report so the owner sees all
     of them at once.
+
+    ``pace`` compresses the story-time plan into video time (every authored
+    second and frame count is divided by it); ``speech_rate`` is how much
+    faster than normal the voices speak, used for line length estimates and
+    passed to the voice engines on every line. The defaults compile at real
+    time.
     """
     if not isinstance(plan, dict):
         raise ValueError('Plan must be an object')
+    pace, speech_rate = check_pace(pace, speech_rate)
     duration_s = _num(plan.get('duration_s'), 0)
     if duration_s <= 0:
         raise ValueError('Plan needs a positive duration_s')
-    D = fr(duration_s, fps)
+
+    def F(t, default=0.0):
+        """Story seconds -> compiled frame."""
+        return fr(_num(t, default) / pace, fps)
+
+    def N(n):
+        """Story frame count -> compiled frame count."""
+        return int(round(n / pace)) if pace != 1.0 else n
+
+    D = F(duration_s)
     m = {
         'schema_version': S.SCHEMA_VERSION,
         'fps': fps, 'width': width, 'height': height, 'duration_frames': D,
@@ -241,13 +353,14 @@ def compile_plan(plan, *, fps, width, height, characters=None):
         'metadata': copy.deepcopy(plan.get('metadata') or {}),
         'inspiration': copy.deepcopy(plan.get('inspiration') or {}),
         'notes': [],
+        'pace': {'timeline': pace, 'speech_rate': speech_rate},
     }
     hook = plan.get('hook') or {}
     payoff = plan.get('payoff') or {}
     m['hook'] = {'id': 'hook', 'text': str(hook.get('text', ''))[:400], 'question': str(hook.get('question', ''))[:300],
-                 'end_frame': fr(_num(hook.get('t_end'), 3.0), fps)}
+                 'end_frame': F(hook.get('t_end'), 3.0)}
     m['payoff'] = {'resolves': 'hook', 'text': str(payoff.get('text', ''))[:400],
-                   'start_frame': fr(_num(payoff.get('t_start'), duration_s * 0.8), fps)}
+                   'start_frame': F(payoff.get('t_start'), duration_s * 0.8)}
     m['setting'].setdefault('preset', 'sky_obby')
     m['setting'].setdefault('time_of_day', 'noon')
     m['setting'].setdefault('lighting', 'natural')
@@ -264,8 +377,8 @@ def compile_plan(plan, *, fps, width, height, characters=None):
         cam = copy.deepcopy(s.get('camera') or {})
         shots.append({
             'id': str(s.get('id') or f's{i + 1}'),
-            'start_frame': fr(_num(s.get('start_s')), fps),
-            'end_frame': fr(_num(s.get('end_s')), fps),
+            'start_frame': F(s.get('start_s')),
+            'end_frame': F(s.get('end_s')),
             'renderer': s.get('renderer', 'blender'),
             'transition_in': s.get('transition_in', 'cut'),
             'clip': s.get('clip'),
@@ -303,11 +416,11 @@ def compile_plan(plan, *, fps, width, height, characters=None):
             keys.append({'frame': 0, 'pose': copy.deepcopy(prev), 'auto': True, 'explicit': {'position', 'facing'}})
             m['notes'].append(f'{cid}: no pose at frame 0; default standing pose inserted')
         for k in raw:
-            f = fr(_num(k.get('t')), fps)
+            f = F(k.get('t'))
             pose = resolve_pose(prev, k)
             entry = {'frame': f, 'pose': pose, 'explicit': {x for x in ('position', 'facing') if k.get(x) is not None}}
             if k.get('blend_frames') is not None:
-                entry['blend_frames'] = max(1, int(_num(k['blend_frames'], 8)))
+                entry['blend_frames'] = max(1, N(int(_num(k['blend_frames'], 8))))
             if k.get('note'):
                 entry['note'] = str(k['note'])[:300]
             if keys and keys[-1]['frame'] == f:
@@ -319,29 +432,35 @@ def compile_plan(plan, *, fps, width, height, characters=None):
 
     # Actions
     actions = []
+    story_main = {}
     for i, a in enumerate(plan.get('actions') or []):
-        start = fr(_num(a.get('t')), fps)
-        ph = {k: max(0, int(_num(a.get(k), d))) for k, d in
-              (('anticipation_frames', 4), ('main_frames', 12), ('follow_through_frames', 6), ('hold_frames', 0))}
+        start = F(a.get('t'))
+        names = ('anticipation_frames', 'main_frames', 'follow_through_frames', 'hold_frames')
+        authored = [max(0, int(_num(a.get(k), d))) for k, d in zip(names, (4, 12, 6, 0))]
+        ph = dict(zip(names, _phase_lengths(start, _num(a.get('t')) * fps, authored, pace)))
         act = {'id': str(a.get('id') or f'a{i + 1}'), 'character': a.get('character'), 'type': a.get('type'),
                'start_frame': start, **ph, 'params': copy.deepcopy(a.get('params') or {})}
         act['end_frame'] = start + sum(ph.values())
+        story_main[id(act)] = authored[1]
         actions.append(act)
     actions.sort(key=lambda a: a['start_frame'])
     # Locomotion and turns need end keys so the track and the action agree.
+    blend0 = max(1, N(DEFAULT_BLEND_FRAMES))
     for a in actions:
         if a['character'] not in tracks:
             continue
         keys = tracks[a['character']]['keys']
+        if pace != 1.0 and a['type'] == 'jump' and a['params'].get('to') is not None:
+            _keep_jump_plausible(m, a, keys, story_main.get(id(a), a['main_frames']), fps, pace)
         end_f = a['start_frame'] + a['anticipation_frames'] + a['main_frames']
         patch = {}
         if a['type'] in S.LOCOMOTION and a['params'].get('to') is not None:
             to = a['params']['to']
             patch['position'] = [_num(to[0]), _num(to[1])]
-            a['params']['from'] = pose_at(keys, a['start_frame'])['position']
+            a['params']['from'] = pose_at(keys, a['start_frame'], blend0)['position']
         if a['type'] == 'turn' and a['params'].get('to_facing') is not None:
             patch['facing'] = _num(a['params']['to_facing'])
-            a['params']['from_facing'] = pose_at(keys, a['start_frame'])['facing']
+            a['params']['from_facing'] = pose_at(keys, a['start_frame'], blend0)['facing']
         if not patch:
             continue
         existing = [k for k in keys if k['frame'] == end_f]
@@ -349,7 +468,7 @@ def compile_plan(plan, *, fps, width, height, characters=None):
             existing[0]['pose'].update(patch)
             existing[0].setdefault('explicit', set()).update(patch)
         else:
-            base = pose_at(keys, end_f)
+            base = pose_at(keys, end_f, blend0)
             base.update(patch)
             keys.append({'frame': end_f, 'pose': base, 'auto': True, 'explicit': set(patch), 'blend_frames': 1})
             keys.sort(key=lambda k: k['frame'])
@@ -367,6 +486,14 @@ def compile_plan(plan, *, fps, width, height, characters=None):
         for k in tr['keys']:
             k['explicit'] = sorted(k.get('explicit', set()))
             k.setdefault('auto', False)
+        if pace != 1.0:
+            # The implicit expression/pose blend is authored time like an
+            # explicit blend_frames, so it is compressed too. Writing it on the
+            # keys keeps the solver, validator and QA (which assume the
+            # real-time default) in agreement.
+            for k0, k1 in zip(tr['keys'], tr['keys'][1:]):
+                if not k1.get('blend_frames'):
+                    k1['blend_frames'] = max(1, min(blend0, k1['frame'] - k0['frame']))
     # Start states are read only after propagation, so a second turn starts
     # from the facing the first turn ended on.
     for a in actions:
@@ -378,6 +505,8 @@ def compile_plan(plan, *, fps, width, height, characters=None):
             a['params']['from'] = start['position']
         if a['type'] == 'turn' and a['params'].get('to_facing') is not None:
             a['params']['from_facing'] = start['facing']
+    if pace != 1.0:
+        _walks_to_runs(m, actions, story_main, fps, pace)
     m['tracks'] = {'characters': tracks, 'actions': actions}
 
     # Prop events from grab/drop actions plus explicit events
@@ -391,7 +520,7 @@ def compile_plan(plan, *, fps, width, height, characters=None):
             events.append({'frame': a['start_frame'] + a['anticipation_frames'], 'prop': a['params'].get('prop'),
                            'event': 'detach', 'character': a['character'], 'hand': hand, 'action': a['id']})
     for e in plan.get('props_events') or []:
-        events.append({'frame': fr(_num(e.get('t')), fps), 'prop': e.get('prop'), 'event': e.get('event'),
+        events.append({'frame': F(e.get('t')), 'prop': e.get('prop'), 'event': e.get('event'),
                        'character': e.get('character'), 'hand': e.get('hand', 'right')})
     events.sort(key=lambda e: e['frame'])
     m['tracks']['props'] = events
@@ -399,7 +528,7 @@ def compile_plan(plan, *, fps, width, height, characters=None):
     # Blinks
     blinks = {}
     for cid in cast_ids:
-        authored = [fr(_num(t), fps) for t in ((plan.get('blinks') or {}).get(cid) or [])]
+        authored = [F(t) for t in ((plan.get('blinks') or {}).get(cid) or [])]
         closed = []
         keys = tracks[cid]['keys']
         for k0, k1 in zip(keys, keys[1:] + [{'frame': D}]):
@@ -415,10 +544,10 @@ def compile_plan(plan, *, fps, width, height, characters=None):
     lines = []
     for i, ln in enumerate(plan.get('lines') or []):
         line = {'id': str(ln.get('id') or f'l{i + 1}'), 'speaker': ln.get('speaker', 'narrator'),
-                'text': str(ln.get('text', '')).strip()[:400], 'start_frame': fr(_num(ln.get('t')), fps),
+                'text': str(ln.get('text', '')).strip()[:400], 'start_frame': F(ln.get('t')),
                 'emotion': ln.get('emotion', 'neutral'), 'pace': ln.get('pace', 'normal'),
-                'volume': ln.get('volume', 'normal'), 'pause_after_ms': int(_num(ln.get('pause_after_ms'), 0)),
-                'delivery': str(ln.get('delivery', ''))[:300]}
+                'volume': ln.get('volume', 'normal'), 'pause_after_ms': int(_num(ln.get('pause_after_ms'), 0) / pace),
+                'delivery': str(ln.get('delivery', ''))[:300], 'speech_rate': speech_rate}
         line['est_frames'] = estimate_line_frames(line, fps)
         line['est_end_frame'] = line['start_frame'] + line['est_frames']
         lines.append(line)
@@ -428,14 +557,70 @@ def compile_plan(plan, *, fps, width, height, characters=None):
         ln['window_end_frame'] = nxt
     m['lines'] = lines
     m['captions'] = captions_for(lines, fps)
-    m['sfx'] = [{'id': f'x{i + 1}', 'cue': x.get('cue'), 'frame': fr(_num(x.get('t')), fps),
+    m['sfx'] = [{'id': f'x{i + 1}', 'cue': x.get('cue'), 'frame': F(x.get('t')),
                  'gain_db': _num(x.get('gain_db'), -6)} for i, x in enumerate(plan.get('sfx') or [])]
-    m['music'] = [{'frame': fr(_num(x.get('t')), fps), 'cue': x.get('cue', 'playful')}
+    m['music'] = [{'frame': F(x.get('t')), 'cue': x.get('cue', 'playful')}
                   for x in (plan.get('music') or [{'t': 0, 'cue': 'playful'}])]
-    m['cover_frame'] = min(D - 1, max(0, fr(_num(plan.get('cover_t'), min(2.0, duration_s / 3)), fps)))
+    m['cover_frame'] = min(D - 1, max(0, F(plan.get('cover_t'), min(2.0, duration_s / 3))))
 
     m['beats'] = derive_beats(m, plan.get('beats') or [])
     return m
+
+
+def _keep_jump_plausible(m, a, keys, story_main, fps, pace):
+    """A jump's airtime is physics: compressing a plausible jump can make it
+    faster than any plausible jump (MAX_SPEED['jump']). Such a jump keeps the
+    shortest plausible airtime instead (its landing moves a few frames later,
+    noted in the manifest). A jump that was already implausible in story time
+    is left for the validator to report."""
+    pos = keys[0]['pose']['position'] if keys else S.DEFAULT_POSE['position']
+    for k in keys:
+        if k['frame'] > a['start_frame']:
+            break
+        if 'position' in k.get('explicit', ()):
+            pos = k['pose']['position']
+    try:
+        to = a['params']['to']
+        dist = math.dist(pos, [_num(to[0]), _num(to[1])])
+    except (TypeError, ValueError, IndexError, KeyError):
+        return
+    limit = S.MAX_SPEED['jump']
+    if dist / (max(1, story_main) / fps) > limit or dist / (max(1, a['main_frames']) / fps) <= limit:
+        return
+    need = max(1, int(math.ceil(dist / limit * fps)) - 1)
+    while dist / (need / fps) > limit:  # the validator's exact comparison
+        need += 1
+    extra = need - a['main_frames']
+    if extra <= 0:
+        return
+    a['main_frames'] = need
+    a['end_frame'] += extra
+    m['notes'].append(f'{a["character"]}: jump {a["id"]} keeps {need} frames of airtime for {dist:.2f} m at pace '
+                      f'{pace:g} (compressed it would be faster than a plausible jump); landing {extra} frame(s) later')
+
+
+def _walks_to_runs(m, actions, story_main, fps, pace):
+    """A walk that was a plausible walking speed in story time but is faster
+    than a plausible walk once compressed is performed as a run, if a run at
+    that speed is plausible (noted in the manifest). Anything faster stays a
+    walk so the validator reports it."""
+    walk_max, run_max = S.MAX_SPEED['walk'], S.MAX_SPEED['run']
+    for a in actions:
+        if a['type'] != 'walk' or a['params'].get('to') is None or a['params'].get('from') is None:
+            continue
+        try:
+            to = a['params']['to']
+            dist = math.dist(a['params']['from'], [_num(to[0]), _num(to[1])])
+        except (TypeError, ValueError, IndexError, KeyError):
+            continue
+        story_secs = max(1, story_main.get(id(a), a['main_frames'])) / fps
+        secs = max(1, a['main_frames']) / fps
+        speed = dist / secs
+        if dist / story_secs <= walk_max < speed <= run_max:
+            a['type'] = 'run'
+            a['converted_from'] = 'walk'
+            m['notes'].append(f'{a["character"]}: walk {a["id"]} covers {dist:.2f} m in {secs:.2f}s at pace {pace:g} '
+                              f'({speed:.1f} m/s, above a plausible walk); performed as a run')
 
 
 def _shot_at(m, f):
@@ -477,9 +662,19 @@ def active_actions(m, cid, a_frame, b_frame):
 
 
 def derive_beats(m, authored):
+    """One beat per second of story time (one video second at pace 1, two
+    thirds of a second at pace 1.5), split at cuts. An authored beat applies to
+    the story second its ``start_s`` falls in."""
     fps, D = m['fps'], m['duration_frames']
+    pace = manifest_pace(m)
+    sec_starts = []
+    while True:
+        f = fr(len(sec_starts) / pace, fps)
+        if f >= D:
+            break
+        sec_starts.append(f)
     cuts = sorted({s['start_frame'] for s in m['shots']} | {s['end_frame'] for s in m['shots']})
-    bounds = sorted(set(list(range(0, D, fps)) + [c for c in cuts if 0 < c < D] + [D]))
+    bounds = sorted(set(sec_starts + [c for c in cuts if 0 < c < D] + [D]))
     by_sec = {}
     for b in authored:
         if isinstance(b, dict):
@@ -488,7 +683,7 @@ def derive_beats(m, authored):
     last_auth = {}
     for i in range(len(bounds) - 1):
         a, b = bounds[i], bounds[i + 1]
-        sec = a // fps
+        sec = bisect.bisect_right(sec_starts, a) - 1
         auth = by_sec.get(sec)
         inherited = auth is None
         if auth is None:

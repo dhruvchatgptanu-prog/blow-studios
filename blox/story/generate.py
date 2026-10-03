@@ -7,10 +7,11 @@ errors are sent back for at most two correction rounds.
 """
 import copy
 import json
+import math
 
 from .. import llm, untrusted
 from ..manifest import schema as S
-from ..manifest.compile import compile_plan
+from ..manifest.compile import compile_plan, pace_kwargs
 from ..manifest.validate import validate
 from ..util import Blocked, stable_hash
 
@@ -231,8 +232,10 @@ EXAMPLE = {
 
 def plan_rules(prefs):
     pr = prefs['production']
-    return [
-        f'Duration between {pr["min_seconds"]} and {pr["max_seconds"]} seconds (target {pr["target_seconds"]}). '
+    pace = float(pace_kwargs(prefs)['pace'])
+    rules = [
+        f'Duration between {pr["min_seconds"] * pace:g} and {pr["max_seconds"] * pace:g} seconds '
+        f'(target {pr["target_seconds"] * pace:g}). '
         f'The video is {pr["width"]}x{pr["height"]} vertical at {pr["fps"]} fps.',
         'Coordinates: ' + S.COORDINATE_SYSTEM['world'] + ' ' + S.COORDINATE_SYSTEM['facing'],
         'Head yaw/pitch/roll are degrees relative to the torso; +yaw turns toward the character\'s left, +pitch looks up.',
@@ -254,6 +257,14 @@ def plan_rules(prefs):
         'dangerous imitable stunts, or claims of real gameplay.',
         'Metadata title <= 90 characters; description 1-3 sentences, no external links.',
     ]
+    if pace != 1.0:
+        rate = float(pace_kwargs(prefs)['speech_rate'])
+        hold = math.ceil((pr.get('min_expression_frames', 8) + 10 / pace) * pace)
+        rules.append(f'Write all times and frame counts in story time: the finished video plays the plan {pace:g}x '
+                     f'faster (every time and frame count is divided by {pace:g}) and voices speak {rate:g}x faster '
+                     f'than the speaking rates above. Expressions and blinks are not compressed, so hold each '
+                     f'non-neutral expression at least {hold} frames; jumps must stay plausible after compression.')
+    return rules
 
 
 def generate_plan(key, concept, prefs, characters, cast_map, video_id=None, previous=None, errors=None):
@@ -281,7 +292,7 @@ def plan_with_validation(key_base, concept, prefs, characters, cast_map, video_i
     for attempt in range(max_fixes + 1):
         plan = to_plan(raw)
         try:
-            m = compile_plan(plan, fps=pr['fps'], width=pr['width'], height=pr['height'])
+            m = compile_plan(plan, fps=pr['fps'], width=pr['width'], height=pr['height'], **pace_kwargs(prefs))
             rep = validate(m, prefs)
         except (ValueError, KeyError, TypeError) as e:
             m, rep = None, {'ok': False, 'errors': [{'code': 'compile', 'message': str(e)[:300]}], 'warnings': []}

@@ -151,7 +151,7 @@ LAST_PLATFORM = {
                feet={'stance': 'wide'}, eye_target={'kind': 'point', 'point': [3.0, 0.4, 0.3]}),
             _k(14.9, expression='relieved', head={'yaw': -55}, eye_target={'kind': 'camera'},
                feet={'stance': 'neutral'}),
-            _k(15.6, expression='proud', arms={'right': 'fist_pump'}),
+            _k(15.7, expression='proud', arms={'right': 'fist_pump'}),
             _k(16.6, arms={'right': 'rest'}),
             _k(21.0, expression='curious', head={'yaw': 0}, eye_target={'kind': 'character', 'id': 'pip'}),
             _k(22.2, eye_target={'kind': 'prop', 'id': 'exit_door'}),
