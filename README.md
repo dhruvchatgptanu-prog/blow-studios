@@ -104,7 +104,7 @@ disclosure. Autopilot refuses to start until both are chosen.
 |---|---|---|
 | **Enable** | Settings → *Autopilot activation*: choose a mode, type `ENABLE` | Refused with a precise list until OpenAI, YouTube Data API, OAuth client, a *confirmed* channel, Blender, FFmpeg, audience + disclosure and a live worker are all in place. |
 | Mode *review* | same | Production runs ahead; each QA-approved video waits for **Approve for publishing**. |
-| Mode *autopilot* | same | QA-approved videos are scheduled without per-video approval. *Hold*/*blocked* videos are never published. |
+| Mode *autopilot* | same | QA-approved videos are scheduled without per-video approval. *Hold*/*blocked* videos are never published, and demo videos always wait for your approval. |
 | **Pause** / Resume | Dashboard | No new paid generation or uploads start; running steps stop at the next safe checkpoint; research and verification continue. Slots that pass while paused are skipped with the reason. |
 | **Emergency stop** | red button in the sidebar | Cancels queued paid and publishing tasks, kills running renders at a safe point, leaves only read-only work. Clearing it leaves autopilot *paused* until you resume. |
 | Turn off | Dashboard / Settings | Stops scheduling new work. |

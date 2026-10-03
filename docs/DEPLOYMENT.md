@@ -109,7 +109,10 @@ enable it again.
 Ubuntu 24.04 packages: `python3-venv ffmpeg fonts-dejavu-core blender libegl1 libegl-mesa0
 libgl1-mesa-dri libgles2`. Then `pip install -r requirements.lock`, set the environment variables from
 `.env.example`, and run `python -m blox.cli migrate`, `gunicorn app:app` and `python worker.py --roles all`
-under a process supervisor (systemd units restarting on failure).
+under a process supervisor (systemd units restarting on failure). A systemd `EnvironmentFile=` can read
+the `.env` written by `setup.py` as is. Do not `source` that file in a shell: `$$` would expand to the
+shell's process id. When exporting the hash by hand, single-quote it:
+`export ADMIN_PASSWORD_HASH='scrypt:32768:8:1$salt$hash'`.
 
 ## GPU rendering
 

@@ -309,3 +309,10 @@ def test_approve_requires_disclosure_choices(client, db):
     assert r.status_code == 400 and 'audience' in r.get_json()['error'].lower()
     ready_to_publish(db)
     assert client.post(f'/api/videos/{vid}/approve', json={}).status_code == 200
+
+
+def test_demo_videos_are_labelled(client):
+    r = client.post('/api/videos', json={'kind': 'demo'})
+    vid = r.get_json()['id']
+    v = client.get(f'/api/videos/{vid}').get_json()['video']
+    assert v['origin'] == 'demo' and v['status'] == 'scripted'

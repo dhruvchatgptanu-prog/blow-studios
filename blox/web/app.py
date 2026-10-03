@@ -225,7 +225,7 @@ def create_app():
         pr = p['production']
         m = C.compile_plan(plan_body, fps=pr['fps'], width=pr['width'], height=pr['height'])
         rep = V.validate(m, p)
-        vid = videos.create(m['title'] or 'Untitled', 'manual', status='concept_selected', d=d,
+        vid = videos.create(m['title'] or 'Untitled', 'demo' if source == 'demo' else 'manual', status='concept_selected', d=d,
                             metadata={'publish_metadata': m.get('metadata') or {'title': m['title']}}, actor='owner')
         chars = repo.characters(active_only=False, d=d)
         names = {c['id']: chars.get(c['character_id'], {}).get('name', c['id']) for c in m['cast']}

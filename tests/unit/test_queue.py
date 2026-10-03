@@ -127,3 +127,10 @@ def test_blocked_kinds_on_pause_and_estop(anydb):
     blocked = set(worker.blocked_kinds(p))
     assert 'video.upload' in blocked and 'shot.render' in blocked
     assert not blocked & jobs.READ_ONLY
+
+
+def test_every_task_kind_has_a_handler():
+    from blox.tasks import HANDLERS, ensure_loaded
+    ensure_loaded()
+    assert set(jobs.KIND_ROLE) == set(HANDLERS)
+    assert jobs.PAID_OR_PUBLISHING <= set(jobs.KIND_ROLE) and jobs.READ_ONLY <= set(jobs.KIND_ROLE)

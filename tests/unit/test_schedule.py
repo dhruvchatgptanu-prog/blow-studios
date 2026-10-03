@@ -210,3 +210,15 @@ def test_schedule_validation(db, bad):
     p['schedule'].update(bad)
     with pytest.raises(ValueError):
         prefs.put(p, db)
+
+
+def test_demo_videos_never_publish_without_explicit_approval(db, clock):
+    clock.t = ts(2026, 9, 21, 9, 0)
+    ready_to_publish(db, mode='autopilot')
+    v = approved_video(db)
+    db.execute("UPDATE videos SET origin='demo' WHERE id=?", (v,))
+    orchestrator.tick('o1', d=db)
+    assert videos.get(v, db)['slot_id'] is None
+    videos.merge_metadata(v, {'owner_approved': True}, db)
+    orchestrator.tick('o1', d=db)
+    assert videos.get(v, db)['slot_id'] is not None

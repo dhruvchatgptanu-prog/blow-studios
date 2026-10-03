@@ -22,7 +22,6 @@ KIND_ROLE = {
     'research.discover': 'research',
     'research.snapshot': 'research',
     'research.reference': 'research',
-    'research.analyze': 'research',
     'video.develop': 'orchestrate',
     'video.voice': 'render',
     'shot.render': 'render',

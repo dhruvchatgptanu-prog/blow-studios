@@ -140,3 +140,13 @@ def test_media_commands_never_use_a_shell():
     import inspect
     src = inspect.getsource(media)
     assert 'shell=True' not in src
+
+
+def test_upscaled_shots_are_disclosed(built):
+    m, p, rep, _ = built
+    ck = Checks(30)
+    rep2 = dict(rep, shot_native_sizes=[{'shot': 's1', 'renderer': 'runway', 'native': [720, 1280], 'upscaled': True},
+                                        {'shot': 's2', 'renderer': 'blender', 'native': [W, H], 'upscaled': False}])
+    technical.run(ck, m, rep['final'], p, rep2, rep['mix']['paths']['dialog'])
+    c = next(x for x in ck.items if x['id'] == 'native_resolution')
+    assert [s['shot'] for s in c['evidence']['upscaled_shots']] == ['s1'] and 'upscaled' in c['evidence']['note']

@@ -465,7 +465,11 @@ def assemble(ctx):
                                     'placements': out['mix']['placements'], 'music_source': out['mix']['music_source'],
                                     'ducking': out['mix']['ducking']},
                             'captions': out['captions'], 'thumbnail_16x9': repo.rel(out['thumbnail_16x9']),
-                            'native_render_size': out['native_render_size']}, d)
+                            'native_render_size': out['native_render_size'],
+                            'shot_native_sizes': [{'shot': r['shot_key'], 'renderer': r['renderer'],
+                                                   'native': [r['native_w'], r['native_h']],
+                                                   'upscaled': bool((r['detail'] or {}).get('upscaled'))}
+                                                  for r in repo.shots(mid, d)]}, d)
     if videos.get(vid, d)['status'] == 'rendering':
         videos.transition(vid, 'checking', 'Running quality control', d=d)
     jobs.enqueue('video.qa', {'manifest_id': mid, 'render_id': rid}, video_id=vid, idempotency_key=f'qa:{rid}', d=d)
@@ -478,7 +482,8 @@ def assembly_from_render(r):
     return {'final': repo.absp(r['file']), 'joined': repo.absp(det['joined']), 'width': det['width'],
             'height': det['height'], 'captions': det.get('captions', []),
             'mix': {'paths': {k: repo.absp(x) for k, x in mix['paths'].items()}, 'placements': mix['placements']},
-            'native_render_size': det.get('native_render_size')}
+            'native_render_size': det.get('native_render_size'),
+            'shot_native_sizes': det.get('shot_native_sizes', [])}
 
 
 @handler('video.qa')

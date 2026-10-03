@@ -51,6 +51,13 @@ def run(ck, m, final, prefs, assembly, dialog_wav=None):
            'pass' if (w, h) == (exp_w, exp_h) else 'fail', 'major' if (w, h) != (exp_w, exp_h) else 'info',
            {'actual': [w, h], 'expected': [exp_w, exp_h], 'native_render': native}, 0.99, 'deterministic',
            target=target_video, repair={'action': 're_render_all_final_quality'} if (w, h) != (exp_w, exp_h) else None)
+    shots = assembly.get('shot_native_sizes') or []
+    up = [x for x in shots if x.get('upscaled')]
+    ck.add('native_resolution', 'Native resolution of each shot recorded', 'technical', 'pass', 'info',
+           {'upscaled_shots': up, 'shots': shots,
+            'note': ('Some shots were generated below the output size and upscaled; do not describe the video as '
+                     'native high resolution.') if up else 'All shots were rendered at the output size.'},
+           0.99, 'deterministic', target=target_video)
     rate = media.fraction(vs.get('avg_frame_rate'))
     ck.add('fps', 'Correct frame rate (constant)', 'technical', 'pass' if abs(rate - fps) < 0.01 else 'fail',
            'major', {'avg_frame_rate': vs.get('avg_frame_rate'), 'r_frame_rate': vs.get('r_frame_rate'), 'expected': fps},

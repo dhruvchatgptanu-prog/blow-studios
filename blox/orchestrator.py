@@ -71,7 +71,8 @@ def eligible_videos(d, p):
     out = []
     for r in rows:
         meta = json.loads(r['metadata'] or '{}')
-        if p['autopilot']['mode'] == 'review' and not meta.get('owner_approved'):
+        # Review mode needs approval for everything; demo content always needs it.
+        if (p['autopilot']['mode'] == 'review' or r['origin'] == 'demo') and not meta.get('owner_approved'):
             continue
         out.append(r)
     return out
