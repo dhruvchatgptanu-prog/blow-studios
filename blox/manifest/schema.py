@@ -45,7 +45,7 @@ COSTUME = {
     'hat': (None, 'cap', 'cap_backwards', 'crown', 'bow', 'beanie'),
     'eyewear': (None, 'glasses', 'sunglasses'),
     'top': ('hoodie', 'tee', 'jacket', 'vest', 'cardigan'),
-    'tie': (True, False),
+    'tie': (False, True),
     'badge': (None, 'star', 'diamond'),
 }
 

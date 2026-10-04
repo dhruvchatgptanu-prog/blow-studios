@@ -708,11 +708,19 @@ def create_app():
             if bad:
                 raise ValueError('Costume: ' + '; '.join(bad))
             return out
+
+        def variant(c):
+            # A variant (e.g. Rook's crown for brag moments) overrides only the items it names.
+            c = {k: v for k, v in (c if isinstance(c, dict) else {}).items() if k in BL.R.COSTUME_KEYS}
+            bad = BL.R.costume_problems(c)
+            if bad:
+                raise ValueError('Costume variant: ' + '; '.join(bad))
+            return c
         clean_bible = {'summary': str(bible.get('summary', ''))[:400], 'personality': str(bible.get('personality', ''))[:400],
                        'scale': scale, 'palette': pal, 'costume': costume(bible.get('costume')),
                        'visual_rules': [str(x)[:160] for x in (bible.get('visual_rules') or [])][:12]}
         if isinstance(bible.get('costume_variants'), dict):
-            clean_bible['costume_variants'] = {str(k)[:20]: costume(v)
+            clean_bible['costume_variants'] = {str(k)[:20]: variant(v)
                                                for k, v in list(bible['costume_variants'].items())[:6]}
         clean_voice = {'openai_voice': str(voice.get('openai_voice', 'alloy'))[:20],
                        'openai_instructions': str(voice.get('openai_instructions', ''))[:600],
