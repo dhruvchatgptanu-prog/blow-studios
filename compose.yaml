@@ -1,0 +1,90 @@
+# docker compose up --build -d
+# Services: PostgreSQL, the web app, and workers split by role so a long Blender render never delays
+# slot handling or uploads. State lives in PostgreSQL plus ./data (media, renders, vault key).
+# ./data is the same folder the previous release used; the container user is uid 10001:
+#   sudo chown -R 10001:10001 data
+x-app: &app
+  build: .
+  image: blox-studio:local
+  env_file: .env
+  environment:
+    DATABASE_URL: ${DATABASE_URL:-postgresql://blox:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/blox}
+  volumes: ["./data:/app/data"]
+  restart: unless-stopped
+  depends_on:
+    db: {condition: service_healthy}
+
+x-worker-health: &worker-health
+  test: ["CMD", "python", "-m", "blox.cli", "healthcheck", "--worker"]
+  interval: 60s
+  timeout: 10s
+  start_period: 60s
+  retries: 3
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: blox
+      POSTGRES_USER: blox
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blox -d blox"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  migrate:
+    <<: *app
+    command: ["python", "-m", "blox.cli", "migrate"]
+    restart: "no"
+
+  web:
+    <<: *app
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      db: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+
+  # Scheduler + story development (cheap, must stay responsive).
+  worker-orchestrate:
+    <<: *app
+    command: ["python", "worker.py", "--roles", "orchestrate"]
+    healthcheck: *worker-health
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+
+  worker-research:
+    <<: *app
+    command: ["python", "worker.py", "--roles", "research,analytics"]
+    healthcheck: *worker-health
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+
+  # Voices, Blender shots and assembly (CPU heavy). Scale with: docker compose up -d --scale worker-render=2
+  worker-render:
+    <<: *app
+    command: ["python", "worker.py", "--roles", "render"]
+    healthcheck: *worker-health
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+
+  worker-qa:
+    <<: *app
+    command: ["python", "worker.py", "--roles", "qa"]
+    healthcheck: *worker-health
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+
+  # Uploads and publication checks (one at a time).
+  worker-publish:
+    <<: *app
+    command: ["python", "worker.py", "--roles", "publish"]
+    healthcheck: *worker-health
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+
+volumes:
+  pgdata:

@@ -1,0 +1,7697 @@
+[
+ {
+  "source": "claude_session_2026_10_03",
+  "title": "The Golden Coin Trade",
+  "logline": "Pip offers Bloxy a shiny golden coin for their trophy. Both of them think they won the trade.",
+  "duration_s": 30.0,
+  "story": {
+   "premise": "Pip offers to swap a rare golden coin for Bloxy's shiny trophy.",
+   "conflict": "Bloxy suspects a trick but really wants the coin.",
+   "stakes": "The trophy is Bloxy's proudest possession.",
+   "reveal": "The coin is chocolate, and the trophy says \"participant\".",
+   "ending": "Both realise they traded junk and burst out laughing.",
+   "ending_type": "twist"
+  },
+  "hook": {
+   "text": "Pip slides up holding a glowing golden coin.",
+   "question": "Is the trade a scam?",
+   "t_end": 3.0
+  },
+  "payoff": {
+   "text": "Both items are worthless, so nobody was scammed after all.",
+   "t_start": 23.0
+  },
+  "setting": {
+   "preset": "town_street",
+   "time_of_day": "noon",
+   "lighting": "natural",
+   "description": "A sunny block street with a little house behind them.",
+   "props": [
+    {
+     "id": "house",
+     "type": "house",
+     "position": [
+      -1.6,
+      3.2,
+      0.0
+     ],
+     "color": "#E8C07D"
+    },
+    {
+     "id": "coin",
+     "type": "coin",
+     "position": [
+      1.15,
+      0.0,
+      1.0
+     ],
+     "color": "#F5C518"
+    },
+    {
+     "id": "trophy",
+     "type": "trophy",
+     "position": [
+      -0.25,
+      -0.35,
+      0.0
+     ],
+     "color": "#C9A227"
+    },
+    {
+     "id": "lamp",
+     "type": "lamp",
+     "position": [
+      2.6,
+      1.6,
+      0.0
+     ]
+    }
+   ]
+  },
+  "cast": [
+   {
+    "id": "bloxy",
+    "character_id": "ch_bloxy"
+   },
+   {
+    "id": "pip",
+    "character_id": "ch_pip"
+   }
+  ],
+  "shots": [
+   {
+    "id": "s1",
+    "start_s": 0.0,
+    "end_s": 3.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s2",
+    "start_s": 3.0,
+    "end_s": 7.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_left",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s3",
+    "start_s": 7.0,
+    "end_s": 11.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s4",
+    "start_s": 11.0,
+    "end_s": 15.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium_close",
+     "framing_end": "close_up",
+     "move": "push_in",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s5",
+    "start_s": 15.0,
+    "end_s": 19.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s6",
+    "start_s": 19.0,
+    "end_s": 23.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s7",
+    "start_s": 23.0,
+    "end_s": 27.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s8",
+    "start_s": 27.0,
+    "end_s": 30.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "front",
+     "angle": "eye"
+    }
+   }
+  ],
+  "beats": [
+   {
+    "start_s": 0,
+    "purpose": "hook",
+    "description": "Pip holds out a glowing coin with a sly grin."
+   },
+   {
+    "start_s": 1,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 2,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 3,
+    "purpose": "setup",
+    "description": "Bloxy hugs the trophy, suspicious."
+   },
+   {
+    "start_s": 4,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 5,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 6,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 7,
+    "purpose": "inciting",
+    "description": "Pip sweetens the deal."
+   },
+   {
+    "start_s": 8,
+    "purpose": "inciting"
+   },
+   {
+    "start_s": 9,
+    "purpose": "inciting"
+   },
+   {
+    "start_s": 10,
+    "purpose": "inciting"
+   },
+   {
+    "start_s": 11,
+    "purpose": "escalation",
+    "description": "Bloxy wrestles with temptation, then agrees."
+   },
+   {
+    "start_s": 12,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 13,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 14,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 15,
+    "purpose": "reaction",
+    "description": "Pip gloats, unwrapping the coin."
+   },
+   {
+    "start_s": 16,
+    "purpose": "reaction"
+   },
+   {
+    "start_s": 17,
+    "purpose": "reaction"
+   },
+   {
+    "start_s": 18,
+    "purpose": "reaction"
+   },
+   {
+    "start_s": 19,
+    "purpose": "reveal",
+    "description": "Bloxy reads the trophy plate: participant."
+   },
+   {
+    "start_s": 20,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 21,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 22,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 23,
+    "purpose": "payoff",
+    "description": "Pip bites the coin: it is chocolate."
+   },
+   {
+    "start_s": 24,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 25,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 26,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 27,
+    "purpose": "button",
+    "description": "They look at each other and laugh."
+   },
+   {
+    "start_s": 28,
+    "purpose": "button"
+   },
+   {
+    "start_s": 29,
+    "purpose": "button"
+   }
+  ],
+  "performance": {
+   "pip": [
+    {
+     "t": 0.0,
+     "position": [
+      1.1,
+      0.0
+     ],
+     "facing": -90,
+     "expression": "smug",
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     },
+     "arms": {
+      "right": "reach"
+     }
+    },
+    {
+     "t": 7.0,
+     "expression": "excited",
+     "arms": {
+      "right": "rest"
+     }
+    },
+    {
+     "t": 15.0,
+     "expression": "proud",
+     "posture": "proud"
+    },
+    {
+     "t": 19.0,
+     "expression": "curious"
+    },
+    {
+     "t": 23.0,
+     "expression": "embarrassed",
+     "posture": "upright"
+    },
+    {
+     "t": 27.6,
+     "expression": "laughing"
+    }
+   ],
+   "bloxy": [
+    {
+     "t": 0.0,
+     "position": [
+      -0.4,
+      0.0
+     ],
+     "facing": 90,
+     "expression": "curious",
+     "arms": {
+      "left": "hold_prop"
+     },
+     "eye_target": {
+      "kind": "character",
+      "id": "pip"
+     }
+    },
+    {
+     "t": 3.0,
+     "expression": "worried",
+     "arms": {
+      "left": "chest"
+     }
+    },
+    {
+     "t": 11.0,
+     "expression": "determined",
+     "arms": {
+      "left": "rest"
+     }
+    },
+    {
+     "t": 13.2,
+     "expression": "happy"
+    },
+    {
+     "t": 19.0,
+     "expression": "startled",
+     "eye_target": {
+      "kind": "prop",
+      "id": "trophy"
+     },
+     "head": {
+      "pitch": -18
+     }
+    },
+    {
+     "t": 20.8,
+     "expression": "embarrassed",
+     "head": {
+      "pitch": 0
+     },
+     "eye_target": {
+      "kind": "character",
+      "id": "pip"
+     }
+    },
+    {
+     "t": 27.2,
+     "expression": "laughing",
+     "eye_target": {
+      "kind": "character",
+      "id": "pip"
+     }
+    }
+   ]
+  },
+  "actions": [
+   {
+    "character": "pip",
+    "type": "talk",
+    "t": 0.6,
+    "anticipation_frames": 2,
+    "main_frames": 40,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {
+     "hand": "left"
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "head_shake",
+    "t": 4.2,
+    "anticipation_frames": 3,
+    "main_frames": 18,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "pip",
+    "type": "shrug",
+    "t": 8.0,
+    "anticipation_frames": 4,
+    "main_frames": 14,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "think",
+    "t": 11.4,
+    "anticipation_frames": 4,
+    "main_frames": 30,
+    "follow_through_frames": 6,
+    "hold_frames": 6,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "nod",
+    "t": 13.6,
+    "anticipation_frames": 2,
+    "main_frames": 14,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "pip",
+    "type": "celebrate",
+    "t": 15.4,
+    "anticipation_frames": 6,
+    "main_frames": 18,
+    "follow_through_frames": 8,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "facepalm",
+    "t": 21.0,
+    "anticipation_frames": 4,
+    "main_frames": 10,
+    "follow_through_frames": 6,
+    "hold_frames": 20,
+    "params": {
+     "hand": "right"
+    }
+   },
+   {
+    "character": "pip",
+    "type": "facepalm",
+    "t": 25.2,
+    "anticipation_frames": 4,
+    "main_frames": 10,
+    "follow_through_frames": 6,
+    "hold_frames": 16,
+    "params": {
+     "hand": "left"
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "hop",
+    "t": 27.8,
+    "anticipation_frames": 3,
+    "main_frames": 10,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   }
+  ],
+  "lines": [
+   {
+    "id": "l1",
+    "speaker": "pip",
+    "text": "Psst. Want a real golden coin?",
+    "t": 0.3,
+    "emotion": "smug",
+    "pace": "normal",
+    "volume": "soft",
+    "delivery": "conspiratorial whisper"
+   },
+   {
+    "id": "l2",
+    "speaker": "bloxy",
+    "text": "Nice try. This trophy stays with me.",
+    "t": 3.4,
+    "emotion": "worried",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l3",
+    "speaker": "pip",
+    "text": "One coin. Shiny. Rare. Final offer!",
+    "t": 7.3,
+    "emotion": "excited",
+    "pace": "fast",
+    "volume": "normal"
+   },
+   {
+    "id": "l4",
+    "speaker": "bloxy",
+    "text": "Hmm... fine. Deal!",
+    "t": 11.5,
+    "emotion": "determined",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l5",
+    "speaker": "pip",
+    "text": "Pleasure doing business!",
+    "t": 15.4,
+    "emotion": "proud",
+    "pace": "fast",
+    "volume": "loud"
+   },
+   {
+    "id": "l6",
+    "speaker": "bloxy",
+    "text": "Wait... it says \"participant\".",
+    "t": 19.6,
+    "emotion": "startled",
+    "pace": "slow",
+    "volume": "normal"
+   },
+   {
+    "id": "l7",
+    "speaker": "pip",
+    "text": "And this coin is... chocolate.",
+    "t": 23.3,
+    "emotion": "embarrassed",
+    "pace": "slow",
+    "volume": "normal"
+   },
+   {
+    "id": "l8",
+    "speaker": "bloxy",
+    "text": "So we both got scammed?",
+    "t": 27.2,
+    "emotion": "laughing",
+    "pace": "normal",
+    "volume": "normal"
+   }
+  ],
+  "sfx": [
+   {
+    "cue": "sparkle",
+    "t": 0.4
+   },
+   {
+    "cue": "drumroll",
+    "t": 11.0
+   },
+   {
+    "cue": "tada",
+    "t": 15.3
+   },
+   {
+    "cue": "fail_horn",
+    "t": 20.4
+   },
+   {
+    "cue": "pop",
+    "t": 24.6
+   }
+  ],
+  "music": [
+   {
+    "t": 0,
+    "cue": "mystery"
+   },
+   {
+    "t": 11.0,
+    "cue": "tension"
+   },
+   {
+    "t": 15.0,
+    "cue": "triumph"
+   },
+   {
+    "t": 19.0,
+    "cue": "playful"
+   }
+  ],
+  "cover_t": 1.2,
+  "metadata": {
+   "title": "The Golden Coin Trade",
+   "description": "A trade nobody wins. Or everybody does?",
+   "tags": [
+    "roblox",
+    "animation",
+    "story",
+    "funny",
+    "trade"
+   ]
+  },
+  "inspiration": {
+   "note": "Original story written by Claude for this channel. Informed only by broad themes observed in research titles (twists, rivalry, rescues); no specific video.",
+   "sources": []
+  }
+ },
+ {
+  "source": "claude_session_2026_10_03",
+  "title": "The Spring Pad Shortcut",
+  "logline": "Bloxy finds a spring pad that skips the whole obby. It works a little too well.",
+  "duration_s": 30.0,
+  "story": {
+   "premise": "Bloxy discovers a spring pad next to a long obby course.",
+   "conflict": "Pip insists on walking the easy bridge course the normal way.",
+   "stakes": "Whoever reaches the checkpoint flag first wins bragging rights.",
+   "reveal": "The spring launches Bloxy straight past the flag and off the map.",
+   "ending": "Pip strolls to the flag while Bloxy's voice fades into the sky.",
+   "ending_type": "irony"
+  },
+  "hook": {
+   "text": "Bloxy spots a glowing spring pad beside the obby.",
+   "question": "Will the shortcut work?",
+   "t_end": 3.0
+  },
+  "payoff": {
+   "text": "The shortcut works too well; Pip wins by walking.",
+   "t_start": 22.0
+  },
+  "setting": {
+   "preset": "sky_obby",
+   "time_of_day": "morning",
+   "lighting": "natural",
+   "description": "A start platform with a spring pad, an easy bridge course, and a checkpoint across the clouds.",
+   "props": [
+    {
+     "id": "start",
+     "type": "platform",
+     "position": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      4.0,
+      3.0
+     ],
+     "color": "#4CAF50"
+    },
+    {
+     "id": "spring",
+     "type": "spring_pad",
+     "position": [
+      1.2,
+      0.0,
+      0.0
+     ],
+     "size": [
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "id": "bridge",
+     "type": "platform",
+     "position": [
+      3.25,
+      -0.3,
+      0.0
+     ],
+     "size": [
+      3.2,
+      1.2
+     ],
+     "color": "#2196F3"
+    },
+    {
+     "id": "goal",
+     "type": "platform",
+     "position": [
+      5.6,
+      0.0,
+      0.0
+     ],
+     "size": [
+      2.2,
+      2.2
+     ],
+     "color": "#FF9800"
+    },
+    {
+     "id": "flag",
+     "type": "checkpoint_flag",
+     "position": [
+      6.1,
+      0.3,
+      0.0
+     ],
+     "color": "#E2504C"
+    }
+   ]
+  },
+  "cast": [
+   {
+    "id": "bloxy",
+    "character_id": "ch_bloxy"
+   },
+   {
+    "id": "pip",
+    "character_id": "ch_pip"
+   }
+  ],
+  "shots": [
+   {
+    "id": "s1",
+    "start_s": 0.0,
+    "end_s": 3.5,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "three_quarter_left",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s2",
+    "start_s": 3.5,
+    "end_s": 7.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s3",
+    "start_s": 7.0,
+    "end_s": 11.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s4",
+    "start_s": 11.0,
+    "end_s": 14.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s5",
+    "start_s": 14.0,
+    "end_s": 18.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "full",
+     "framing_end": "full",
+     "move": "static",
+     "side": "three_quarter_left",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s6",
+    "start_s": 18.0,
+    "end_s": 22.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s7",
+    "start_s": 22.0,
+    "end_s": 26.5,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "full",
+     "framing_end": "medium",
+     "move": "follow",
+     "side": "profile_left",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s8",
+    "start_s": 26.5,
+    "end_s": 30.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium_close",
+     "framing_end": "close_up",
+     "move": "push_in",
+     "side": "front",
+     "angle": "eye"
+    }
+   }
+  ],
+  "beats": [
+   {
+    "start_s": 0,
+    "purpose": "hook",
+    "description": "Bloxy eyes the spring pad with a grin."
+   },
+   {
+    "start_s": 1,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 2,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 3,
+    "purpose": "setup",
+    "description": "Pip points at the long course."
+   },
+   {
+    "start_s": 4,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 5,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 6,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 7,
+    "purpose": "inciting",
+    "description": "Bloxy declares the shortcut plan."
+   },
+   {
+    "start_s": 8,
+    "purpose": "inciting"
+   },
+   {
+    "start_s": 9,
+    "purpose": "inciting"
+   },
+   {
+    "start_s": 10,
+    "purpose": "inciting"
+   },
+   {
+    "start_s": 11,
+    "purpose": "escalation",
+    "description": "Pip warns it is a bad idea."
+   },
+   {
+    "start_s": 12,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 13,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 14,
+    "purpose": "climax",
+    "description": "Bloxy hops onto the pad, crouches, and celebrates too early."
+   },
+   {
+    "start_s": 15,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 16,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 17,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 18,
+    "purpose": "reveal",
+    "description": "Pip watches something fly far overhead."
+   },
+   {
+    "start_s": 19,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 20,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 21,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 22,
+    "purpose": "payoff",
+    "description": "Pip walks calmly to the flag."
+   },
+   {
+    "start_s": 23,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 24,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 25,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 26,
+    "purpose": "button",
+    "description": "Pip shrugs at the camera; a distant \"help\" echoes."
+   },
+   {
+    "start_s": 27,
+    "purpose": "button"
+   },
+   {
+    "start_s": 28,
+    "purpose": "button"
+   },
+   {
+    "start_s": 29,
+    "purpose": "button"
+   }
+  ],
+  "performance": {
+   "bloxy": [
+    {
+     "t": 0.0,
+     "position": [
+      -0.4,
+      0.2
+     ],
+     "facing": 90,
+     "expression": "curious",
+     "eye_target": {
+      "kind": "prop",
+      "id": "spring"
+     }
+    },
+    {
+     "t": 1.2,
+     "expression": "excited",
+     "eye_target": {
+      "kind": "camera"
+     }
+    },
+    {
+     "t": 7.0,
+     "expression": "smug",
+     "eye_target": {
+      "kind": "character",
+      "id": "pip"
+     },
+     "posture": "proud"
+    },
+    {
+     "t": 14.0,
+     "expression": "determined",
+     "posture": "ready"
+    },
+    {
+     "t": 16.0,
+     "expression": "excited",
+     "eye_target": {
+      "kind": "camera"
+     }
+    }
+   ],
+   "pip": [
+    {
+     "t": 0.0,
+     "position": [
+      -1.4,
+      -0.6
+     ],
+     "facing": 90,
+     "expression": "neutral",
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     }
+    },
+    {
+     "t": 3.5,
+     "expression": "happy",
+     "eye_target": {
+      "kind": "prop",
+      "id": "flag"
+     }
+    },
+    {
+     "t": 11.0,
+     "expression": "worried",
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     }
+    },
+    {
+     "t": 18.0,
+     "expression": "startled",
+     "head": {
+      "pitch": 25
+     },
+     "eye_target": {
+      "kind": "point",
+      "point": [
+       3.0,
+       4.0,
+       6.0
+      ]
+     }
+    },
+    {
+     "t": 20.4,
+     "expression": "bored",
+     "head": {
+      "pitch": 0
+     },
+     "eye_target": {
+      "kind": "prop",
+      "id": "flag"
+     }
+    },
+    {
+     "t": 27.6,
+     "expression": "smug",
+     "eye_target": {
+      "kind": "camera"
+     }
+    }
+   ]
+  },
+  "actions": [
+   {
+    "character": "pip",
+    "type": "point",
+    "t": 3.8,
+    "anticipation_frames": 4,
+    "main_frames": 10,
+    "follow_through_frames": 4,
+    "hold_frames": 16,
+    "params": {
+     "hand": "right"
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "talk",
+    "t": 7.3,
+    "anticipation_frames": 2,
+    "main_frames": 60,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {
+     "hand": "right"
+    }
+   },
+   {
+    "character": "pip",
+    "type": "head_shake",
+    "t": 11.3,
+    "anticipation_frames": 3,
+    "main_frames": 20,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "walk",
+    "t": 14.2,
+    "anticipation_frames": 2,
+    "main_frames": 30,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {
+     "to": [
+      1.2,
+      0.0
+     ]
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "crouch",
+    "t": 15.6,
+    "anticipation_frames": 4,
+    "main_frames": 10,
+    "follow_through_frames": 4,
+    "hold_frames": 4,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "stand_up",
+    "t": 16.6,
+    "anticipation_frames": 2,
+    "main_frames": 8,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "celebrate",
+    "t": 17.2,
+    "anticipation_frames": 4,
+    "main_frames": 14,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "pip",
+    "type": "walk",
+    "t": 22.2,
+    "anticipation_frames": 2,
+    "main_frames": 150,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {
+     "to": [
+      5.4,
+      -0.2
+     ]
+    }
+   },
+   {
+    "character": "pip",
+    "type": "shrug",
+    "t": 27.6,
+    "anticipation_frames": 4,
+    "main_frames": 14,
+    "follow_through_frames": 8,
+    "hold_frames": 0,
+    "params": {}
+   }
+  ],
+  "lines": [
+   {
+    "id": "l1",
+    "speaker": "bloxy",
+    "text": "Oh, a spring pad!",
+    "t": 0.4,
+    "emotion": "excited",
+    "pace": "fast",
+    "volume": "loud"
+   },
+   {
+    "id": "l2",
+    "speaker": "pip",
+    "text": "The course is right there.",
+    "t": 3.9,
+    "emotion": "happy",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l3",
+    "speaker": "bloxy",
+    "text": "Courses are for people without spring pads.",
+    "t": 7.4,
+    "emotion": "smug",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l4",
+    "speaker": "pip",
+    "text": "I don't think that's how it works.",
+    "t": 11.2,
+    "emotion": "worried",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l5",
+    "speaker": "bloxy",
+    "text": "See you at the flag!",
+    "t": 15.2,
+    "emotion": "excited",
+    "pace": "fast",
+    "volume": "loud"
+   },
+   {
+    "id": "l6",
+    "speaker": "pip",
+    "text": "Was that... over the flag?",
+    "t": 18.8,
+    "emotion": "startled",
+    "pace": "slow",
+    "volume": "normal"
+   },
+   {
+    "id": "l7",
+    "speaker": "pip",
+    "text": "Checkpoint reached.",
+    "t": 26.8,
+    "emotion": "smug",
+    "pace": "slow",
+    "volume": "soft"
+   },
+   {
+    "id": "l8",
+    "speaker": "bloxy",
+    "text": "Heeelp!",
+    "t": 28.6,
+    "emotion": "scared",
+    "pace": "fast",
+    "volume": "soft",
+    "delivery": "distant, from far above"
+   }
+  ],
+  "sfx": [
+   {
+    "cue": "sparkle",
+    "t": 0.2
+   },
+   {
+    "cue": "boing",
+    "t": 17.0
+   },
+   {
+    "cue": "whoosh",
+    "t": 17.3
+   },
+   {
+    "cue": "ding",
+    "t": 26.4
+   },
+   {
+    "cue": "whoosh",
+    "t": 28.4
+   }
+  ],
+  "music": [
+   {
+    "t": 0,
+    "cue": "playful"
+   },
+   {
+    "t": 14.0,
+    "cue": "tension"
+   },
+   {
+    "t": 18.0,
+    "cue": "mystery"
+   },
+   {
+    "t": 22.0,
+    "cue": "chill"
+   }
+  ],
+  "cover_t": 16.4,
+  "metadata": {
+   "title": "The Spring Pad Shortcut",
+   "description": "The fastest way to the checkpoint. Too fast.",
+   "tags": [
+    "roblox",
+    "obby",
+    "animation",
+    "funny",
+    "shortcut"
+   ]
+  },
+  "inspiration": {
+   "note": "Original story written by Claude for this channel. Informed only by broad themes observed in research titles (twists, rivalry, rescues); no specific video.",
+   "sources": []
+  }
+ },
+ {
+  "source": "claude_session_2026_10_03",
+  "title": "The Scariest Campfire Story",
+  "logline": "Pip tells a spooky campfire story about a buzzing monster. The monster is Pip's own phone.",
+  "duration_s": 30.0,
+  "story": {
+   "premise": "Two friends sit by a campfire in a dark forest telling scary stories.",
+   "conflict": "Pip's story is getting a little too real for Bloxy.",
+   "stakes": "Bloxy is one creak away from running home.",
+   "reveal": "The buzzing in the bushes is Pip's phone, which Pip dropped there.",
+   "ending": "Pip screams at their own ringtone; Bloxy deadpans.",
+   "ending_type": "reversal"
+  },
+  "hook": {
+   "text": "Pip leans into the firelight: \"Have you heard of the buzzing one?\"",
+   "question": "Is something out there?",
+   "t_end": 3.0
+  },
+  "payoff": {
+   "text": "The \"monster\" is Pip's phone, and Pip is the one who screams.",
+   "t_start": 22.0
+  },
+  "setting": {
+   "preset": "night_forest",
+   "time_of_day": "night",
+   "lighting": "spooky_low",
+   "description": "A small clearing lit by a campfire, dark pines all around.",
+   "props": [
+    {
+     "id": "fire",
+     "type": "campfire",
+     "position": [
+      0.0,
+      0.9,
+      0.0
+     ]
+    },
+    {
+     "id": "tree_a",
+     "type": "tree",
+     "position": [
+      -2.4,
+      3.4,
+      0.0
+     ]
+    },
+    {
+     "id": "tree_b",
+     "type": "tree",
+     "position": [
+      2.8,
+      3.8,
+      0.0
+     ]
+    },
+    {
+     "id": "bush",
+     "type": "rock",
+     "position": [
+      2.6,
+      1.8,
+      0.0
+     ],
+     "color": "#2E5E3A"
+    },
+    {
+     "id": "phone",
+     "type": "phone",
+     "position": [
+      2.5,
+      1.6,
+      0.5
+     ]
+    }
+   ]
+  },
+  "cast": [
+   {
+    "id": "bloxy",
+    "character_id": "ch_bloxy"
+   },
+   {
+    "id": "pip",
+    "character_id": "ch_pip"
+   }
+  ],
+  "shots": [
+   {
+    "id": "s1",
+    "start_s": 0.0,
+    "end_s": 3.5,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium_close",
+     "framing_end": "close_up",
+     "move": "push_in",
+     "side": "three_quarter_right",
+     "angle": "low"
+    }
+   },
+   {
+    "id": "s2",
+    "start_s": 3.5,
+    "end_s": 7.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_left",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s3",
+    "start_s": 7.0,
+    "end_s": 11.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "close_up",
+     "framing_end": "close_up",
+     "move": "static",
+     "side": "front",
+     "angle": "low"
+    }
+   },
+   {
+    "id": "s4",
+    "start_s": 11.0,
+    "end_s": 14.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s5",
+    "start_s": 14.0,
+    "end_s": 17.5,
+    "camera": {
+     "subject": "prop:bush",
+     "framing_start": "medium_wide",
+     "framing_end": "medium",
+     "move": "push_in",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s6",
+    "start_s": 17.5,
+    "end_s": 22.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_left",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s7",
+    "start_s": 22.0,
+    "end_s": 26.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s8",
+    "start_s": 26.0,
+    "end_s": 30.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   }
+  ],
+  "beats": [
+   {
+    "start_s": 0,
+    "purpose": "hook",
+    "description": "Pip's face lit from below by the fire."
+   },
+   {
+    "start_s": 1,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 2,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 3,
+    "purpose": "setup",
+    "description": "Bloxy pretends not to be scared."
+   },
+   {
+    "start_s": 4,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 5,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 6,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 7,
+    "purpose": "escalation",
+    "description": "Pip builds the story."
+   },
+   {
+    "start_s": 8,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 9,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 10,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 11,
+    "purpose": "escalation",
+    "description": "A buzz from the bushes. Bloxy freezes."
+   },
+   {
+    "start_s": 12,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 13,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 14,
+    "purpose": "reveal",
+    "description": "Push in on the dark bush. It buzzes again."
+   },
+   {
+    "start_s": 15,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 16,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 17,
+    "purpose": "climax",
+    "description": "Bloxy cowers."
+   },
+   {
+    "start_s": 18,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 19,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 20,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 21,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 22,
+    "purpose": "payoff",
+    "description": "Pip hears the ringtone, realises, and screams anyway."
+   },
+   {
+    "start_s": 23,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 24,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 25,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 26,
+    "purpose": "button",
+    "description": "Bloxy stares at the camera, unimpressed."
+   },
+   {
+    "start_s": 27,
+    "purpose": "button"
+   },
+   {
+    "start_s": 28,
+    "purpose": "button"
+   },
+   {
+    "start_s": 29,
+    "purpose": "button"
+   }
+  ],
+  "performance": {
+   "pip": [
+    {
+     "t": 0.0,
+     "position": [
+      0.9,
+      0.0
+     ],
+     "facing": -60,
+     "expression": "smug",
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     },
+     "head": {
+      "pitch": -6
+     }
+    },
+    {
+     "t": 7.0,
+     "expression": "excited",
+     "arms": {
+      "right": "raise"
+     }
+    },
+    {
+     "t": 10.6,
+     "arms": {
+      "right": "rest"
+     }
+    },
+    {
+     "t": 14.0,
+     "expression": "curious",
+     "eye_target": {
+      "kind": "prop",
+      "id": "bush"
+     }
+    },
+    {
+     "t": 22.0,
+     "expression": "startled",
+     "eye_target": {
+      "kind": "prop",
+      "id": "bush"
+     }
+    },
+    {
+     "t": 23.6,
+     "expression": "scared",
+     "arms": {
+      "left": "cover_mouth"
+     }
+    },
+    {
+     "t": 27.0,
+     "expression": "embarrassed",
+     "arms": {
+      "left": "rest"
+     },
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     }
+    }
+   ],
+   "bloxy": [
+    {
+     "t": 0.0,
+     "position": [
+      -0.9,
+      0.0
+     ],
+     "facing": 60,
+     "expression": "neutral",
+     "eye_target": {
+      "kind": "character",
+      "id": "pip"
+     }
+    },
+    {
+     "t": 3.5,
+     "expression": "smug",
+     "arms": {
+      "left": "hips",
+      "right": "hips"
+     }
+    },
+    {
+     "t": 9.5,
+     "expression": "worried",
+     "arms": {
+      "left": "rest",
+      "right": "rest"
+     }
+    },
+    {
+     "t": 11.0,
+     "expression": "scared",
+     "eye_target": {
+      "kind": "prop",
+      "id": "bush"
+     },
+     "posture": "slumped"
+    },
+    {
+     "t": 21.0,
+     "expression": "confused",
+     "posture": "upright",
+     "eye_target": {
+      "kind": "character",
+      "id": "pip"
+     }
+    },
+    {
+     "t": 26.0,
+     "expression": "bored",
+     "eye_target": {
+      "kind": "camera"
+     }
+    }
+   ]
+  },
+  "actions": [
+   {
+    "character": "pip",
+    "type": "talk",
+    "t": 0.4,
+    "anticipation_frames": 2,
+    "main_frames": 70,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {
+     "hand": "right"
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "shrug",
+    "t": 4.0,
+    "anticipation_frames": 4,
+    "main_frames": 14,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "flinch",
+    "t": 11.2,
+    "anticipation_frames": 2,
+    "main_frames": 10,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "look_around",
+    "t": 12.6,
+    "anticipation_frames": 4,
+    "main_frames": 30,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "cower",
+    "t": 17.8,
+    "anticipation_frames": 4,
+    "main_frames": 12,
+    "follow_through_frames": 4,
+    "hold_frames": 60,
+    "params": {}
+   },
+   {
+    "character": "pip",
+    "type": "flinch",
+    "t": 22.6,
+    "anticipation_frames": 2,
+    "main_frames": 10,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {}
+   }
+  ],
+  "lines": [
+   {
+    "id": "l1",
+    "speaker": "pip",
+    "text": "Ever heard of... the buzzer?",
+    "t": 0.4,
+    "emotion": "smug",
+    "pace": "slow",
+    "volume": "soft",
+    "delivery": "spooky campfire voice"
+   },
+   {
+    "id": "l2",
+    "speaker": "bloxy",
+    "text": "Pfft. I'm not scared of stories.",
+    "t": 4.0,
+    "emotion": "smug",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l3",
+    "speaker": "pip",
+    "text": "It hides in bushes. It buzzes... before it strikes!",
+    "t": 7.2,
+    "emotion": "excited",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l4",
+    "speaker": "bloxy",
+    "text": "Did you hear that?!",
+    "t": 11.6,
+    "emotion": "scared",
+    "pace": "fast",
+    "volume": "loud"
+   },
+   {
+    "id": "l5",
+    "speaker": "bloxy",
+    "text": "It's here. It's actually here.",
+    "t": 18.0,
+    "emotion": "scared",
+    "pace": "fast",
+    "volume": "soft"
+   },
+   {
+    "id": "l6",
+    "speaker": "pip",
+    "text": "Wait... my ringtone?",
+    "t": 22.6,
+    "emotion": "startled",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l7",
+    "speaker": "pip",
+    "text": "AAAH! It called me!",
+    "t": 25.0,
+    "emotion": "scared",
+    "pace": "fast",
+    "volume": "shout"
+   },
+   {
+    "id": "l8",
+    "speaker": "bloxy",
+    "text": "You scared yourself.",
+    "t": 27.4,
+    "emotion": "bored",
+    "pace": "slow",
+    "volume": "normal"
+   }
+  ],
+  "sfx": [
+   {
+    "cue": "rumble",
+    "t": 1.2
+   },
+   {
+    "cue": "beep",
+    "t": 11.1
+   },
+   {
+    "cue": "beep",
+    "t": 15.2
+   },
+   {
+    "cue": "gasp_sting",
+    "t": 17.6
+   },
+   {
+    "cue": "beep",
+    "t": 22.4
+   },
+   {
+    "cue": "fail_horn",
+    "t": 27.0
+   }
+  ],
+  "music": [
+   {
+    "t": 0,
+    "cue": "mystery"
+   },
+   {
+    "t": 11.0,
+    "cue": "tension"
+   },
+   {
+    "t": 22.0,
+    "cue": "playful"
+   }
+  ],
+  "cover_t": 8.4,
+  "metadata": {
+   "title": "The Scariest Campfire Story",
+   "description": "Never tell scary stories near your own phone.",
+   "tags": [
+    "roblox",
+    "animation",
+    "story",
+    "spooky",
+    "funny"
+   ]
+  },
+  "inspiration": {
+   "note": "Original story written by Claude for this channel. Informed only by broad themes observed in research titles (twists, rivalry, rescues); no specific video.",
+   "sources": []
+  }
+ },
+ {
+  "source": "claude_session_2026_10_03",
+  "title": "The Last Slice",
+  "logline": "Two best friends are far too polite to take the last slice of pizza.",
+  "duration_s": 30.0,
+  "story": {
+   "premise": "One slice of pizza is left on the desk between Bloxy and Pip.",
+   "conflict": "Each insists the other should have it, louder every time.",
+   "stakes": "Friendship, and dinner.",
+   "reveal": "While they argue, the slice slides off the desk.",
+   "ending": "They stare at the floor slice, then both say \"five second rule?\"",
+   "ending_type": "twist"
+  },
+  "hook": {
+   "text": "Both reach for the last slice at the same moment.",
+   "question": "Who gets it?",
+   "t_end": 3.0
+  },
+  "payoff": {
+   "text": "Nobody gets it; politeness lost them the slice.",
+   "t_start": 23.0
+  },
+  "setting": {
+   "preset": "bedroom",
+   "time_of_day": "night",
+   "lighting": "warm_key_cool_fill",
+   "description": "A cosy bedroom at night, a desk with one pizza slice left.",
+   "props": [
+    {
+     "id": "desk",
+     "type": "desk",
+     "position": [
+      0.0,
+      0.8,
+      0.0
+     ]
+    },
+    {
+     "id": "pizza",
+     "type": "pizza",
+     "position": [
+      0.0,
+      0.8,
+      0.78
+     ]
+    },
+    {
+     "id": "bed",
+     "type": "bed",
+     "position": [
+      -2.6,
+      2.4,
+      0.0
+     ]
+    },
+    {
+     "id": "lamp",
+     "type": "lamp",
+     "position": [
+      1.6,
+      1.6,
+      0.0
+     ]
+    }
+   ]
+  },
+  "cast": [
+   {
+    "id": "bloxy",
+    "character_id": "ch_bloxy"
+   },
+   {
+    "id": "pip",
+    "character_id": "ch_pip"
+   }
+  ],
+  "shots": [
+   {
+    "id": "s1",
+    "start_s": 0.0,
+    "end_s": 3.0,
+    "camera": {
+     "subject": "prop:pizza",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "front",
+     "angle": "high"
+    }
+   },
+   {
+    "id": "s2",
+    "start_s": 3.0,
+    "end_s": 7.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_left",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s3",
+    "start_s": 7.0,
+    "end_s": 11.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s4",
+    "start_s": 11.0,
+    "end_s": 15.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s5",
+    "start_s": 15.0,
+    "end_s": 19.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s6",
+    "start_s": 19.0,
+    "end_s": 23.0,
+    "camera": {
+     "subject": "prop:pizza",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "front",
+     "angle": "high"
+    }
+   },
+   {
+    "id": "s7",
+    "start_s": 23.0,
+    "end_s": 26.5,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_left",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s8",
+    "start_s": 26.5,
+    "end_s": 30.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   }
+  ],
+  "beats": [
+   {
+    "start_s": 0,
+    "purpose": "hook",
+    "description": "One slice. Two hands reach in."
+   },
+   {
+    "start_s": 1,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 2,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 3,
+    "purpose": "setup",
+    "description": "Bloxy pulls back: \"You take it.\""
+   },
+   {
+    "start_s": 4,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 5,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 6,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 7,
+    "purpose": "escalation",
+    "description": "Pip: \"No, you!\""
+   },
+   {
+    "start_s": 8,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 9,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 10,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 11,
+    "purpose": "escalation",
+    "description": "Bloxy insists, louder."
+   },
+   {
+    "start_s": 12,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 13,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 14,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 15,
+    "purpose": "climax",
+    "description": "Pip insists, louder still; arms wave."
+   },
+   {
+    "start_s": 16,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 17,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 18,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 19,
+    "purpose": "reveal",
+    "description": "The slice slides off the desk."
+   },
+   {
+    "start_s": 20,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 21,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 22,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 23,
+    "purpose": "payoff",
+    "description": "They stare down at the floor."
+   },
+   {
+    "start_s": 24,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 25,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 26,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 27,
+    "purpose": "button",
+    "description": "\"Five second rule?\" together."
+   },
+   {
+    "start_s": 28,
+    "purpose": "button"
+   },
+   {
+    "start_s": 29,
+    "purpose": "button"
+   }
+  ],
+  "performance": {
+   "bloxy": [
+    {
+     "t": 0.0,
+     "position": [
+      -0.8,
+      0.2
+     ],
+     "facing": 60,
+     "expression": "excited",
+     "arms": {
+      "right": "reach"
+     },
+     "eye_target": {
+      "kind": "prop",
+      "id": "pizza"
+     }
+    },
+    {
+     "t": 3.0,
+     "expression": "embarrassed",
+     "arms": {
+      "right": "rest"
+     },
+     "eye_target": {
+      "kind": "character",
+      "id": "pip"
+     }
+    },
+    {
+     "t": 11.0,
+     "expression": "determined",
+     "arms": {
+      "right": "point"
+     }
+    },
+    {
+     "t": 13.5,
+     "arms": {
+      "right": "rest"
+     }
+    },
+    {
+     "t": 19.2,
+     "expression": "startled",
+     "eye_target": {
+      "kind": "prop",
+      "id": "pizza"
+     },
+     "head": {
+      "pitch": -20
+     }
+    },
+    {
+     "t": 23.0,
+     "expression": "sad",
+     "head": {
+      "pitch": -28
+     }
+    },
+    {
+     "t": 27.0,
+     "expression": "curious",
+     "head": {
+      "pitch": 0
+     },
+     "eye_target": {
+      "kind": "character",
+      "id": "pip"
+     }
+    }
+   ],
+   "pip": [
+    {
+     "t": 0.0,
+     "position": [
+      0.8,
+      0.2
+     ],
+     "facing": -60,
+     "expression": "excited",
+     "arms": {
+      "left": "reach"
+     },
+     "eye_target": {
+      "kind": "prop",
+      "id": "pizza"
+     }
+    },
+    {
+     "t": 3.2,
+     "expression": "happy",
+     "arms": {
+      "left": "rest"
+     },
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     }
+    },
+    {
+     "t": 7.0,
+     "expression": "determined",
+     "arms": {
+      "left": "point"
+     }
+    },
+    {
+     "t": 9.5,
+     "arms": {
+      "left": "rest"
+     }
+    },
+    {
+     "t": 15.0,
+     "expression": "angry",
+     "arms": {
+      "left": "arms_out",
+      "right": "arms_out"
+     }
+    },
+    {
+     "t": 18.6,
+     "expression": "startled",
+     "arms": {
+      "left": "rest",
+      "right": "rest"
+     },
+     "eye_target": {
+      "kind": "prop",
+      "id": "pizza"
+     }
+    },
+    {
+     "t": 23.0,
+     "expression": "sad",
+     "head": {
+      "pitch": -28
+     }
+    },
+    {
+     "t": 26.6,
+     "expression": "curious",
+     "head": {
+      "pitch": 0
+     },
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     }
+    }
+   ]
+  },
+  "actions": [
+   {
+    "character": "bloxy",
+    "type": "talk",
+    "t": 3.4,
+    "anticipation_frames": 2,
+    "main_frames": 50,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {
+     "hand": "left"
+    }
+   },
+   {
+    "character": "pip",
+    "type": "head_shake",
+    "t": 7.4,
+    "anticipation_frames": 3,
+    "main_frames": 18,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "head_shake",
+    "t": 11.4,
+    "anticipation_frames": 3,
+    "main_frames": 16,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "pip",
+    "type": "hop",
+    "t": 15.6,
+    "anticipation_frames": 3,
+    "main_frames": 10,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "flinch",
+    "t": 19.3,
+    "anticipation_frames": 2,
+    "main_frames": 10,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "pip",
+    "type": "facepalm",
+    "t": 23.6,
+    "anticipation_frames": 4,
+    "main_frames": 10,
+    "follow_through_frames": 6,
+    "hold_frames": 24,
+    "params": {
+     "hand": "right"
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "shrug",
+    "t": 27.2,
+    "anticipation_frames": 4,
+    "main_frames": 14,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {}
+   }
+  ],
+  "lines": [
+   {
+    "id": "l1",
+    "speaker": "bloxy",
+    "text": "Oh! No, no. You take it.",
+    "t": 3.3,
+    "emotion": "embarrassed",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l2",
+    "speaker": "pip",
+    "text": "No way. You're the guest!",
+    "t": 7.2,
+    "emotion": "happy",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l3",
+    "speaker": "bloxy",
+    "text": "I insist. Take the slice!",
+    "t": 11.2,
+    "emotion": "determined",
+    "pace": "normal",
+    "volume": "loud"
+   },
+   {
+    "id": "l4",
+    "speaker": "pip",
+    "text": "I insist MORE!",
+    "t": 15.3,
+    "emotion": "angry",
+    "pace": "fast",
+    "volume": "shout"
+   },
+   {
+    "id": "l5",
+    "speaker": "bloxy",
+    "text": "Uh... the slice.",
+    "t": 19.6,
+    "emotion": "startled",
+    "pace": "slow",
+    "volume": "soft"
+   },
+   {
+    "id": "l6",
+    "speaker": "pip",
+    "text": "It fell. Face down.",
+    "t": 23.4,
+    "emotion": "sad",
+    "pace": "slow",
+    "volume": "soft"
+   },
+   {
+    "id": "l7",
+    "speaker": "bloxy",
+    "text": "Five second rule?",
+    "t": 27.0,
+    "emotion": "curious",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l8",
+    "speaker": "pip",
+    "text": "Five second rule.",
+    "t": 28.6,
+    "emotion": "determined",
+    "pace": "fast",
+    "volume": "normal"
+   }
+  ],
+  "sfx": [
+   {
+    "cue": "pop",
+    "t": 0.4
+   },
+   {
+    "cue": "swoosh_up",
+    "t": 19.1
+   },
+   {
+    "cue": "thud",
+    "t": 19.8
+   },
+   {
+    "cue": "fail_horn",
+    "t": 23.2
+   }
+  ],
+  "music": [
+   {
+    "t": 0,
+    "cue": "playful"
+   },
+   {
+    "t": 15.0,
+    "cue": "tension"
+   },
+   {
+    "t": 19.0,
+    "cue": "sad"
+   },
+   {
+    "t": 26.5,
+    "cue": "playful"
+   }
+  ],
+  "cover_t": 1.0,
+  "metadata": {
+   "title": "The Last Slice",
+   "description": "Politeness has a price. Usually a pizza slice.",
+   "tags": [
+    "roblox",
+    "animation",
+    "funny",
+    "pizza",
+    "friends"
+   ]
+  },
+  "inspiration": {
+   "note": "Original story written by Claude for this channel. Informed only by broad themes observed in research titles (twists, rivalry, rescues); no specific video.",
+   "sources": []
+  }
+ },
+ {
+  "source": "claude_session_2026_10_03",
+  "title": "Homework Panic",
+  "logline": "Bloxy panics about forgotten homework in an empty classroom. It is Saturday.",
+  "duration_s": 30.0,
+  "story": {
+   "premise": "Bloxy bursts into the classroom, sure they forgot the big homework.",
+   "conflict": "Pip seems strangely calm about it.",
+   "stakes": "Bloxy thinks they are about to fail.",
+   "reveal": "The sign on the board says \"SATURDAY - NO CLASS\".",
+   "ending": "Bloxy realises they came to school on a weekend; Pip only came for the free cupcake.",
+   "ending_type": "twist"
+  },
+  "hook": {
+   "text": "Bloxy runs in shouting about the homework.",
+   "question": "Did Bloxy really forget it?",
+   "t_end": 3.0
+  },
+  "payoff": {
+   "text": "There is no homework due: it is Saturday.",
+   "t_start": 21.0
+  },
+  "setting": {
+   "preset": "classroom",
+   "time_of_day": "morning",
+   "lighting": "soft_overcast",
+   "description": "An empty block classroom with desks and a sign on the board.",
+   "props": [
+    {
+     "id": "desk_a",
+     "type": "desk",
+     "position": [
+      -1.2,
+      1.4,
+      0.0
+     ]
+    },
+    {
+     "id": "desk_b",
+     "type": "desk",
+     "position": [
+      1.2,
+      1.4,
+      0.0
+     ]
+    },
+    {
+     "id": "sign",
+     "type": "sign",
+     "position": [
+      0.0,
+      3.2,
+      1.2
+     ],
+     "text": "SATURDAY - NO CLASS"
+    },
+    {
+     "id": "cup",
+     "type": "cup",
+     "position": [
+      1.2,
+      1.4,
+      0.78
+     ]
+    }
+   ]
+  },
+  "cast": [
+   {
+    "id": "bloxy",
+    "character_id": "ch_bloxy"
+   },
+   {
+    "id": "pip",
+    "character_id": "ch_pip"
+   }
+  ],
+  "shots": [
+   {
+    "id": "s1",
+    "start_s": 0.0,
+    "end_s": 3.5,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "full",
+     "framing_end": "medium",
+     "move": "follow",
+     "side": "three_quarter_left",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s2",
+    "start_s": 3.5,
+    "end_s": 7.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s3",
+    "start_s": 7.0,
+    "end_s": 11.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium_close",
+     "framing_end": "close_up",
+     "move": "push_in",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s4",
+    "start_s": 11.0,
+    "end_s": 15.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s5",
+    "start_s": 15.0,
+    "end_s": 18.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s6",
+    "start_s": 18.0,
+    "end_s": 21.0,
+    "camera": {
+     "subject": "prop:sign",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s7",
+    "start_s": 21.0,
+    "end_s": 25.5,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s8",
+    "start_s": 25.5,
+    "end_s": 30.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   }
+  ],
+  "beats": [
+   {
+    "start_s": 0,
+    "purpose": "hook",
+    "description": "Bloxy sprints in, panicking."
+   },
+   {
+    "start_s": 1,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 2,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 3,
+    "purpose": "setup",
+    "description": "Pip sits calmly with a cupcake cup."
+   },
+   {
+    "start_s": 4,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 5,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 6,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 7,
+    "purpose": "escalation",
+    "description": "Bloxy spirals: no homework, no excuse."
+   },
+   {
+    "start_s": 8,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 9,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 10,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 11,
+    "purpose": "escalation",
+    "description": "Pip points at the board."
+   },
+   {
+    "start_s": 12,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 13,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 14,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 15,
+    "purpose": "reveal",
+    "description": "Bloxy turns to look."
+   },
+   {
+    "start_s": 16,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 17,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 18,
+    "purpose": "reveal",
+    "description": "The sign: SATURDAY - NO CLASS."
+   },
+   {
+    "start_s": 19,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 20,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 21,
+    "purpose": "payoff",
+    "description": "Bloxy deflates."
+   },
+   {
+    "start_s": 22,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 23,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 24,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 25,
+    "purpose": "button",
+    "description": "Pip: \"I just came for the cupcake.\""
+   },
+   {
+    "start_s": 26,
+    "purpose": "button"
+   },
+   {
+    "start_s": 27,
+    "purpose": "button"
+   },
+   {
+    "start_s": 28,
+    "purpose": "button"
+   },
+   {
+    "start_s": 29,
+    "purpose": "button"
+   }
+  ],
+  "performance": {
+   "bloxy": [
+    {
+     "t": 0.0,
+     "position": [
+      -2.4,
+      -0.4
+     ],
+     "facing": 90,
+     "expression": "scared",
+     "eye_target": {
+      "kind": "character",
+      "id": "pip"
+     }
+    },
+    {
+     "t": 7.0,
+     "expression": "worried",
+     "arms": {
+      "left": "head_scratch"
+     }
+    },
+    {
+     "t": 10.0,
+     "arms": {
+      "left": "rest"
+     }
+    },
+    {
+     "t": 15.0,
+     "expression": "confused"
+    },
+    {
+     "t": 18.6,
+     "expression": "startled",
+     "eye_target": {
+      "kind": "prop",
+      "id": "sign"
+     }
+    },
+    {
+     "t": 21.0,
+     "expression": "embarrassed",
+     "eye_target": {
+      "kind": "camera"
+     },
+     "posture": "slumped"
+    },
+    {
+     "t": 26.0,
+     "expression": "bored",
+     "eye_target": {
+      "kind": "character",
+      "id": "pip"
+     }
+    }
+   ],
+   "pip": [
+    {
+     "t": 0.0,
+     "position": [
+      1.0,
+      0.3
+     ],
+     "facing": -90,
+     "expression": "bored",
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     },
+     "arms": {
+      "right": "chin"
+     }
+    },
+    {
+     "t": 7.0,
+     "expression": "curious",
+     "arms": {
+      "right": "rest"
+     }
+    },
+    {
+     "t": 11.0,
+     "expression": "smug"
+    },
+    {
+     "t": 25.5,
+     "expression": "happy",
+     "eye_target": {
+      "kind": "camera"
+     }
+    }
+   ]
+  },
+  "actions": [
+   {
+    "character": "bloxy",
+    "type": "run",
+    "t": 0.2,
+    "anticipation_frames": 2,
+    "main_frames": 50,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {
+     "to": [
+      -0.4,
+      -0.4
+     ]
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "talk",
+    "t": 7.2,
+    "anticipation_frames": 2,
+    "main_frames": 70,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {
+     "hand": "right"
+    }
+   },
+   {
+    "character": "pip",
+    "type": "point",
+    "t": 11.4,
+    "anticipation_frames": 4,
+    "main_frames": 10,
+    "follow_through_frames": 4,
+    "hold_frames": 20,
+    "params": {
+     "hand": "left"
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "turn",
+    "t": 15.6,
+    "anticipation_frames": 4,
+    "main_frames": 14,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {
+     "to_facing": 0
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "facepalm",
+    "t": 21.6,
+    "anticipation_frames": 4,
+    "main_frames": 10,
+    "follow_through_frames": 6,
+    "hold_frames": 30,
+    "params": {
+     "hand": "right"
+    }
+   },
+   {
+    "character": "pip",
+    "type": "shrug",
+    "t": 26.4,
+    "anticipation_frames": 4,
+    "main_frames": 14,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {}
+   }
+  ],
+  "lines": [
+   {
+    "id": "l1",
+    "speaker": "bloxy",
+    "text": "The homework! I forgot the homework!",
+    "t": 0.4,
+    "emotion": "scared",
+    "pace": "fast",
+    "volume": "shout"
+   },
+   {
+    "id": "l2",
+    "speaker": "pip",
+    "text": "Morning to you too.",
+    "t": 4.0,
+    "emotion": "bored",
+    "pace": "slow",
+    "volume": "normal"
+   },
+   {
+    "id": "l3",
+    "speaker": "bloxy",
+    "text": "It's due today and I have nothing!",
+    "t": 7.4,
+    "emotion": "worried",
+    "pace": "fast",
+    "volume": "loud"
+   },
+   {
+    "id": "l4",
+    "speaker": "pip",
+    "text": "Read the board.",
+    "t": 11.6,
+    "emotion": "smug",
+    "pace": "slow",
+    "volume": "normal"
+   },
+   {
+    "id": "l5",
+    "speaker": "bloxy",
+    "text": "What board?",
+    "t": 15.4,
+    "emotion": "confused",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l6",
+    "speaker": "bloxy",
+    "text": "It's Saturday?!",
+    "t": 21.3,
+    "emotion": "embarrassed",
+    "pace": "normal",
+    "volume": "loud"
+   },
+   {
+    "id": "l7",
+    "speaker": "bloxy",
+    "text": "Then why are YOU here?",
+    "t": 23.6,
+    "emotion": "confused",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l8",
+    "speaker": "pip",
+    "text": "Free cupcake day.",
+    "t": 26.0,
+    "emotion": "happy",
+    "pace": "slow",
+    "volume": "normal"
+   }
+  ],
+  "sfx": [
+   {
+    "cue": "footstep",
+    "t": 0.2
+   },
+   {
+    "cue": "gasp_sting",
+    "t": 7.0
+   },
+   {
+    "cue": "ding",
+    "t": 18.4
+   },
+   {
+    "cue": "fail_horn",
+    "t": 21.2
+   }
+  ],
+  "music": [
+   {
+    "t": 0,
+    "cue": "tension"
+   },
+   {
+    "t": 11.0,
+    "cue": "mystery"
+   },
+   {
+    "t": 21.0,
+    "cue": "playful"
+   }
+  ],
+  "cover_t": 19.2,
+  "metadata": {
+   "title": "Homework Panic",
+   "description": "Check the calendar before you panic.",
+   "tags": [
+    "roblox",
+    "animation",
+    "school",
+    "funny",
+    "story"
+   ]
+  },
+  "inspiration": {
+   "note": "Original story written by Claude for this channel. Informed only by broad themes observed in research titles (twists, rivalry, rescues); no specific video.",
+   "sources": []
+  }
+ },
+ {
+  "source": "claude_session_2026_10_03",
+  "title": "The Perfect Speedrun",
+  "logline": "Bloxy pulls off a flawless lava speedrun. Pip forgot to press start.",
+  "duration_s": 30.0,
+  "story": {
+   "premise": "Pip times Bloxy's attempt at a world-record lava speedrun.",
+   "conflict": "One mistake means falling short of the record.",
+   "stakes": "A shot at the top of the leaderboard.",
+   "reveal": "Pip never pressed start on the timer.",
+   "ending": "Bloxy collapses; Pip offers \"one more time?\"",
+   "ending_type": "twist"
+  },
+  "hook": {
+   "text": "Bloxy crouches at the start line over glowing lava.",
+   "question": "Will Bloxy beat the record?",
+   "t_end": 3.0
+  },
+  "payoff": {
+   "text": "A perfect run, and no time on the clock.",
+   "t_start": 22.0
+  },
+  "setting": {
+   "preset": "lava_obby",
+   "time_of_day": "sunset",
+   "lighting": "dramatic_rim",
+   "description": "Stone platforms over bubbling lava, a finish platform with a flag.",
+   "props": [
+    {
+     "id": "start",
+     "type": "platform",
+     "position": [
+      -2.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      2.0,
+      2.0
+     ],
+     "color": "#7A7A7A"
+    },
+    {
+     "id": "mid",
+     "type": "platform",
+     "position": [
+      0.6,
+      0.0,
+      0.0
+     ],
+     "size": [
+      1.6,
+      1.6
+     ],
+     "color": "#7A7A7A"
+    },
+    {
+     "id": "finish",
+     "type": "platform",
+     "position": [
+      3.2,
+      0.0,
+      0.0
+     ],
+     "size": [
+      2.0,
+      2.0
+     ],
+     "color": "#4CAF50"
+    },
+    {
+     "id": "flag",
+     "type": "checkpoint_flag",
+     "position": [
+      3.8,
+      0.5,
+      0.0
+     ],
+     "color": "#E2504C"
+    },
+    {
+     "id": "phone",
+     "type": "phone",
+     "position": [
+      3.0,
+      -0.7,
+      0.9
+     ]
+    }
+   ]
+  },
+  "cast": [
+   {
+    "id": "bloxy",
+    "character_id": "ch_bloxy"
+   },
+   {
+    "id": "pip",
+    "character_id": "ch_pip"
+   }
+  ],
+  "shots": [
+   {
+    "id": "s1",
+    "start_s": 0.0,
+    "end_s": 3.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "front",
+     "angle": "low"
+    }
+   },
+   {
+    "id": "s2",
+    "start_s": 3.0,
+    "end_s": 6.5,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s3",
+    "start_s": 6.5,
+    "end_s": 12.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "full",
+     "framing_end": "full",
+     "move": "follow",
+     "side": "profile_right",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s4",
+    "start_s": 12.0,
+    "end_s": 16.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s5",
+    "start_s": 16.0,
+    "end_s": 19.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s6",
+    "start_s": 19.0,
+    "end_s": 22.0,
+    "camera": {
+     "subject": "prop:phone",
+     "framing_start": "close_up",
+     "framing_end": "close_up",
+     "move": "static",
+     "side": "front",
+     "angle": "high"
+    }
+   },
+   {
+    "id": "s7",
+    "start_s": 22.0,
+    "end_s": 26.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s8",
+    "start_s": 26.0,
+    "end_s": 30.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   }
+  ],
+  "beats": [
+   {
+    "start_s": 0,
+    "purpose": "hook",
+    "description": "Bloxy in a racing crouch, lava glowing below."
+   },
+   {
+    "start_s": 1,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 2,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 3,
+    "purpose": "setup",
+    "description": "Pip raises the phone timer."
+   },
+   {
+    "start_s": 4,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 5,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 6,
+    "purpose": "climax",
+    "description": "Bloxy jumps across the lava platforms."
+   },
+   {
+    "start_s": 7,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 8,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 9,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 10,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 11,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 12,
+    "purpose": "reaction",
+    "description": "Perfect landing; victory dance."
+   },
+   {
+    "start_s": 13,
+    "purpose": "reaction"
+   },
+   {
+    "start_s": 14,
+    "purpose": "reaction"
+   },
+   {
+    "start_s": 15,
+    "purpose": "reaction"
+   },
+   {
+    "start_s": 16,
+    "purpose": "reveal",
+    "description": "Pip stares at the phone."
+   },
+   {
+    "start_s": 17,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 18,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 19,
+    "purpose": "reveal",
+    "description": "The timer reads 0:00."
+   },
+   {
+    "start_s": 20,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 21,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 22,
+    "purpose": "payoff",
+    "description": "Bloxy falls to the ground."
+   },
+   {
+    "start_s": 23,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 24,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 25,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 26,
+    "purpose": "button",
+    "description": "Pip: \"One more time?\""
+   },
+   {
+    "start_s": 27,
+    "purpose": "button"
+   },
+   {
+    "start_s": 28,
+    "purpose": "button"
+   },
+   {
+    "start_s": 29,
+    "purpose": "button"
+   }
+  ],
+  "performance": {
+   "bloxy": [
+    {
+     "t": 0.0,
+     "position": [
+      -2.2,
+      0.0
+     ],
+     "facing": 90,
+     "expression": "determined",
+     "posture": "ready",
+     "eye_target": {
+      "kind": "prop",
+      "id": "finish"
+     }
+    },
+    {
+     "t": 12.0,
+     "expression": "excited",
+     "posture": "proud",
+     "eye_target": {
+      "kind": "camera"
+     }
+    },
+    {
+     "t": 16.0,
+     "expression": "happy",
+     "posture": "upright",
+     "eye_target": {
+      "kind": "character",
+      "id": "pip"
+     }
+    },
+    {
+     "t": 22.0,
+     "expression": "sad"
+    }
+   ],
+   "pip": [
+    {
+     "t": 0.0,
+     "position": [
+      3.0,
+      -0.9
+     ],
+     "facing": -90,
+     "expression": "excited",
+     "arms": {
+      "right": "hold_prop"
+     },
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     }
+    },
+    {
+     "t": 16.0,
+     "expression": "curious",
+     "eye_target": {
+      "kind": "prop",
+      "id": "phone"
+     },
+     "head": {
+      "pitch": -15
+     }
+    },
+    {
+     "t": 18.0,
+     "expression": "embarrassed",
+     "head": {
+      "pitch": 0
+     },
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     }
+    },
+    {
+     "t": 26.0,
+     "expression": "happy",
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     }
+    }
+   ]
+  },
+  "actions": [
+   {
+    "character": "pip",
+    "type": "talk",
+    "t": 3.3,
+    "anticipation_frames": 2,
+    "main_frames": 40,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {
+     "hand": "left"
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "jump",
+    "t": 6.8,
+    "anticipation_frames": 8,
+    "main_frames": 16,
+    "follow_through_frames": 8,
+    "hold_frames": 4,
+    "params": {
+     "to": [
+      0.6,
+      0.0
+     ]
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "jump",
+    "t": 8.6,
+    "anticipation_frames": 6,
+    "main_frames": 16,
+    "follow_through_frames": 8,
+    "hold_frames": 4,
+    "params": {
+     "to": [
+      2.6,
+      0.0
+     ]
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "stumble",
+    "t": 10.2,
+    "anticipation_frames": 2,
+    "main_frames": 14,
+    "follow_through_frames": 8,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "celebrate",
+    "t": 12.4,
+    "anticipation_frames": 4,
+    "main_frames": 14,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "dance",
+    "t": 13.8,
+    "anticipation_frames": 2,
+    "main_frames": 40,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "pip",
+    "type": "facepalm",
+    "t": 18.4,
+    "anticipation_frames": 4,
+    "main_frames": 10,
+    "follow_through_frames": 6,
+    "hold_frames": 8,
+    "params": {
+     "hand": "left"
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "fall_down",
+    "t": 22.4,
+    "anticipation_frames": 4,
+    "main_frames": 14,
+    "follow_through_frames": 6,
+    "hold_frames": 30,
+    "params": {}
+   },
+   {
+    "character": "pip",
+    "type": "shrug",
+    "t": 26.6,
+    "anticipation_frames": 4,
+    "main_frames": 14,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {}
+   }
+  ],
+  "lines": [
+   {
+    "id": "l1",
+    "speaker": "pip",
+    "text": "Timer ready. World record time!",
+    "t": 3.3,
+    "emotion": "excited",
+    "pace": "normal",
+    "volume": "loud"
+   },
+   {
+    "id": "l2",
+    "speaker": "bloxy",
+    "text": "Here... we... go!",
+    "t": 6.6,
+    "emotion": "determined",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l3",
+    "speaker": "bloxy",
+    "text": "Yes! New record!",
+    "t": 12.6,
+    "emotion": "excited",
+    "pace": "fast",
+    "volume": "shout"
+   },
+   {
+    "id": "l4",
+    "speaker": "bloxy",
+    "text": "What's my time?",
+    "t": 16.3,
+    "emotion": "happy",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l5",
+    "speaker": "pip",
+    "text": "Uh...",
+    "t": 18.4,
+    "emotion": "embarrassed",
+    "pace": "slow",
+    "volume": "soft"
+   },
+   {
+    "id": "l6",
+    "speaker": "pip",
+    "text": "I forgot to press start.",
+    "t": 19.4,
+    "emotion": "embarrassed",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l7",
+    "speaker": "bloxy",
+    "text": "Nooo!",
+    "t": 22.8,
+    "emotion": "sad",
+    "pace": "slow",
+    "volume": "loud"
+   },
+   {
+    "id": "l8",
+    "speaker": "pip",
+    "text": "One more time?",
+    "t": 26.8,
+    "emotion": "happy",
+    "pace": "normal",
+    "volume": "normal"
+   }
+  ],
+  "sfx": [
+   {
+    "cue": "beep",
+    "t": 3.2
+   },
+   {
+    "cue": "whoosh",
+    "t": 7.0
+   },
+   {
+    "cue": "sizzle",
+    "t": 7.8
+   },
+   {
+    "cue": "whoosh",
+    "t": 8.8
+   },
+   {
+    "cue": "thud",
+    "t": 9.5
+   },
+   {
+    "cue": "tada",
+    "t": 12.4
+   },
+   {
+    "cue": "fail_horn",
+    "t": 19.2
+   },
+   {
+    "cue": "thud",
+    "t": 22.9
+   }
+  ],
+  "music": [
+   {
+    "t": 0,
+    "cue": "tension"
+   },
+   {
+    "t": 12.0,
+    "cue": "triumph"
+   },
+   {
+    "t": 16.0,
+    "cue": "mystery"
+   },
+   {
+    "t": 22.0,
+    "cue": "sad"
+   },
+   {
+    "t": 26.0,
+    "cue": "playful"
+   }
+  ],
+  "cover_t": 12.8,
+  "metadata": {
+   "title": "The Perfect Speedrun",
+   "description": "The best run nobody timed.",
+   "tags": [
+    "roblox",
+    "obby",
+    "lava",
+    "speedrun",
+    "animation"
+   ]
+  },
+  "inspiration": {
+   "note": "Original story written by Claude for this channel. Informed only by broad themes observed in research titles (twists, rivalry, rescues); no specific video.",
+   "sources": []
+  }
+ },
+ {
+  "source": "claude_session_2026_10_03",
+  "title": "The Same Gift",
+  "logline": "Bloxy and Pip secretly buy each other a present. It is the exact same ball.",
+  "duration_s": 30.0,
+  "story": {
+   "premise": "It is friendship day and both friends bring a wrapped gift.",
+   "conflict": "Each is nervous the other will not like it.",
+   "stakes": "Picking the perfect gift for a best friend.",
+   "reveal": "Both gifts are the same red ball.",
+   "ending": "They laugh and play catch with two balls.",
+   "ending_type": "heartwarming"
+  },
+  "hook": {
+   "text": "Bloxy hides a gift behind their back as Pip walks up.",
+   "question": "What is in the box?",
+   "t_end": 3.0
+  },
+  "payoff": {
+   "text": "Same gift, same taste: best friends.",
+   "t_start": 22.0
+  },
+  "setting": {
+   "preset": "town_street",
+   "time_of_day": "sunset",
+   "lighting": "warm_key_cool_fill",
+   "description": "A quiet street at sunset outside a block house.",
+   "props": [
+    {
+     "id": "house",
+     "type": "house",
+     "position": [
+      0.0,
+      3.6,
+      0.0
+     ],
+     "color": "#9FC5E8"
+    },
+    {
+     "id": "gift_b",
+     "type": "gift",
+     "position": [
+      -0.75,
+      -0.45,
+      0.0
+     ],
+     "color": "#E2504C"
+    },
+    {
+     "id": "gift_p",
+     "type": "gift",
+     "position": [
+      0.75,
+      -0.45,
+      0.0
+     ],
+     "color": "#18A999"
+    },
+    {
+     "id": "tree",
+     "type": "tree",
+     "position": [
+      2.8,
+      2.6,
+      0.0
+     ]
+    }
+   ]
+  },
+  "cast": [
+   {
+    "id": "bloxy",
+    "character_id": "ch_bloxy"
+   },
+   {
+    "id": "pip",
+    "character_id": "ch_pip"
+   }
+  ],
+  "shots": [
+   {
+    "id": "s1",
+    "start_s": 0.0,
+    "end_s": 3.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s2",
+    "start_s": 3.0,
+    "end_s": 7.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s3",
+    "start_s": 7.0,
+    "end_s": 11.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_left",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s4",
+    "start_s": 11.0,
+    "end_s": 15.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s5",
+    "start_s": 15.0,
+    "end_s": 18.5,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s6",
+    "start_s": 18.5,
+    "end_s": 22.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s7",
+    "start_s": 22.0,
+    "end_s": 26.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_left",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s8",
+    "start_s": 26.0,
+    "end_s": 30.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   }
+  ],
+  "beats": [
+   {
+    "start_s": 0,
+    "purpose": "hook",
+    "description": "Bloxy, nervous, hides a gift."
+   },
+   {
+    "start_s": 1,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 2,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 3,
+    "purpose": "setup",
+    "description": "Pip arrives hiding one too."
+   },
+   {
+    "start_s": 4,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 5,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 6,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 7,
+    "purpose": "inciting",
+    "description": "They swap."
+   },
+   {
+    "start_s": 8,
+    "purpose": "inciting"
+   },
+   {
+    "start_s": 9,
+    "purpose": "inciting"
+   },
+   {
+    "start_s": 10,
+    "purpose": "inciting"
+   },
+   {
+    "start_s": 11,
+    "purpose": "escalation",
+    "description": "Pip opens: a red ball. Delighted."
+   },
+   {
+    "start_s": 12,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 13,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 14,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 15,
+    "purpose": "reveal",
+    "description": "Bloxy opens theirs: the same red ball."
+   },
+   {
+    "start_s": 16,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 17,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 18,
+    "purpose": "reaction",
+    "description": "A beat of silence."
+   },
+   {
+    "start_s": 19,
+    "purpose": "reaction"
+   },
+   {
+    "start_s": 20,
+    "purpose": "reaction"
+   },
+   {
+    "start_s": 21,
+    "purpose": "reaction"
+   },
+   {
+    "start_s": 22,
+    "purpose": "payoff",
+    "description": "They burst out laughing."
+   },
+   {
+    "start_s": 23,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 24,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 25,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 26,
+    "purpose": "button",
+    "description": "\"Catch?\" \"Catch!\""
+   },
+   {
+    "start_s": 27,
+    "purpose": "button"
+   },
+   {
+    "start_s": 28,
+    "purpose": "button"
+   },
+   {
+    "start_s": 29,
+    "purpose": "button"
+   }
+  ],
+  "performance": {
+   "bloxy": [
+    {
+     "t": 0.0,
+     "position": [
+      -0.75,
+      0.0
+     ],
+     "facing": 60,
+     "expression": "worried",
+     "eye_target": {
+      "kind": "camera"
+     },
+     "arms": {
+      "right": "hold_prop"
+     }
+    },
+    {
+     "t": 3.0,
+     "expression": "happy",
+     "eye_target": {
+      "kind": "character",
+      "id": "pip"
+     }
+    },
+    {
+     "t": 7.0,
+     "expression": "excited",
+     "arms": {
+      "right": "rest"
+     }
+    },
+    {
+     "t": 15.0,
+     "expression": "startled"
+    },
+    {
+     "t": 18.6,
+     "expression": "confused"
+    },
+    {
+     "t": 22.0,
+     "expression": "laughing"
+    }
+   ],
+   "pip": [
+    {
+     "t": 0.0,
+     "position": [
+      0.75,
+      0.0
+     ],
+     "facing": -60,
+     "expression": "happy",
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     },
+     "arms": {
+      "left": "hold_prop"
+     }
+    },
+    {
+     "t": 7.0,
+     "expression": "excited",
+     "arms": {
+      "left": "rest"
+     }
+    },
+    {
+     "t": 11.0,
+     "expression": "excited"
+    },
+    {
+     "t": 18.5,
+     "expression": "curious"
+    },
+    {
+     "t": 22.0,
+     "expression": "laughing"
+    }
+   ]
+  },
+  "actions": [
+   {
+    "character": "bloxy",
+    "type": "talk",
+    "t": 3.4,
+    "anticipation_frames": 2,
+    "main_frames": 40,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {
+     "hand": "left"
+    }
+   },
+   {
+    "character": "pip",
+    "type": "nod",
+    "t": 4.8,
+    "anticipation_frames": 2,
+    "main_frames": 14,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "pip",
+    "type": "celebrate",
+    "t": 11.6,
+    "anticipation_frames": 4,
+    "main_frames": 14,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "flinch",
+    "t": 15.4,
+    "anticipation_frames": 2,
+    "main_frames": 8,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "pip",
+    "type": "think",
+    "t": 18.8,
+    "anticipation_frames": 4,
+    "main_frames": 30,
+    "follow_through_frames": 6,
+    "hold_frames": 6,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "hop",
+    "t": 22.4,
+    "anticipation_frames": 3,
+    "main_frames": 10,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "pip",
+    "type": "dance",
+    "t": 26.4,
+    "anticipation_frames": 2,
+    "main_frames": 50,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   }
+  ],
+  "lines": [
+   {
+    "id": "l1",
+    "speaker": "bloxy",
+    "text": "Okay. Act normal.",
+    "t": 0.4,
+    "emotion": "worried",
+    "pace": "normal",
+    "volume": "soft"
+   },
+   {
+    "id": "l2",
+    "speaker": "pip",
+    "text": "Happy friendship day!",
+    "t": 3.4,
+    "emotion": "happy",
+    "pace": "normal",
+    "volume": "loud"
+   },
+   {
+    "id": "l3",
+    "speaker": "bloxy",
+    "text": "Swap on three. One, two, three!",
+    "t": 7.2,
+    "emotion": "excited",
+    "pace": "fast",
+    "volume": "normal"
+   },
+   {
+    "id": "l4",
+    "speaker": "pip",
+    "text": "A ball! I love it!",
+    "t": 11.4,
+    "emotion": "excited",
+    "pace": "fast",
+    "volume": "loud"
+   },
+   {
+    "id": "l5",
+    "speaker": "bloxy",
+    "text": "Wait. A ball... for me?",
+    "t": 15.3,
+    "emotion": "startled",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l6",
+    "speaker": "pip",
+    "text": "The same ball.",
+    "t": 18.9,
+    "emotion": "curious",
+    "pace": "slow",
+    "volume": "normal"
+   },
+   {
+    "id": "l7",
+    "speaker": "bloxy",
+    "text": "Great minds!",
+    "t": 22.6,
+    "emotion": "laughing",
+    "pace": "fast",
+    "volume": "loud"
+   },
+   {
+    "id": "l8",
+    "speaker": "pip",
+    "text": "Catch?",
+    "t": 26.6,
+    "emotion": "happy",
+    "pace": "fast",
+    "volume": "normal"
+   },
+   {
+    "id": "l9",
+    "speaker": "bloxy",
+    "text": "Catch!",
+    "t": 28.4,
+    "emotion": "excited",
+    "pace": "fast",
+    "volume": "loud"
+   }
+  ],
+  "sfx": [
+   {
+    "cue": "sparkle",
+    "t": 7.6
+   },
+   {
+    "cue": "pop",
+    "t": 11.2
+   },
+   {
+    "cue": "pop",
+    "t": 15.1
+   },
+   {
+    "cue": "boing",
+    "t": 28.6
+   }
+  ],
+  "music": [
+   {
+    "t": 0,
+    "cue": "chill"
+   },
+   {
+    "t": 15.0,
+    "cue": "mystery"
+   },
+   {
+    "t": 22.0,
+    "cue": "playful"
+   }
+  ],
+  "cover_t": 15.6,
+  "metadata": {
+   "title": "The Same Gift",
+   "description": "Best friends think alike. Literally.",
+   "tags": [
+    "roblox",
+    "animation",
+    "friendship",
+    "wholesome",
+    "story"
+   ]
+  },
+  "inspiration": {
+   "note": "Original story written by Claude for this channel. Informed only by broad themes observed in research titles (twists, rivalry, rescues); no specific video.",
+   "sources": []
+  }
+ },
+ {
+  "source": "claude_session_2026_10_03",
+  "title": "The Perfect Selfie",
+  "logline": "Bloxy tries to take one perfect selfie. Pip photobombs every single shot.",
+  "duration_s": 30.0,
+  "story": {
+   "premise": "Bloxy wants a flawless selfie for their profile picture.",
+   "conflict": "Pip keeps popping into frame with silly poses.",
+   "stakes": "Bloxy's patience.",
+   "reveal": "The photo with Pip in it gets far more likes.",
+   "ending": "Bloxy grudgingly invites Pip into the next one.",
+   "ending_type": "heartwarming"
+  },
+  "hook": {
+   "text": "Bloxy strikes a pose, phone up: \"Perfect.\"",
+   "question": "Will Bloxy get the perfect shot?",
+   "t_end": 3.0
+  },
+  "payoff": {
+   "text": "The photobombed selfie is the best one.",
+   "t_start": 22.0
+  },
+  "setting": {
+   "preset": "studio",
+   "time_of_day": "noon",
+   "lighting": "natural",
+   "description": "A bright studio with a soft backdrop.",
+   "props": [
+    {
+     "id": "phone",
+     "type": "phone",
+     "position": [
+      0.3,
+      -0.5,
+      1.3
+     ]
+    },
+    {
+     "id": "lamp",
+     "type": "lamp",
+     "position": [
+      -2.2,
+      1.6,
+      0.0
+     ]
+    }
+   ]
+  },
+  "cast": [
+   {
+    "id": "bloxy",
+    "character_id": "ch_bloxy"
+   },
+   {
+    "id": "pip",
+    "character_id": "ch_pip"
+   }
+  ],
+  "shots": [
+   {
+    "id": "s1",
+    "start_s": 0.0,
+    "end_s": 3.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s2",
+    "start_s": 3.0,
+    "end_s": 6.5,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s3",
+    "start_s": 6.5,
+    "end_s": 10.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s4",
+    "start_s": 10.0,
+    "end_s": 13.5,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s5",
+    "start_s": 13.5,
+    "end_s": 17.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium_close",
+     "framing_end": "close_up",
+     "move": "push_in",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s6",
+    "start_s": 17.0,
+    "end_s": 22.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s7",
+    "start_s": 22.0,
+    "end_s": 26.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s8",
+    "start_s": 26.0,
+    "end_s": 30.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "front",
+     "angle": "eye"
+    }
+   }
+  ],
+  "beats": [
+   {
+    "start_s": 0,
+    "purpose": "hook",
+    "description": "Bloxy poses with the phone."
+   },
+   {
+    "start_s": 1,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 2,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 3,
+    "purpose": "inciting",
+    "description": "Pip pops up behind, waving."
+   },
+   {
+    "start_s": 4,
+    "purpose": "inciting"
+   },
+   {
+    "start_s": 5,
+    "purpose": "inciting"
+   },
+   {
+    "start_s": 6,
+    "purpose": "escalation",
+    "description": "Bloxy tries again, annoyed."
+   },
+   {
+    "start_s": 7,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 8,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 9,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 10,
+    "purpose": "escalation",
+    "description": "Pip dances into frame."
+   },
+   {
+    "start_s": 11,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 12,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 13,
+    "purpose": "climax",
+    "description": "Bloxy finally snaps."
+   },
+   {
+    "start_s": 14,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 15,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 16,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 17,
+    "purpose": "reveal",
+    "description": "Pip shows the likes on the photobomb picture."
+   },
+   {
+    "start_s": 18,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 19,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 20,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 21,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 22,
+    "purpose": "payoff",
+    "description": "Bloxy stares at the numbers."
+   },
+   {
+    "start_s": 23,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 24,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 25,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 26,
+    "purpose": "button",
+    "description": "\"Fine. Get in.\""
+   },
+   {
+    "start_s": 27,
+    "purpose": "button"
+   },
+   {
+    "start_s": 28,
+    "purpose": "button"
+   },
+   {
+    "start_s": 29,
+    "purpose": "button"
+   }
+  ],
+  "performance": {
+   "bloxy": [
+    {
+     "t": 0.0,
+     "position": [
+      -0.3,
+      0.0
+     ],
+     "facing": 20,
+     "expression": "proud",
+     "arms": {
+      "right": "raise"
+     },
+     "eye_target": {
+      "kind": "prop",
+      "id": "phone"
+     }
+    },
+    {
+     "t": 3.4,
+     "expression": "startled"
+    },
+    {
+     "t": 6.5,
+     "expression": "determined",
+     "eye_target": {
+      "kind": "prop",
+      "id": "phone"
+     }
+    },
+    {
+     "t": 10.4,
+     "expression": "angry"
+    },
+    {
+     "t": 13.5,
+     "expression": "angry",
+     "arms": {
+      "right": "rest"
+     },
+     "eye_target": {
+      "kind": "character",
+      "id": "pip"
+     }
+    },
+    {
+     "t": 22.0,
+     "expression": "confused"
+    },
+    {
+     "t": 25.0,
+     "expression": "embarrassed",
+     "eye_target": {
+      "kind": "camera"
+     }
+    },
+    {
+     "t": 28.0,
+     "expression": "happy",
+     "eye_target": {
+      "kind": "character",
+      "id": "pip"
+     }
+    }
+   ],
+   "pip": [
+    {
+     "t": 0.0,
+     "position": [
+      1.4,
+      0.8
+     ],
+     "facing": -30,
+     "expression": "smug",
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     }
+    },
+    {
+     "t": 3.0,
+     "expression": "excited",
+     "eye_target": {
+      "kind": "camera"
+     }
+    },
+    {
+     "t": 10.0,
+     "expression": "laughing"
+    },
+    {
+     "t": 17.0,
+     "expression": "proud",
+     "arms": {
+      "left": "hold_prop"
+     },
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     }
+    },
+    {
+     "t": 21.0,
+     "arms": {
+      "left": "rest"
+     }
+    },
+    {
+     "t": 26.0,
+     "expression": "excited",
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     }
+    }
+   ]
+  },
+  "actions": [
+   {
+    "character": "pip",
+    "type": "wave",
+    "t": 3.2,
+    "anticipation_frames": 4,
+    "main_frames": 26,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {
+     "hand": "right"
+    }
+   },
+   {
+    "character": "pip",
+    "type": "dance",
+    "t": 10.2,
+    "anticipation_frames": 2,
+    "main_frames": 60,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "facepalm",
+    "t": 14.6,
+    "anticipation_frames": 4,
+    "main_frames": 10,
+    "follow_through_frames": 6,
+    "hold_frames": 14,
+    "params": {
+     "hand": "left"
+    }
+   },
+   {
+    "character": "pip",
+    "type": "talk",
+    "t": 17.4,
+    "anticipation_frames": 2,
+    "main_frames": 70,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {
+     "hand": "right"
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "shrug",
+    "t": 26.4,
+    "anticipation_frames": 4,
+    "main_frames": 14,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "pip",
+    "type": "celebrate",
+    "t": 28.6,
+    "anticipation_frames": 4,
+    "main_frames": 14,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {}
+   }
+  ],
+  "lines": [
+   {
+    "id": "l1",
+    "speaker": "bloxy",
+    "text": "Perfect lighting. Perfect angle.",
+    "t": 0.3,
+    "emotion": "proud",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l2",
+    "speaker": "pip",
+    "text": "Hiii!",
+    "t": 3.4,
+    "emotion": "excited",
+    "pace": "fast",
+    "volume": "loud"
+   },
+   {
+    "id": "l3",
+    "speaker": "bloxy",
+    "text": "Pip! Again. Serious face.",
+    "t": 6.8,
+    "emotion": "determined",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l4",
+    "speaker": "pip",
+    "text": "Dance break!",
+    "t": 10.6,
+    "emotion": "laughing",
+    "pace": "fast",
+    "volume": "loud"
+   },
+   {
+    "id": "l5",
+    "speaker": "bloxy",
+    "text": "Can I get ONE normal picture?!",
+    "t": 14.0,
+    "emotion": "angry",
+    "pace": "fast",
+    "volume": "loud"
+   },
+   {
+    "id": "l6",
+    "speaker": "pip",
+    "text": "Look. The one with me got a thousand likes.",
+    "t": 17.6,
+    "emotion": "proud",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l7",
+    "speaker": "bloxy",
+    "text": "Mine got... three.",
+    "t": 22.4,
+    "emotion": "embarrassed",
+    "pace": "slow",
+    "volume": "normal"
+   },
+   {
+    "id": "l8",
+    "speaker": "bloxy",
+    "text": "Fine. Get in the picture.",
+    "t": 26.3,
+    "emotion": "happy",
+    "pace": "normal",
+    "volume": "normal"
+   }
+  ],
+  "sfx": [
+   {
+    "cue": "click",
+    "t": 2.6
+   },
+   {
+    "cue": "pop",
+    "t": 3.3
+   },
+   {
+    "cue": "click",
+    "t": 9.6
+   },
+   {
+    "cue": "boing",
+    "t": 10.4
+   },
+   {
+    "cue": "click",
+    "t": 13.2
+   },
+   {
+    "cue": "ding",
+    "t": 18.2
+   },
+   {
+    "cue": "click",
+    "t": 29.2
+   }
+  ],
+  "music": [
+   {
+    "t": 0,
+    "cue": "chill"
+   },
+   {
+    "t": 10.0,
+    "cue": "playful"
+   },
+   {
+    "t": 17.0,
+    "cue": "triumph"
+   },
+   {
+    "t": 26.0,
+    "cue": "chill"
+   }
+  ],
+  "cover_t": 4.0,
+  "metadata": {
+   "title": "The Perfect Selfie",
+   "description": "Some photobombs are actually improvements.",
+   "tags": [
+    "roblox",
+    "animation",
+    "selfie",
+    "funny",
+    "friends"
+   ]
+  },
+  "inspiration": {
+   "note": "Original story written by Claude for this channel. Informed only by broad themes observed in research titles (twists, rivalry, rescues); no specific video.",
+   "sources": []
+  }
+ },
+ {
+  "source": "claude_session_2026_10_03",
+  "title": "The Acceptance Speech",
+  "logline": "Bloxy rehearses a dramatic award speech. Pip wins the award, then gives Bloxy one anyway.",
+  "duration_s": 30.0,
+  "story": {
+   "premise": "Backstage at the Block Awards, Bloxy practises a winner's speech.",
+   "conflict": "Bloxy is certain they will win; Pip is nominated too.",
+   "stakes": "The golden trophy.",
+   "reveal": "Pip wins.",
+   "ending": "Pip hands Bloxy the trophy: \"For the best speech nobody heard.\"",
+   "ending_type": "heartwarming"
+  },
+  "hook": {
+   "text": "Bloxy, trophy-less, bows to an imaginary crowd.",
+   "question": "Will Bloxy win?",
+   "t_end": 3.0
+  },
+  "payoff": {
+   "text": "Bloxy loses the award but gets the trophy anyway.",
+   "t_start": 22.0
+  },
+  "setting": {
+   "preset": "studio",
+   "time_of_day": "night",
+   "lighting": "dramatic_rim",
+   "description": "A small stage with a spotlight lamp and a trophy on a stand.",
+   "props": [
+    {
+     "id": "trophy",
+     "type": "trophy",
+     "position": [
+      1.6,
+      0.4,
+      0.0
+     ],
+     "color": "#F5C518"
+    },
+    {
+     "id": "lamp",
+     "type": "lamp",
+     "position": [
+      -2.0,
+      1.4,
+      0.0
+     ]
+    },
+    {
+     "id": "sign",
+     "type": "sign",
+     "position": [
+      0.0,
+      2.6,
+      1.4
+     ],
+     "text": "BLOCK AWARDS"
+    }
+   ]
+  },
+  "cast": [
+   {
+    "id": "bloxy",
+    "character_id": "ch_bloxy"
+   },
+   {
+    "id": "pip",
+    "character_id": "ch_pip"
+   }
+  ],
+  "shots": [
+   {
+    "id": "s1",
+    "start_s": 0.0,
+    "end_s": 3.5,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "front",
+     "angle": "low"
+    }
+   },
+   {
+    "id": "s2",
+    "start_s": 3.5,
+    "end_s": 8.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "three_quarter_left",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s3",
+    "start_s": 8.0,
+    "end_s": 11.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s4",
+    "start_s": 11.0,
+    "end_s": 15.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s5",
+    "start_s": 15.0,
+    "end_s": 18.5,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s6",
+    "start_s": 18.5,
+    "end_s": 22.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "close_up",
+     "framing_end": "close_up",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s7",
+    "start_s": 22.0,
+    "end_s": 26.5,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s8",
+    "start_s": 26.5,
+    "end_s": 30.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "front",
+     "angle": "eye"
+    }
+   }
+  ],
+  "beats": [
+   {
+    "start_s": 0,
+    "purpose": "hook",
+    "description": "Bloxy bows to nobody."
+   },
+   {
+    "start_s": 1,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 2,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 3,
+    "purpose": "setup",
+    "description": "Bloxy rehearses: thank you, thank you."
+   },
+   {
+    "start_s": 4,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 5,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 6,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 7,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 8,
+    "purpose": "inciting",
+    "description": "Pip reads the winner card."
+   },
+   {
+    "start_s": 9,
+    "purpose": "inciting"
+   },
+   {
+    "start_s": 10,
+    "purpose": "inciting"
+   },
+   {
+    "start_s": 11,
+    "purpose": "escalation",
+    "description": "Bloxy steps forward, ready."
+   },
+   {
+    "start_s": 12,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 13,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 14,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 15,
+    "purpose": "reveal",
+    "description": "Pip: \"The winner is... me?\""
+   },
+   {
+    "start_s": 16,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 17,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 18,
+    "purpose": "reaction",
+    "description": "Bloxy's face falls."
+   },
+   {
+    "start_s": 19,
+    "purpose": "reaction"
+   },
+   {
+    "start_s": 20,
+    "purpose": "reaction"
+   },
+   {
+    "start_s": 21,
+    "purpose": "reaction"
+   },
+   {
+    "start_s": 22,
+    "purpose": "payoff",
+    "description": "Pip hands the trophy over."
+   },
+   {
+    "start_s": 23,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 24,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 25,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 26,
+    "purpose": "button",
+    "description": "Bloxy, moved, starts the speech anyway."
+   },
+   {
+    "start_s": 27,
+    "purpose": "button"
+   },
+   {
+    "start_s": 28,
+    "purpose": "button"
+   },
+   {
+    "start_s": 29,
+    "purpose": "button"
+   }
+  ],
+  "performance": {
+   "bloxy": [
+    {
+     "t": 0.0,
+     "position": [
+      -0.8,
+      0.0
+     ],
+     "facing": 30,
+     "expression": "proud",
+     "eye_target": {
+      "kind": "camera"
+     },
+     "posture": "proud"
+    },
+    {
+     "t": 3.5,
+     "expression": "happy",
+     "arms": {
+      "right": "chest"
+     }
+    },
+    {
+     "t": 7.6,
+     "arms": {
+      "right": "rest"
+     }
+    },
+    {
+     "t": 11.0,
+     "expression": "excited",
+     "posture": "ready",
+     "eye_target": {
+      "kind": "character",
+      "id": "pip"
+     }
+    },
+    {
+     "t": 18.5,
+     "expression": "sad",
+     "posture": "slumped"
+    },
+    {
+     "t": 23.0,
+     "expression": "startled",
+     "posture": "upright"
+    },
+    {
+     "t": 26.5,
+     "expression": "happy",
+     "eye_target": {
+      "kind": "camera"
+     },
+     "arms": {
+      "left": "hold_prop"
+     }
+    }
+   ],
+   "pip": [
+    {
+     "t": 0.0,
+     "position": [
+      1.2,
+      0.6
+     ],
+     "facing": -40,
+     "expression": "neutral",
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     }
+    },
+    {
+     "t": 8.0,
+     "expression": "curious",
+     "head": {
+      "pitch": -12
+     }
+    },
+    {
+     "t": 15.0,
+     "expression": "startled",
+     "head": {
+      "pitch": 0
+     }
+    },
+    {
+     "t": 17.0,
+     "expression": "happy"
+    },
+    {
+     "t": 22.0,
+     "expression": "happy",
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     }
+    }
+   ]
+  },
+  "actions": [
+   {
+    "character": "bloxy",
+    "type": "nod",
+    "t": 0.6,
+    "anticipation_frames": 2,
+    "main_frames": 16,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "talk",
+    "t": 3.8,
+    "anticipation_frames": 2,
+    "main_frames": 90,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {
+     "hand": "left"
+    }
+   },
+   {
+    "character": "pip",
+    "type": "talk",
+    "t": 8.3,
+    "anticipation_frames": 2,
+    "main_frames": 60,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {
+     "hand": "right"
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "walk",
+    "t": 11.4,
+    "anticipation_frames": 2,
+    "main_frames": 30,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {
+     "to": [
+      -0.2,
+      0.0
+     ]
+    }
+   },
+   {
+    "character": "pip",
+    "type": "celebrate",
+    "t": 16.2,
+    "anticipation_frames": 4,
+    "main_frames": 14,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "pip",
+    "type": "walk",
+    "t": 22.4,
+    "anticipation_frames": 2,
+    "main_frames": 40,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {
+     "to": [
+      0.65,
+      0.4
+     ]
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "celebrate",
+    "t": 27.6,
+    "anticipation_frames": 4,
+    "main_frames": 14,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {}
+   }
+  ],
+  "lines": [
+   {
+    "id": "l1",
+    "speaker": "bloxy",
+    "text": "Thank you. Thank you all.",
+    "t": 0.4,
+    "emotion": "proud",
+    "pace": "slow",
+    "volume": "normal"
+   },
+   {
+    "id": "l2",
+    "speaker": "bloxy",
+    "text": "Thanks, coach. Thanks, mom. And me.",
+    "t": 3.8,
+    "emotion": "happy",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l3",
+    "speaker": "pip",
+    "text": "Okay! The winner is...",
+    "t": 8.3,
+    "emotion": "curious",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l4",
+    "speaker": "bloxy",
+    "text": "This is it. This is my moment.",
+    "t": 11.4,
+    "emotion": "excited",
+    "pace": "fast",
+    "volume": "soft"
+   },
+   {
+    "id": "l5",
+    "speaker": "pip",
+    "text": "...me? It says me!",
+    "t": 15.2,
+    "emotion": "startled",
+    "pace": "fast",
+    "volume": "loud"
+   },
+   {
+    "id": "l6",
+    "speaker": "bloxy",
+    "text": "Oh. Congrats.",
+    "t": 19.0,
+    "emotion": "sad",
+    "pace": "slow",
+    "volume": "soft"
+   },
+   {
+    "id": "l7",
+    "speaker": "pip",
+    "text": "Here. For the best speech nobody heard.",
+    "t": 22.6,
+    "emotion": "happy",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l8",
+    "speaker": "bloxy",
+    "text": "Thanks, mom...",
+    "t": 27.2,
+    "emotion": "happy",
+    "pace": "slow",
+    "volume": "normal"
+   }
+  ],
+  "sfx": [
+   {
+    "cue": "drumroll",
+    "t": 8.2
+   },
+   {
+    "cue": "tada",
+    "t": 15.6
+   },
+   {
+    "cue": "sparkle",
+    "t": 23.8
+   }
+  ],
+  "music": [
+   {
+    "t": 0,
+    "cue": "triumph"
+   },
+   {
+    "t": 8.0,
+    "cue": "tension"
+   },
+   {
+    "t": 18.5,
+    "cue": "sad"
+   },
+   {
+    "t": 22.0,
+    "cue": "chill"
+   }
+  ],
+  "cover_t": 1.0,
+  "metadata": {
+   "title": "The Acceptance Speech",
+   "description": "Not every winner gets the trophy. Some get a better friend.",
+   "tags": [
+    "roblox",
+    "animation",
+    "wholesome",
+    "award",
+    "story"
+   ]
+  },
+  "inspiration": {
+   "note": "Original story written by Claude for this channel. Informed only by broad themes observed in research titles (twists, rivalry, rescues); no specific video.",
+   "sources": []
+  }
+ },
+ {
+  "source": "claude_session_2026_10_03",
+  "title": "Keys All The Way Down",
+  "logline": "Bloxy finally opens the treasure chest. Inside is another key.",
+  "duration_s": 30.0,
+  "story": {
+   "premise": "A treasure chest waits at the end of the obby, and Bloxy has the key.",
+   "conflict": "Every chest holds only another key to another chest.",
+   "stakes": "The legendary obby treasure.",
+   "reveal": "The last chest holds a single slice of pizza.",
+   "ending": "Pip eats it before Bloxy notices.",
+   "ending_type": "twist"
+  },
+  "hook": {
+   "text": "Bloxy turns the key in the chest with a grin.",
+   "question": "What is the treasure?",
+   "t_end": 3.0
+  },
+  "payoff": {
+   "text": "The legendary treasure was pizza, and Pip ate it.",
+   "t_start": 22.0
+  },
+  "setting": {
+   "preset": "sky_obby",
+   "time_of_day": "noon",
+   "lighting": "natural",
+   "description": "A treasure platform high above the clouds with two chests.",
+   "props": [
+    {
+     "id": "deck",
+     "type": "platform",
+     "position": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      4.4,
+      3.0
+     ],
+     "color": "#4CAF50"
+    },
+    {
+     "id": "chest_a",
+     "type": "chest",
+     "position": [
+      -0.6,
+      0.7,
+      0.0
+     ],
+     "color": "#8E5A2B"
+    },
+    {
+     "id": "chest_b",
+     "type": "chest",
+     "position": [
+      1.2,
+      0.9,
+      0.0
+     ],
+     "color": "#8E5A2B"
+    },
+    {
+     "id": "key",
+     "type": "key",
+     "position": [
+      -0.6,
+      0.7,
+      0.55
+     ],
+     "color": "#F5C518"
+    }
+   ]
+  },
+  "cast": [
+   {
+    "id": "bloxy",
+    "character_id": "ch_bloxy"
+   },
+   {
+    "id": "pip",
+    "character_id": "ch_pip"
+   }
+  ],
+  "shots": [
+   {
+    "id": "s1",
+    "start_s": 0.0,
+    "end_s": 3.5,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "three_quarter_left",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s2",
+    "start_s": 3.5,
+    "end_s": 7.0,
+    "camera": {
+     "subject": "prop:chest_a",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "front",
+     "angle": "high"
+    }
+   },
+   {
+    "id": "s3",
+    "start_s": 7.0,
+    "end_s": 11.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s4",
+    "start_s": 11.0,
+    "end_s": 14.5,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s5",
+    "start_s": 14.5,
+    "end_s": 19.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_left",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s6",
+    "start_s": 19.0,
+    "end_s": 22.0,
+    "camera": {
+     "subject": "prop:chest_b",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "front",
+     "angle": "high"
+    }
+   },
+   {
+    "id": "s7",
+    "start_s": 22.0,
+    "end_s": 26.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "close_up",
+     "framing_end": "close_up",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s8",
+    "start_s": 26.0,
+    "end_s": 30.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "front",
+     "angle": "eye"
+    }
+   }
+  ],
+  "beats": [
+   {
+    "start_s": 0,
+    "purpose": "hook",
+    "description": "Bloxy, key in hand, at the chest."
+   },
+   {
+    "start_s": 1,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 2,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 3,
+    "purpose": "reveal",
+    "description": "The lid opens: another key."
+   },
+   {
+    "start_s": 4,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 5,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 6,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 7,
+    "purpose": "reaction",
+    "description": "Bloxy blinks."
+   },
+   {
+    "start_s": 8,
+    "purpose": "reaction"
+   },
+   {
+    "start_s": 9,
+    "purpose": "reaction"
+   },
+   {
+    "start_s": 10,
+    "purpose": "reaction"
+   },
+   {
+    "start_s": 11,
+    "purpose": "escalation",
+    "description": "Pip points at the second chest."
+   },
+   {
+    "start_s": 12,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 13,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 14,
+    "purpose": "climax",
+    "description": "Bloxy marches over and unlocks it."
+   },
+   {
+    "start_s": 15,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 16,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 17,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 18,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 19,
+    "purpose": "reveal",
+    "description": "Inside: one pizza slice."
+   },
+   {
+    "start_s": 20,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 21,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 22,
+    "purpose": "payoff",
+    "description": "Bloxy turns, but the slice is gone."
+   },
+   {
+    "start_s": 23,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 24,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 25,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 26,
+    "purpose": "button",
+    "description": "Pip, mouth full, waves."
+   },
+   {
+    "start_s": 27,
+    "purpose": "button"
+   },
+   {
+    "start_s": 28,
+    "purpose": "button"
+   },
+   {
+    "start_s": 29,
+    "purpose": "button"
+   }
+  ],
+  "performance": {
+   "bloxy": [
+    {
+     "t": 0.0,
+     "position": [
+      -0.6,
+      0.0
+     ],
+     "facing": 10,
+     "expression": "excited",
+     "eye_target": {
+      "kind": "prop",
+      "id": "chest_a"
+     },
+     "arms": {
+      "right": "reach"
+     }
+    },
+    {
+     "t": 3.5,
+     "expression": "curious",
+     "arms": {
+      "right": "rest"
+     }
+    },
+    {
+     "t": 7.0,
+     "expression": "confused",
+     "eye_target": {
+      "kind": "camera"
+     }
+    },
+    {
+     "t": 14.5,
+     "expression": "determined",
+     "eye_target": {
+      "kind": "prop",
+      "id": "chest_b"
+     }
+    },
+    {
+     "t": 19.0,
+     "expression": "happy"
+    },
+    {
+     "t": 22.0,
+     "expression": "startled",
+     "eye_target": {
+      "kind": "camera"
+     }
+    },
+    {
+     "t": 24.4,
+     "expression": "angry",
+     "eye_target": {
+      "kind": "character",
+      "id": "pip"
+     }
+    }
+   ],
+   "pip": [
+    {
+     "t": 0.0,
+     "position": [
+      1.9,
+      -0.6
+     ],
+     "facing": -50,
+     "expression": "curious",
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     }
+    },
+    {
+     "t": 11.0,
+     "expression": "happy",
+     "eye_target": {
+      "kind": "prop",
+      "id": "chest_b"
+     }
+    },
+    {
+     "t": 19.0,
+     "expression": "smug",
+     "eye_target": {
+      "kind": "prop",
+      "id": "chest_b"
+     }
+    },
+    {
+     "t": 26.0,
+     "expression": "happy",
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     }
+    }
+   ]
+  },
+  "actions": [
+   {
+    "character": "bloxy",
+    "type": "push",
+    "t": 0.6,
+    "anticipation_frames": 4,
+    "main_frames": 12,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {
+     "prop": "chest_a",
+     "hand": "right"
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "facepalm",
+    "t": 7.6,
+    "anticipation_frames": 4,
+    "main_frames": 10,
+    "follow_through_frames": 6,
+    "hold_frames": 20,
+    "params": {
+     "hand": "left"
+    }
+   },
+   {
+    "character": "pip",
+    "type": "point",
+    "t": 11.3,
+    "anticipation_frames": 4,
+    "main_frames": 10,
+    "follow_through_frames": 4,
+    "hold_frames": 16,
+    "params": {
+     "hand": "right"
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "walk",
+    "t": 14.8,
+    "anticipation_frames": 2,
+    "main_frames": 44,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {
+     "to": [
+      0.6,
+      0.2
+     ]
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "push",
+    "t": 17.2,
+    "anticipation_frames": 4,
+    "main_frames": 12,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {
+     "prop": "chest_b",
+     "hand": "right"
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "celebrate",
+    "t": 19.6,
+    "anticipation_frames": 4,
+    "main_frames": 14,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "look_around",
+    "t": 22.4,
+    "anticipation_frames": 4,
+    "main_frames": 30,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "pip",
+    "type": "wave",
+    "t": 26.4,
+    "anticipation_frames": 4,
+    "main_frames": 26,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {
+     "hand": "left"
+    }
+   }
+  ],
+  "lines": [
+   {
+    "id": "l1",
+    "speaker": "bloxy",
+    "text": "The legendary treasure. Finally.",
+    "t": 0.4,
+    "emotion": "excited",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l2",
+    "speaker": "bloxy",
+    "text": "...Another key?",
+    "t": 4.4,
+    "emotion": "curious",
+    "pace": "slow",
+    "volume": "normal"
+   },
+   {
+    "id": "l3",
+    "speaker": "bloxy",
+    "text": "Who puts a key in a chest?!",
+    "t": 7.4,
+    "emotion": "confused",
+    "pace": "fast",
+    "volume": "loud"
+   },
+   {
+    "id": "l4",
+    "speaker": "pip",
+    "text": "Maybe it opens that one.",
+    "t": 11.4,
+    "emotion": "happy",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l5",
+    "speaker": "bloxy",
+    "text": "Okay. Treasure, here I come.",
+    "t": 15.0,
+    "emotion": "determined",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l6",
+    "speaker": "bloxy",
+    "text": "Pizza! Real pizza!",
+    "t": 19.8,
+    "emotion": "excited",
+    "pace": "fast",
+    "volume": "loud"
+   },
+   {
+    "id": "l7",
+    "speaker": "bloxy",
+    "text": "Wait. Where did it go?",
+    "t": 22.6,
+    "emotion": "startled",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l8",
+    "speaker": "pip",
+    "text": "Mm-hm. Legendary.",
+    "t": 26.8,
+    "emotion": "happy",
+    "pace": "slow",
+    "volume": "normal"
+   }
+  ],
+  "sfx": [
+   {
+    "cue": "click",
+    "t": 1.2
+   },
+   {
+    "cue": "sparkle",
+    "t": 4.0
+   },
+   {
+    "cue": "fail_horn",
+    "t": 4.6
+   },
+   {
+    "cue": "click",
+    "t": 17.8
+   },
+   {
+    "cue": "tada",
+    "t": 19.5
+   },
+   {
+    "cue": "pop",
+    "t": 21.8
+   }
+  ],
+  "music": [
+   {
+    "t": 0,
+    "cue": "mystery"
+   },
+   {
+    "t": 7.0,
+    "cue": "playful"
+   },
+   {
+    "t": 14.5,
+    "cue": "tension"
+   },
+   {
+    "t": 19.0,
+    "cue": "triumph"
+   },
+   {
+    "t": 22.0,
+    "cue": "playful"
+   }
+  ],
+  "cover_t": 20.2,
+  "metadata": {
+   "title": "Keys All The Way Down",
+   "description": "The real treasure was pizza. Briefly.",
+   "tags": [
+    "roblox",
+    "obby",
+    "treasure",
+    "animation",
+    "funny"
+   ]
+  },
+  "inspiration": {
+   "note": "Original story written by Claude for this channel. Informed only by broad themes observed in research titles (twists, rivalry, rescues); no specific video.",
+   "sources": []
+  }
+ },
+ {
+  "source": "claude_session_2026_10_03",
+  "title": "Something Is Under The Bed",
+  "logline": "Bloxy hears noises in the dark. It is Pip, sleepwalking toward the fridge.",
+  "duration_s": 30.0,
+  "story": {
+   "premise": "Bloxy is woken at night by strange noises in the bedroom.",
+   "conflict": "Every time the lamp turns on, the noise stops.",
+   "stakes": "Bloxy's sleep, and courage.",
+   "reveal": "Pip is sleepwalking, mumbling about pizza.",
+   "ending": "Bloxy tucks Pip back in; Pip mumbles \"extra cheese\".",
+   "ending_type": "heartwarming"
+  },
+  "hook": {
+   "text": "In the dark, a thump. Bloxy sits bolt upright.",
+   "question": "What is making the noise?",
+   "t_end": 3.0
+  },
+  "payoff": {
+   "text": "The monster is a sleepwalking best friend.",
+   "t_start": 22.0
+  },
+  "setting": {
+   "preset": "bedroom",
+   "time_of_day": "night",
+   "lighting": "spooky_low",
+   "description": "A dark bedroom lit by moonlight and a bedside lamp.",
+   "props": [
+    {
+     "id": "bed",
+     "type": "bed",
+     "position": [
+      -1.4,
+      1.2,
+      0.0
+     ]
+    },
+    {
+     "id": "lamp",
+     "type": "lamp",
+     "position": [
+      -0.2,
+      1.4,
+      0.0
+     ]
+    },
+    {
+     "id": "button",
+     "type": "button",
+     "position": [
+      -0.6,
+      0.2,
+      0.9
+     ]
+    },
+    {
+     "id": "crate",
+     "type": "crate",
+     "position": [
+      2.6,
+      1.6,
+      0.0
+     ]
+    }
+   ]
+  },
+  "cast": [
+   {
+    "id": "bloxy",
+    "character_id": "ch_bloxy"
+   },
+   {
+    "id": "pip",
+    "character_id": "ch_pip"
+   }
+  ],
+  "shots": [
+   {
+    "id": "s1",
+    "start_s": 0.0,
+    "end_s": 3.5,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "front",
+     "angle": "low"
+    }
+   },
+   {
+    "id": "s2",
+    "start_s": 3.5,
+    "end_s": 7.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "three_quarter_left",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s3",
+    "start_s": 7.0,
+    "end_s": 10.5,
+    "camera": {
+     "subject": "prop:crate",
+     "framing_start": "medium_wide",
+     "framing_end": "medium",
+     "move": "push_in",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s4",
+    "start_s": 10.5,
+    "end_s": 14.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s5",
+    "start_s": 14.0,
+    "end_s": 18.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "full",
+     "framing_end": "medium",
+     "move": "push_in",
+     "side": "front",
+     "angle": "low"
+    }
+   },
+   {
+    "id": "s6",
+    "start_s": 18.0,
+    "end_s": 22.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_left",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s7",
+    "start_s": 22.0,
+    "end_s": 26.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s8",
+    "start_s": 26.0,
+    "end_s": 30.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "front",
+     "angle": "eye"
+    }
+   }
+  ],
+  "beats": [
+   {
+    "start_s": 0,
+    "purpose": "hook",
+    "description": "Thump. Bloxy jolts awake."
+   },
+   {
+    "start_s": 1,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 2,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 3,
+    "purpose": "setup",
+    "description": "Bloxy presses the lamp button: silence."
+   },
+   {
+    "start_s": 4,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 5,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 6,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 7,
+    "purpose": "escalation",
+    "description": "A shape moves near the crate."
+   },
+   {
+    "start_s": 8,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 9,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 10,
+    "purpose": "escalation",
+    "description": "Bloxy grabs courage."
+   },
+   {
+    "start_s": 11,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 12,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 13,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 14,
+    "purpose": "reveal",
+    "description": "Pip, eyes half-shut, shuffles forward mumbling."
+   },
+   {
+    "start_s": 15,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 16,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 17,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 18,
+    "purpose": "reaction",
+    "description": "Bloxy exhales."
+   },
+   {
+    "start_s": 19,
+    "purpose": "reaction"
+   },
+   {
+    "start_s": 20,
+    "purpose": "reaction"
+   },
+   {
+    "start_s": 21,
+    "purpose": "reaction"
+   },
+   {
+    "start_s": 22,
+    "purpose": "payoff",
+    "description": "Pip sleep-talks about pizza."
+   },
+   {
+    "start_s": 23,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 24,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 25,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 26,
+    "purpose": "button",
+    "description": "Bloxy guides Pip back: \"Extra cheese.\""
+   },
+   {
+    "start_s": 27,
+    "purpose": "button"
+   },
+   {
+    "start_s": 28,
+    "purpose": "button"
+   },
+   {
+    "start_s": 29,
+    "purpose": "button"
+   }
+  ],
+  "performance": {
+   "bloxy": [
+    {
+     "t": 0.0,
+     "position": [
+      -0.6,
+      -0.4
+     ],
+     "facing": 30,
+     "expression": "startled",
+     "eye_target": {
+      "kind": "camera"
+     }
+    },
+    {
+     "t": 3.5,
+     "expression": "scared",
+     "eye_target": {
+      "kind": "prop",
+      "id": "button"
+     }
+    },
+    {
+     "t": 7.0,
+     "expression": "scared",
+     "eye_target": {
+      "kind": "prop",
+      "id": "crate"
+     }
+    },
+    {
+     "t": 10.5,
+     "expression": "determined",
+     "posture": "ready"
+    },
+    {
+     "t": 18.0,
+     "expression": "relieved",
+     "posture": "upright",
+     "eye_target": {
+      "kind": "character",
+      "id": "pip"
+     }
+    },
+    {
+     "t": 26.0,
+     "expression": "happy",
+     "eye_target": {
+      "kind": "camera"
+     }
+    }
+   ],
+   "pip": [
+    {
+     "t": 0.0,
+     "position": [
+      2.2,
+      1.0
+     ],
+     "facing": -110,
+     "expression": "bored",
+     "eyes": {
+      "open": 0.25
+     },
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     }
+    },
+    {
+     "t": 14.0,
+     "expression": "neutral",
+     "eyes": {
+      "open": 0.2
+     }
+    },
+    {
+     "t": 22.0,
+     "expression": "happy",
+     "eyes": {
+      "open": 0.15
+     }
+    },
+    {
+     "t": 26.0,
+     "expression": "happy",
+     "eyes": {
+      "open": 0.1
+     }
+    }
+   ]
+  },
+  "actions": [
+   {
+    "character": "bloxy",
+    "type": "flinch",
+    "t": 0.4,
+    "anticipation_frames": 2,
+    "main_frames": 10,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "push",
+    "t": 4.0,
+    "anticipation_frames": 4,
+    "main_frames": 10,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {
+     "prop": "button",
+     "hand": "right"
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "cower",
+    "t": 7.4,
+    "anticipation_frames": 4,
+    "main_frames": 12,
+    "follow_through_frames": 4,
+    "hold_frames": 50,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "stand_up",
+    "t": 10.8,
+    "anticipation_frames": 2,
+    "main_frames": 10,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "pip",
+    "type": "walk",
+    "t": 14.4,
+    "anticipation_frames": 2,
+    "main_frames": 70,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {
+     "to": [
+      1.2,
+      0.4
+     ]
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "facepalm",
+    "t": 18.6,
+    "anticipation_frames": 4,
+    "main_frames": 10,
+    "follow_through_frames": 6,
+    "hold_frames": 16,
+    "params": {
+     "hand": "left"
+    }
+   },
+   {
+    "character": "pip",
+    "type": "nod",
+    "t": 23.0,
+    "anticipation_frames": 2,
+    "main_frames": 30,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "nod",
+    "t": 27.0,
+    "anticipation_frames": 2,
+    "main_frames": 14,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   }
+  ],
+  "lines": [
+   {
+    "id": "l1",
+    "speaker": "bloxy",
+    "text": "What was that?!",
+    "t": 0.4,
+    "emotion": "startled",
+    "pace": "fast",
+    "volume": "loud"
+   },
+   {
+    "id": "l2",
+    "speaker": "bloxy",
+    "text": "Lamp on. Nothing. Totally fine.",
+    "t": 3.8,
+    "emotion": "scared",
+    "pace": "fast",
+    "volume": "soft"
+   },
+   {
+    "id": "l3",
+    "speaker": "bloxy",
+    "text": "Something is over there.",
+    "t": 8.0,
+    "emotion": "scared",
+    "pace": "slow",
+    "volume": "whisper"
+   },
+   {
+    "id": "l4",
+    "speaker": "bloxy",
+    "text": "Okay. Show yourself!",
+    "t": 11.0,
+    "emotion": "determined",
+    "pace": "normal",
+    "volume": "loud"
+   },
+   {
+    "id": "l5",
+    "speaker": "pip",
+    "text": "Mmm... pizza... must find...",
+    "t": 15.0,
+    "emotion": "neutral",
+    "pace": "slow",
+    "volume": "soft",
+    "delivery": "half-asleep mumble"
+   },
+   {
+    "id": "l6",
+    "speaker": "bloxy",
+    "text": "Pip? You're sleepwalking again.",
+    "t": 18.4,
+    "emotion": "relieved",
+    "pace": "normal",
+    "volume": "soft"
+   },
+   {
+    "id": "l7",
+    "speaker": "pip",
+    "text": "Extra cheese... please...",
+    "t": 23.4,
+    "emotion": "happy",
+    "pace": "slow",
+    "volume": "whisper"
+   },
+   {
+    "id": "l8",
+    "speaker": "bloxy",
+    "text": "Extra cheese. Back to bed.",
+    "t": 26.6,
+    "emotion": "happy",
+    "pace": "slow",
+    "volume": "soft"
+   }
+  ],
+  "sfx": [
+   {
+    "cue": "thud",
+    "t": 0.1
+   },
+   {
+    "cue": "click",
+    "t": 4.5
+   },
+   {
+    "cue": "footstep",
+    "t": 7.2
+   },
+   {
+    "cue": "gasp_sting",
+    "t": 7.6
+   },
+   {
+    "cue": "footstep",
+    "t": 14.6
+   }
+  ],
+  "music": [
+   {
+    "t": 0,
+    "cue": "mystery"
+   },
+   {
+    "t": 7.0,
+    "cue": "tension"
+   },
+   {
+    "t": 18.0,
+    "cue": "chill"
+   }
+  ],
+  "cover_t": 15.4,
+  "metadata": {
+   "title": "Something Is Under The Bed",
+   "description": "The scariest thing in the dark is a hungry friend.",
+   "tags": [
+    "roblox",
+    "animation",
+    "night",
+    "funny",
+    "wholesome"
+   ]
+  },
+  "inspiration": {
+   "note": "Original story written by Claude for this channel. Informed only by broad themes observed in research titles (twists, rivalry, rescues); no specific video.",
+   "sources": []
+  }
+ },
+ {
+  "source": "claude_session_2026_10_03",
+  "title": "The Lava Dare",
+  "logline": "Pip dares Bloxy to touch the lava block. Bloxy finds out what the sign meant.",
+  "duration_s": 30.0,
+  "story": {
+   "premise": "A glowing lava block sits beside a sign reading \"DECOR\".",
+   "conflict": "Pip swears it is harmless; Bloxy refuses to trust it.",
+   "stakes": "Bloxy's pride.",
+   "reveal": "The block is just decoration; Bloxy was scared of a lamp.",
+   "ending": "Bloxy proudly taps it, then sits on it like a chair.",
+   "ending_type": "twist"
+  },
+  "hook": {
+   "text": "Pip: \"I dare you to touch it.\"",
+   "question": "Is the lava real?",
+   "t_end": 3.0
+  },
+  "payoff": {
+   "text": "The terrifying lava block was furniture all along.",
+   "t_start": 22.0
+  },
+  "setting": {
+   "preset": "lava_obby",
+   "time_of_day": "night",
+   "lighting": "dramatic_rim",
+   "description": "A wide stone platform beside the lava sea, a glowing block and a sign.",
+   "props": [
+    {
+     "id": "floor",
+     "type": "platform",
+     "position": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      4.4,
+      3.0
+     ],
+     "color": "#7A7A7A"
+    },
+    {
+     "id": "lava",
+     "type": "lava_block",
+     "position": [
+      0.3,
+      0.9,
+      0.0
+     ]
+    },
+    {
+     "id": "sign",
+     "type": "sign",
+     "position": [
+      1.4,
+      1.1,
+      0.0
+     ],
+     "text": "DECOR"
+    }
+   ]
+  },
+  "cast": [
+   {
+    "id": "bloxy",
+    "character_id": "ch_bloxy"
+   },
+   {
+    "id": "pip",
+    "character_id": "ch_pip"
+   }
+  ],
+  "shots": [
+   {
+    "id": "s1",
+    "start_s": 0.0,
+    "end_s": 3.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s2",
+    "start_s": 3.0,
+    "end_s": 7.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_left",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s3",
+    "start_s": 7.0,
+    "end_s": 10.5,
+    "camera": {
+     "subject": "prop:lava",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s4",
+    "start_s": 10.5,
+    "end_s": 14.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s5",
+    "start_s": 14.0,
+    "end_s": 18.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium",
+     "framing_end": "medium",
+     "move": "static",
+     "side": "three_quarter_left",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s6",
+    "start_s": 18.0,
+    "end_s": 22.0,
+    "camera": {
+     "subject": "prop:sign",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s7",
+    "start_s": 22.0,
+    "end_s": 26.0,
+    "camera": {
+     "subject": "bloxy",
+     "framing_start": "medium_close",
+     "framing_end": "medium_close",
+     "move": "static",
+     "side": "front",
+     "angle": "eye"
+    }
+   },
+   {
+    "id": "s8",
+    "start_s": 26.0,
+    "end_s": 30.0,
+    "camera": {
+     "subject": "pip",
+     "framing_start": "medium",
+     "framing_end": "medium_close",
+     "move": "push_in",
+     "side": "three_quarter_right",
+     "angle": "eye"
+    }
+   }
+  ],
+  "beats": [
+   {
+    "start_s": 0,
+    "purpose": "hook",
+    "description": "Pip, grinning: the dare."
+   },
+   {
+    "start_s": 1,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 2,
+    "purpose": "hook"
+   },
+   {
+    "start_s": 3,
+    "purpose": "setup",
+    "description": "Bloxy backs away."
+   },
+   {
+    "start_s": 4,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 5,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 6,
+    "purpose": "setup"
+   },
+   {
+    "start_s": 7,
+    "purpose": "escalation",
+    "description": "The lava block glows and bubbles."
+   },
+   {
+    "start_s": 8,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 9,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 10,
+    "purpose": "escalation",
+    "description": "Bloxy psyches up."
+   },
+   {
+    "start_s": 11,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 12,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 13,
+    "purpose": "escalation"
+   },
+   {
+    "start_s": 14,
+    "purpose": "climax",
+    "description": "Bloxy reaches out, eyes shut, and touches it."
+   },
+   {
+    "start_s": 15,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 16,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 17,
+    "purpose": "climax"
+   },
+   {
+    "start_s": 18,
+    "purpose": "reveal",
+    "description": "The sign: DECOR."
+   },
+   {
+    "start_s": 19,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 20,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 21,
+    "purpose": "reveal"
+   },
+   {
+    "start_s": 22,
+    "purpose": "payoff",
+    "description": "Bloxy realises it is cool to the touch."
+   },
+   {
+    "start_s": 23,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 24,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 25,
+    "purpose": "payoff"
+   },
+   {
+    "start_s": 26,
+    "purpose": "button",
+    "description": "Pip laughs; Bloxy acts tough."
+   },
+   {
+    "start_s": 27,
+    "purpose": "button"
+   },
+   {
+    "start_s": 28,
+    "purpose": "button"
+   },
+   {
+    "start_s": 29,
+    "purpose": "button"
+   }
+  ],
+  "performance": {
+   "pip": [
+    {
+     "t": 0.0,
+     "position": [
+      1.6,
+      -0.5
+     ],
+     "facing": -80,
+     "expression": "smug",
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     }
+    },
+    {
+     "t": 14.0,
+     "expression": "curious",
+     "eye_target": {
+      "kind": "prop",
+      "id": "lava"
+     }
+    },
+    {
+     "t": 22.0,
+     "expression": "laughing",
+     "eye_target": {
+      "kind": "character",
+      "id": "bloxy"
+     }
+    }
+   ],
+   "bloxy": [
+    {
+     "t": 0.0,
+     "position": [
+      -0.9,
+      -0.2
+     ],
+     "facing": 60,
+     "expression": "worried",
+     "eye_target": {
+      "kind": "character",
+      "id": "pip"
+     }
+    },
+    {
+     "t": 3.0,
+     "expression": "scared",
+     "feet": {
+      "stance": "step_back"
+     }
+    },
+    {
+     "t": 7.0,
+     "expression": "worried",
+     "eye_target": {
+      "kind": "prop",
+      "id": "lava"
+     }
+    },
+    {
+     "t": 10.5,
+     "expression": "determined",
+     "feet": {
+      "stance": "neutral"
+     }
+    },
+    {
+     "t": 14.0,
+     "expression": "scared",
+     "eyes": {
+      "open": 0.1
+     }
+    },
+    {
+     "t": 18.0,
+     "expression": "confused",
+     "eyes": {
+      "open": 1.0
+     },
+     "eye_target": {
+      "kind": "prop",
+      "id": "sign"
+     }
+    },
+    {
+     "t": 22.0,
+     "expression": "embarrassed",
+     "eye_target": {
+      "kind": "camera"
+     }
+    },
+    {
+     "t": 26.0,
+     "expression": "proud",
+     "posture": "proud",
+     "eye_target": {
+      "kind": "character",
+      "id": "pip"
+     }
+    }
+   ]
+  },
+  "actions": [
+   {
+    "character": "pip",
+    "type": "point",
+    "t": 0.4,
+    "anticipation_frames": 4,
+    "main_frames": 10,
+    "follow_through_frames": 4,
+    "hold_frames": 20,
+    "params": {
+     "hand": "right"
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "head_shake",
+    "t": 3.4,
+    "anticipation_frames": 3,
+    "main_frames": 18,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "nod",
+    "t": 11.0,
+    "anticipation_frames": 2,
+    "main_frames": 14,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "walk",
+    "t": 12.2,
+    "anticipation_frames": 2,
+    "main_frames": 40,
+    "follow_through_frames": 4,
+    "hold_frames": 0,
+    "params": {
+     "to": [
+      -0.2,
+      0.4
+     ]
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "reach",
+    "t": 14.4,
+    "anticipation_frames": 6,
+    "main_frames": 18,
+    "follow_through_frames": 6,
+    "hold_frames": 20,
+    "params": {
+     "prop": "lava",
+     "hand": "right"
+    }
+   },
+   {
+    "character": "bloxy",
+    "type": "flinch",
+    "t": 17.0,
+    "anticipation_frames": 2,
+    "main_frames": 8,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {}
+   },
+   {
+    "character": "bloxy",
+    "type": "facepalm",
+    "t": 22.6,
+    "anticipation_frames": 4,
+    "main_frames": 10,
+    "follow_through_frames": 6,
+    "hold_frames": 14,
+    "params": {
+     "hand": "left"
+    }
+   },
+   {
+    "character": "pip",
+    "type": "celebrate",
+    "t": 26.4,
+    "anticipation_frames": 4,
+    "main_frames": 14,
+    "follow_through_frames": 6,
+    "hold_frames": 0,
+    "params": {}
+   }
+  ],
+  "lines": [
+   {
+    "id": "l1",
+    "speaker": "pip",
+    "text": "Touch it. I dare you.",
+    "t": 0.4,
+    "emotion": "smug",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l2",
+    "speaker": "bloxy",
+    "text": "That's lava! Nope. No way.",
+    "t": 3.6,
+    "emotion": "scared",
+    "pace": "fast",
+    "volume": "loud"
+   },
+   {
+    "id": "l3",
+    "speaker": "bloxy",
+    "text": "It's glowing. It's bubbling.",
+    "t": 7.4,
+    "emotion": "worried",
+    "pace": "normal",
+    "volume": "soft"
+   },
+   {
+    "id": "l4",
+    "speaker": "bloxy",
+    "text": "Fine. For honor.",
+    "t": 11.2,
+    "emotion": "determined",
+    "pace": "slow",
+    "volume": "normal"
+   },
+   {
+    "id": "l5",
+    "speaker": "bloxy",
+    "text": "Aaah! ...Huh?",
+    "t": 15.6,
+    "emotion": "scared",
+    "pace": "fast",
+    "volume": "loud"
+   },
+   {
+    "id": "l6",
+    "speaker": "pip",
+    "text": "Read the sign.",
+    "t": 18.6,
+    "emotion": "smug",
+    "pace": "slow",
+    "volume": "normal"
+   },
+   {
+    "id": "l7",
+    "speaker": "bloxy",
+    "text": "A lamp. I feared a lamp.",
+    "t": 22.4,
+    "emotion": "embarrassed",
+    "pace": "normal",
+    "volume": "normal"
+   },
+   {
+    "id": "l8",
+    "speaker": "pip",
+    "text": "So brave!",
+    "t": 26.6,
+    "emotion": "laughing",
+    "pace": "fast",
+    "volume": "loud"
+   }
+  ],
+  "sfx": [
+   {
+    "cue": "sizzle",
+    "t": 7.2
+   },
+   {
+    "cue": "rumble",
+    "t": 8.4
+   },
+   {
+    "cue": "drumroll",
+    "t": 13.6
+   },
+   {
+    "cue": "pop",
+    "t": 15.8
+   },
+   {
+    "cue": "ding",
+    "t": 18.4
+   },
+   {
+    "cue": "fail_horn",
+    "t": 22.8
+   }
+  ],
+  "music": [
+   {
+    "t": 0,
+    "cue": "playful"
+   },
+   {
+    "t": 7.0,
+    "cue": "tension"
+   },
+   {
+    "t": 18.0,
+    "cue": "mystery"
+   },
+   {
+    "t": 22.0,
+    "cue": "playful"
+   }
+  ],
+  "cover_t": 15.8,
+  "metadata": {
+   "title": "The Lava Dare",
+   "description": "Always read the sign first.",
+   "tags": [
+    "roblox",
+    "lava",
+    "obby",
+    "dare",
+    "animation"
+   ]
+  },
+  "inspiration": {
+   "note": "Original story written by Claude for this channel. Informed only by broad themes observed in research titles (twists, rivalry, rescues); no specific video.",
+   "sources": []
+  }
+ }
+]

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="csrf-token" content="{{ csrf }}">
+<title>Blox Studio</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+<aside id="side">
+  <div class="brand">▣ <span>BLOX<span class="thin">STUDIO</span></span></div>
+  <nav id="nav">
+    <button data-view="dashboard">◉ <span>Dashboard</span></button>
+    <button data-view="research">⌕ <span>Trend research</span></button>
+    <button data-view="productions">◫ <span>Director’s editor</span></button>
+    <button data-view="stories">✎ <span>Story backlog</span></button>
+    <button data-view="quality">✓ <span>Quality control</span></button>
+    <button data-view="calendar">▦ <span>Publishing calendar</span></button>
+    <button data-view="characters">☺ <span>Characters</span></button>
+    <button data-view="library">▧ <span>Media library</span></button>
+    <button data-view="queue">≡ <span>Work queue</span></button>
+    <button data-view="budget">$ <span>Budget & learning</span></button>
+    <button data-view="connections">⌘ <span>Connections</span></button>
+    <button data-view="settings">⚙ <span>Settings</span></button>
+  </nav>
+  <div class="side-bottom">
+    <div id="ap-chip" class="chip">Autopilot …</div>
+    <div id="worker-chip" class="chip">Worker …</div>
+    <button id="estop" class="danger small">Emergency stop</button>
+    <button id="logout" class="quiet small">Sign out</button>
+  </div>
+</aside>
+<main>
+  <header><div><p class="eyebrow" id="crumb">BLOX STUDIO</p><h1 id="title">Dashboard</h1></div><div id="header-actions"></div></header>
+  <div id="banner" hidden></div>
+  <div id="toast" role="status" aria-live="polite" hidden></div>
+  <section id="view"><p class="muted">Loading…</p></section>
+</main>
+</body>
+</html>

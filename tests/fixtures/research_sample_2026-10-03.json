@@ -1,0 +1,287 @@
+{
+ "_provenance": {
+  "source": "TubeAlfred MCP connector (search + video details), not the YouTube Data API",
+  "retrieved_at": "2026-10-03T03:45:00Z",
+  "query": "\"roblox animation story shorts\", uploads this week, under 3 minutes",
+  "notes": [
+   "Publish dates have day precision only.",
+   "A like count of 0 was reported for several videos and is treated as hidden/unavailable here.",
+   "Player embed sizes were not available, so aspect ratio is unknown.",
+   "No transcripts were available for any of these videos.",
+   "Converted into YouTube Data API v3 videos.list item shape for tests."
+  ]
+ },
+ "items": [
+  {
+   "kind": "youtube#video",
+   "id": "CxII-_8IHAs",
+   "snippet": {
+    "publishedAt": "2026-10-01T00:00:00Z",
+    "channelId": "UCMsxMi9IehTWf-FB_ZCCGCA",
+    "title": "FROM A MAID TO A PRINCESS, MY LIFE CHANGED #story #roblox #shorts #robloxedit",
+    "description": "",
+    "channelTitle": "lifeisluca",
+    "tags": [],
+    "categoryId": "20",
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT2M15S"
+   },
+   "statistics": {
+    "viewCount": "137664",
+    "commentCount": "547",
+    "likeCount": "7347"
+   },
+   "player": {}
+  },
+  {
+   "kind": "youtube#video",
+   "id": "yAiy_E9K1kg",
+   "snippet": {
+    "publishedAt": "2026-10-01T00:00:00Z",
+    "channelId": "UCEAvkQYtrsbLZ_x-hvMlVlg",
+    "title": "The \"Girl Code\" in action 💀 #shorts #roblox #animation",
+    "description": "",
+    "channelTitle": "VOXIT",
+    "tags": [],
+    "categoryId": "20",
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT31S"
+   },
+   "statistics": {
+    "viewCount": "96927",
+    "commentCount": "5",
+    "likeCount": "1550"
+   },
+   "player": {}
+  },
+  {
+   "kind": "youtube#video",
+   "id": "HrnHh96DV0s",
+   "snippet": {
+    "publishedAt": "2026-09-30T00:00:00Z",
+    "channelId": "UCupkeEMMR0qHFp23zb-0-3Q",
+    "title": "Police Officer Saved Her Life ❤️🚔 | Roblox Story #Shorts",
+    "description": "",
+    "channelTitle": "USA WIN",
+    "tags": [],
+    "categoryId": "20",
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT57S"
+   },
+   "statistics": {
+    "viewCount": "35454",
+    "commentCount": "3"
+   },
+   "player": {}
+  },
+  {
+   "kind": "youtube#video",
+   "id": "UxzEOysVAps",
+   "snippet": {
+    "publishedAt": "2026-09-30T00:00:00Z",
+    "channelId": "UCA6fBzMCYTWwyHRXB_Wbjlg",
+    "title": "Ranking Top 3 Most Funniest Roblox Animated Stories pt-6. #shorts #roblox #usa #storytime",
+    "description": "",
+    "channelTitle": "Ztrocs",
+    "tags": [],
+    "categoryId": "20",
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT2M21S"
+   },
+   "statistics": {
+    "viewCount": "33751",
+    "commentCount": "7"
+   },
+   "player": {}
+  },
+  {
+   "kind": "youtube#video",
+   "id": "rNj2MRwH0kY",
+   "snippet": {
+    "publishedAt": "2026-10-02T00:00:00Z",
+    "channelId": "UCvHWbDiELQiY-QaD0H5JpkA",
+    "title": "I should have ignored that call (ROBLOX LOVE STORY) ☎️💀 #ROBLOX #robloxstory",
+    "description": "",
+    "channelTitle": "SANDBOX BABY",
+    "tags": [],
+    "categoryId": "20",
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT45S"
+   },
+   "statistics": {
+    "viewCount": "32085",
+    "commentCount": "6",
+    "likeCount": "408"
+   },
+   "player": {}
+  },
+  {
+   "kind": "youtube#video",
+   "id": "0PqAE00Rd6o",
+   "snippet": {
+    "publishedAt": "2026-10-01T00:00:00Z",
+    "channelId": "UCa0_kkQ2ja3OAoJAo1MrW_w",
+    "title": "Bullies Made a Huge Mistake!  Roblox Emotia Escape Inspired by @GHS707x  @mirkino_aicomics  #roblox",
+    "description": "",
+    "channelTitle": "Mirkino AI Comics",
+    "tags": [],
+    "categoryId": "20",
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT1M0S"
+   },
+   "statistics": {
+    "viewCount": "26852",
+    "commentCount": "12",
+    "likeCount": "342"
+   },
+   "player": {}
+  },
+  {
+   "kind": "youtube#video",
+   "id": "2CJCWDM3aI4",
+   "snippet": {
+    "publishedAt": "2026-10-02T00:00:00Z",
+    "channelId": "UCA6fBzMCYTWwyHRXB_Wbjlg",
+    "title": "Ranking Top 3 Most Funniest Roblox Animated Stories pt-8. #shorts #roblox #usa #storytime",
+    "description": "",
+    "channelTitle": "Ztrocs",
+    "tags": [],
+    "categoryId": "20",
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT2M44S"
+   },
+   "statistics": {
+    "viewCount": "21773",
+    "commentCount": "5"
+   },
+   "player": {}
+  },
+  {
+   "kind": "youtube#video",
+   "id": "pzFLdcsdpBY",
+   "snippet": {
+    "publishedAt": "2026-10-02T00:00:00Z",
+    "channelId": "UCC5H1RXi-oe95y45cPGIJ_A",
+    "title": "Die With A Smile || He Saved Her Life🥺 || Roblox Edit #robloxshorts #roblox",
+    "description": "",
+    "channelTitle": "Noa Universe",
+    "tags": [],
+    "categoryId": "20",
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT17S"
+   },
+   "statistics": {
+    "viewCount": "12085",
+    "commentCount": "4",
+    "likeCount": "408"
+   },
+   "player": {}
+  },
+  {
+   "kind": "youtube#video",
+   "id": "vDhQWupzvv4",
+   "snippet": {
+    "publishedAt": "2026-10-01T00:00:00Z",
+    "channelId": "UCRXE12lyOAaug0fP9yL-PtQ",
+    "title": "When your Bro always cheats in games 💀 #roblox #shorts",
+    "description": "",
+    "channelTitle": "cartoon 3rd",
+    "tags": [],
+    "categoryId": "20",
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT43S"
+   },
+   "statistics": {
+    "viewCount": "6876",
+    "commentCount": "0"
+   },
+   "player": {}
+  },
+  {
+   "kind": "youtube#video",
+   "id": "jz-D3j5EIn4",
+   "snippet": {
+    "publishedAt": "2026-10-01T00:00:00Z",
+    "channelId": "UCVWRg32sWxGPX8-KQAWdDNA",
+    "title": "Todd Saves a Fairy From His Own Sister! 😱🧚 | Roblox Story #robloxedit #robloxshorts",
+    "description": "",
+    "channelTitle": "Roblox Gaming Studio",
+    "tags": [],
+    "categoryId": "20",
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT45S"
+   },
+   "statistics": {
+    "viewCount": "5500",
+    "commentCount": "1",
+    "likeCount": "142"
+   },
+   "player": {}
+  },
+  {
+   "kind": "youtube#video",
+   "id": "HpMKK2JrwtY",
+   "snippet": {
+    "publishedAt": "2026-10-02T00:00:00Z",
+    "channelId": "UCLOgJlRQRVK_uWTlofFvVNg",
+    "title": "He Sacrificed His Life to Save the Princess 😢❤️ #roblox #animation #shorts",
+    "description": "",
+    "channelTitle": "DrawnToonz",
+    "tags": [],
+    "categoryId": "20",
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT1M23S"
+   },
+   "statistics": {
+    "viewCount": "4817",
+    "commentCount": "1",
+    "likeCount": "135"
+   },
+   "player": {}
+  },
+  {
+   "kind": "youtube#video",
+   "id": "x2WOPQkmVOg",
+   "snippet": {
+    "publishedAt": "2026-10-02T00:00:00Z",
+    "channelId": "UC2wUa8TsOhDZj3p_vR7yIBQ",
+    "title": "Me vs Bro in STEAL A BRAINROT | ROBLOX ANIMATION #roblox #shorts #robloxanimation #usa",
+    "description": "",
+    "channelTitle": "Toonzy",
+    "tags": [],
+    "categoryId": "20",
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT35S"
+   },
+   "statistics": {
+    "viewCount": "4474",
+    "commentCount": "2"
+   },
+   "player": {}
+  }
+ ]
+}
