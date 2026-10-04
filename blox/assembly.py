@@ -22,7 +22,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Cap,{font},{size},&H00FFFFFF,&H00FFFFFF,&H00141414,&H64000000,-1,0,0,0,100,100,0,0,1,{outline},0,2,{ml},{mr},{mv},1
+Style: Cap,{font},{size},{text},{text},{edge},&H70000000,-1,0,0,0,100,100,0,0,1,{outline},{shadow},2,{ml},{mr},{mv},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -42,24 +42,57 @@ def _ass_text(s):
     return s.replace('\\', '').replace('{', '').replace('}', '').replace('\n', ' ')
 
 
+def _caption_text(lines, active):
+    """ASS text of a wrapped caption with token ``active`` (index over all tokens) in the highlight colour."""
+    out, k = [], 0
+    hi, lo = CL.ass_colour(CL.ACTIVE_COLOUR), CL.ass_colour(CL.TEXT_COLOUR)
+    for line in lines:
+        toks = []
+        for tok in line.split():
+            t = _ass_text(tok)
+            toks.append('{\\1c' + hi + '&}' + t + '{\\1c' + lo + '&}' if k == active else t)
+            k += 1
+        out.append(' '.join(toks))
+    return r'\N'.join(out)
+
+
+def caption_segments(c):
+    """(start_frame, end_frame, active word index) runs covering the caption's display time."""
+    words = c.get('words') or [{'start_frame': c['start_frame'], 'end_frame': c['end_frame']}]
+    segs = [(max(c['start_frame'], w['start_frame']), min(c['end_frame'], w['end_frame']), i) for i, w in enumerate(words)]
+    segs = [s for s in segs if s[1] > s[0]]
+    return segs or [(c['start_frame'], c['end_frame'], 0)]
+
+
 def write_captions(m, prefs, path, width, height, positions=None):
+    """One subtitle event per active word, so the spoken word turns yellow (estimated timing when the line
+    was not aligned); the caption pops in on its first event and fades out on its last."""
     pr = prefs['production']
     mt = CL.metrics(width, height, pr)
     out = [ASS_HEADER.format(w=width, h=height, font=pr['caption_font'], size=mt['font_size'], outline=mt['outline'],
+                             shadow=mt['shadow'], text=CL.ass_colour(CL.TEXT_COLOUR), edge=CL.ass_colour(CL.OUTLINE_COLOUR),
                              ml=mt['left'], mr=width - mt['right'], mv=height - mt['bottom'])]
     layout = []
     top_y = CL.top_anchor(height, pr)
+    fps = m['fps']
     for c in m['captions']:
         pos = (positions or {}).get(c['id'], 'bottom')
         lines, _ = CL.wrap(c['text'], width, height, pr)
-        tag = r'{\fad(40,40)}' if pos == 'bottom' else r'{\an8\fad(40,40)}'
-        text = tag + r'\N'.join(_ass_text(l) for l in lines)
         mv = 0 if pos == 'bottom' else top_y
-        out.append(f'Dialogue: 0,{_ass_time(c["start_frame"], m["fps"])},{_ass_time(c["end_frame"], m["fps"])},Cap,,0,0,'
-                   f'{mv},,{text}\n')
+        segs = caption_segments(c)
+        for j, (a, b, active) in enumerate(segs):
+            tags = '' if pos == 'bottom' else r'\an8'
+            if j == 0:
+                tags += r'\fscx86\fscy86\t(0,90,\fscx100\fscy100)'
+            fade_in, fade_out = (40 if j == 0 else 0), (40 if j == len(segs) - 1 else 0)
+            if fade_in or fade_out:
+                tags += f'\\fad({fade_in},{fade_out})'
+            text = ('{' + tags + '}' if tags else '') + _caption_text(lines, active if c.get('words') else -1)
+            out.append(f'Dialogue: 0,{_ass_time(a, fps)},{_ass_time(b, fps)},Cap,,0,0,{mv},,{text}\n')
         bx, _ = CL.box(c['text'], width, height, pr, pos)
         layout.append({'id': c['id'], 'text': c['text'], 'lines': lines, 'box': bx, 'start_frame': c['start_frame'],
-                       'end_frame': c['end_frame'], 'timing': c['timing'], 'position': pos})
+                       'end_frame': c['end_frame'], 'timing': c['timing'], 'position': pos,
+                       'words': c.get('words') or []})
     with open(path, 'w', encoding='utf-8') as f:
         f.write(''.join(out))
     return layout
@@ -112,7 +145,11 @@ def mix(m, line_audio, prefs, work_dir, music_asset=None):
     sfx = np.zeros(n)
     for x in m['sfx']:
         clip = synth.sfx(x['cue'], seed=7)
-        _place(sfx, clip / (np.max(np.abs(clip)) or 1.0) * 0.6, x['frame'] / fps, 10 ** (x['gain_db'] / 20))
+        start = x['frame'] / fps
+        if x.get('align') == 'peak':
+            # Automatic cut whooshes peak on the cut frame instead of starting there.
+            start = max(0.0, start - int(np.argmax(np.abs(clip))) / A.SR)
+        _place(sfx, clip / (np.max(np.abs(clip)) or 1.0) * 0.6, start, 10 ** (x['gain_db'] / 20))
     if pr['music'] == 'none':
         music = np.zeros(n)
         music_source = 'none'
@@ -122,11 +159,14 @@ def mix(m, line_audio, prefs, work_dir, music_asset=None):
         music = np.tile(raw, reps)[:n]
         music_source = 'owner_asset'
     else:
-        music = synth.music_track([(mu['frame'] / fps, mu['cue']) for mu in m['music']], total)[:n]
+        music = synth.music_track([(mu['frame'] / fps, mu['cue'], mu.get('section', 0)) for mu in m['music']],
+                                  total)[:n]
         if len(music) < n:
             music = np.concatenate([music, np.zeros(n - len(music))])
         music_source = 'generated'
     music = music * 10 ** (pr['music_gain_db'] / 20)
+    drops = [(d['start_frame'] / fps, d['end_frame'] / fps) for d in m.get('music_dropouts', [])]
+    music = synth.apply_dropouts(music, drops)
     gains, env_db = duck_envelope(dialog, pr['duck_db'])
     music_ducked = music * gains
     master = dialog + sfx * 0.7 + music_ducked
@@ -145,7 +185,9 @@ def mix(m, line_audio, prefs, work_dir, music_asset=None):
                tp=min(-1.5, qa['true_peak_max_dbtp'] - 0.5), channels=2)
     speech_frac = float(np.mean(env_db < -1)) if len(env_db) else 0.0
     return {'paths': paths, 'placements': placements, 'music_source': music_source,
-            'ducking': {'duck_db': pr['duck_db'], 'fraction_ducked': round(speech_frac, 3)}}
+            'ducking': {'duck_db': pr['duck_db'], 'fraction_ducked': round(speech_frac, 3)},
+            'music_dropouts_s': [[round(a, 3), round(b, 3)] for a, b in drops],
+            'auto_sfx': sum(1 for x in m['sfx'] if x.get('auto'))}
 
 
 def concat_shots(m, shot_files, work_dir):
@@ -165,9 +207,35 @@ def concat_shots(m, shot_files, work_dir):
     with open(listing, 'w') as f:
         f.write(''.join(f"file '{p}'\n" for p in parts))
     joined = os.path.join(work_dir, 'joined.mp4')
+    freezes = [e for e in m.get('effects', []) if e.get('type') == 'freeze']
+    first = 'joined_cut.mp4' if freezes else 'joined.mp4'
     media.run([config.FFMPEG_BIN, '-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', 'concat.txt', '-an',
-               '-c', 'copy', 'joined.mp4'], cwd=work_dir)
+               '-c', 'copy', first], cwd=work_dir)
+    if freezes:
+        apply_freezes(freezes, work_dir, first, 'joined.mp4')
     return joined
+
+
+def freeze_graph(freezes, src='0:v', ref='1:v'):
+    """FFmpeg filter graph that holds frame f for n frames (f+1..f+n-1 repeat f) for every freeze.
+    The frame count, and so the sync with the sound, is unchanged. Returns (graph, output label)."""
+    k = len(freezes)
+    parts = [f'[{ref}]split={k}' + ''.join(f'[r{i}]' for i in range(k))] if k > 1 else []
+    cur = f'[{src}]'
+    for i, e in enumerate(sorted(freezes, key=lambda e: e['frame'])):
+        r = f'[r{i}]' if k > 1 else f'[{ref}]'
+        parts.append(f'{cur}{r}freezeframes=first={e["frame"] + 1}:last={e["frame"] + e["frames"] - 1}:'
+                     f'replace={e["frame"]}[v{i}]')
+        cur = f'[v{i}]'
+    return ';'.join(parts), cur
+
+
+def apply_freezes(freezes, work_dir, src, dst):
+    """Freeze frames go into the joined picture, before captions: the captionless reference QA compares the
+    final against holds the same frames, and the captions keep running over the held picture."""
+    graph, out = freeze_graph(freezes)
+    media.run([config.FFMPEG_BIN, '-y', '-v', 'error', '-i', src, '-i', src, '-filter_complex', graph, '-map', out,
+               '-c:v', 'libx264', '-crf', '16', '-pix_fmt', 'yuv420p', '-an', dst], cwd=work_dir)
 
 
 def final_encode(m, joined, master_wav, captions_ass, work_dir, burn_captions=True):

@@ -3,6 +3,10 @@
 The validator uses ``fits`` before rendering; the assembler writes the same
 layout into an ASS subtitle file (pixel coordinates, PlayRes = frame size);
 QA then measures where caption pixels actually landed in the rendered video.
+
+Style: bold white sans in 1-3 word chunks with a heavy black outline and a
+soft drop shadow, low in the frame above the Shorts UI; the word being spoken
+turns yellow. The outline and the shadow are part of every box and fit test.
 """
 import functools
 import os
@@ -15,6 +19,11 @@ FONT_CANDIDATES = [
     '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
 ]
 MAX_LINES = 2
+OUTLINE_RATIO = 0.17   # outline thickness / font size: a heavy, sticker-like black edge
+SHADOW_RATIO = 0.06    # drop shadow offset / font size
+TEXT_COLOUR = '#FFFFFF'
+ACTIVE_COLOUR = '#FFD60A'  # the word being spoken
+OUTLINE_COLOUR = '#000000'
 
 
 def font_path():
@@ -32,11 +41,12 @@ def _font(size):
 def metrics(width, height, pr):
     sa = pr['safe_area']
     size = max(12, int(round(pr['caption_font_size_ratio'] * height)))
-    outline = max(2, size // 9)
+    outline = max(3, int(round(size * OUTLINE_RATIO)))
+    shadow = max(1, int(round(size * SHADOW_RATIO)))
     left, right = int(sa['left'] * width), int(sa['right'] * width)
-    bottom = int((sa['bottom'] - 0.015) * height)
-    return {'font_size': size, 'outline': outline, 'left': left, 'right': right, 'bottom': bottom,
-            'max_width': right - left - 2 * outline, 'line_height': int(size * 1.18),
+    bottom = int((sa['bottom'] - 0.015) * height) - shadow
+    return {'font_size': size, 'outline': outline, 'shadow': shadow, 'left': left, 'right': right, 'bottom': bottom,
+            'max_width': right - left - 2 * outline - shadow, 'line_height': int(size * 1.18),
             'top_limit': int(sa['top'] * height)}
 
 
@@ -59,6 +69,16 @@ def wrap(text, width, height, pr):
             cur = trial
     if cur:
         lines.append(cur)
+    if len(lines) == 2:
+        # Balance a two-line caption (no single word stranded on the second line) when both halves fit.
+        best = None
+        for k in range(1, len(words)):
+            a, b = ' '.join(words[:k]), ' '.join(words[k:])
+            wa, wb = text_width(a, mt['font_size']), text_width(b, mt['font_size'])
+            if max(wa, wb) <= mt['max_width'] and (best is None or max(wa, wb) < best[0]):
+                best = (max(wa, wb), [a, b])
+        if best:
+            lines = best[1]
     return lines, mt
 
 
@@ -84,15 +104,22 @@ def box(text, width, height, pr, position='bottom'):
     lines, mt = wrap(text, width, height, pr)
     widest = max((text_width(l, mt['font_size']) for l in lines), default=0)
     cx = (mt['left'] + mt['right']) / 2
+    sh = mt.get('shadow', 0)
     x0 = cx - widest / 2 - mt['outline']
-    x1 = cx + widest / 2 + mt['outline']
+    x1 = cx + widest / 2 + mt['outline'] + sh
     if position == 'top':
         y0 = top_anchor(height, pr) - mt['outline']
-        y1 = top_anchor(height, pr) + len(lines) * mt['line_height'] + mt['outline']
+        y1 = top_anchor(height, pr) + len(lines) * mt['line_height'] + mt['outline'] + sh
     else:
-        y1 = mt['bottom'] + mt['outline']
+        y1 = mt['bottom'] + mt['outline'] + sh
         y0 = mt['bottom'] - len(lines) * mt['line_height'] - mt['outline']
     return [int(x0), int(y0), int(x1), int(y1)], lines
+
+
+def ass_colour(hex_rgb, alpha=0):
+    """'#RRGGBB' -> ASS '&HAABBGGRR' (alpha 0 = opaque)."""
+    h = hex_rgb.lstrip('#')
+    return f'&H{alpha:02X}{h[4:6]}{h[2:4]}{h[0:2]}'.upper()
 
 
 def face_boxes(rec_chars, width, height):

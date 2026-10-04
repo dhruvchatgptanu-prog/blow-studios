@@ -87,7 +87,7 @@ def plan_schema(cast_ids, character_ids):
                           'camera': obj({'subject': STR, 'framing_start': enum(S.FRAMINGS),
                                          'framing_end': enum(S.FRAMINGS), 'angle': enum(S.CAMERA_ANGLES),
                                          'side': enum(S.CAMERA_SIDES), 'move': enum(S.CAMERA_MOVES),
-                                         'ease': enum(S.EASES), 'shake': N})})),
+                                         'ease': enum(S.EASES), 'shake': N, 'punch_t': NN})})),
         'beats': arr(obj({'start_s': N, 'purpose': enum(S.PURPOSES), 'description': STR, 'continuity': arr(STR)})),
         'performance': arr(obj({
             'character': enum(cast_ids), 't': N, 'expression': enum(S.EXPRESSIONS, True),
@@ -112,6 +112,9 @@ def plan_schema(cast_ids, character_ids):
                           'pause_after_ms': N, 'delivery': STR})),
         'sfx': arr(obj({'cue': enum(S.SFX_CUES), 't': N, 'gain_db': N})),
         'music': arr(obj({'t': N, 'cue': enum(S.MUSIC_CUES)})),
+        'effects': arr(obj({'type': enum(S.EFFECTS), 't': N, 'frames': NN, 'strength': NN})),
+        'style': obj({'expression_snap': enum(S.EXPRESSION_SNAP), 'whoosh_on_cuts': {'type': 'boolean'},
+                      'music_dropout': {'type': 'boolean'}}),
         'cover_t': N,
         'metadata': obj({'title': STR, 'description': STR, 'tags': arr(STR)}),
     })
@@ -149,6 +152,10 @@ def to_plan(data):
         acts.append({k: a[k] for k in ('character', 'type', 't', 'anticipation_frames', 'main_frames',
                                        'follow_through_frames', 'hold_frames')} | {'params': params})
     p['actions'] = acts
+    p['effects'] = [{k: v for k, v in e.items() if v is not None} for e in p.get('effects') or []]
+    for s in p.get('shots', []):
+        if (s.get('camera') or {}).get('punch_t', 0) is None:
+            s['camera'].pop('punch_t')
     for s in p.get('setting', {}).get('props', []):
         if s.get('size') is None:
             s.pop('size', None)
@@ -215,7 +222,7 @@ EXAMPLE = {
     'note': 'Format example only (first seconds of a different story). Write a new story; do not copy.',
     'shots': [{'id': 's1', 'start_s': 0, 'end_s': 3.5, 'transition_in': 'cut',
                'camera': {'subject': 'hero', 'framing_start': 'medium', 'framing_end': 'close_up', 'angle': 'eye',
-                          'side': 'front', 'move': 'push_in', 'ease': 'in_out', 'shake': 0}}],
+                          'side': 'front', 'move': 'push_in', 'ease': 'in_out', 'shake': 0, 'punch_t': None}}],
     'performance': [{'character': 'hero', 't': 0.0, 'expression': 'curious', 'position': [0.6, 0], 'facing': 90,
                      'eye_target': {'kind': 'point', 'id': None, 'point': [2.2, 0.2, 0.6]}, 'head': None,
                      'brows': None, 'eyes': None, 'mouth': None, 'shoulders_raise': None, 'arms': None,
@@ -269,6 +276,12 @@ def plan_rules(prefs):
         'Use only original names and situations. No real people, brands other than generic game references, '
         'dangerous imitable stunts, or claims of real gameplay.',
         'Metadata title <= 90 characters; description 1-3 sentences, no external links.',
+        'Comedy edit tools (optional, use sparingly): camera move zoom_punch snaps from framing_start to a tighter '
+        'framing_end at punch_t (a reaction or a reveal); effects "shake" (strength 0-1) on an impact; at most one '
+        '"freeze" (6-30 frames) on a shocked face in a pause between lines, never over dialogue or across a cut. '
+        'style.expression_snap "cut" swaps faces on cuts; style.whoosh_on_cuts adds whooshes in fast stretches; '
+        'style.music_dropout silences the music for a moment before the punchline. Big-reaction expressions: '
+        'screaming, smug_max, mischief, frozen.',
     ]
     if pace != 1.0:
         rate = float(pace_kwargs(prefs)['speech_rate'])

@@ -110,6 +110,9 @@ def interp_pose(a, b, u):
             if isinstance(a[part][k], (int, float)) and isinstance(b[part].get(k), (int, float)):
                 out[part][k] = round(_lerp(a[part][k], b[part][k], e), 4)
     out['mouth']['open'] = round(_lerp(a['mouth']['open'], b['mouth']['open'], e), 4)
+    if 'pupil' in a['eyes'] or 'pupil' in b['eyes']:
+        # Optional control (absent = 1): blend it like the other numbers instead of switching at u = 0.5.
+        out['eyes']['pupil'] = round(_lerp(a['eyes'].get('pupil', 1.0), b['eyes'].get('pupil', 1.0), e), 4)
     return out
 
 
@@ -249,7 +252,11 @@ def _phase_lengths(start_frame, start_story_frame, lengths, pace):
     return out
 
 
-def split_caption_groups(text, max_words=4, max_chars=26):
+CAPTION_MAX_WORDS = 3   # punchy 1-3 word chunks
+CAPTION_MAX_CHARS = 16  # mostly one line at the default caption size
+
+
+def split_caption_groups(text, max_words=CAPTION_MAX_WORDS, max_chars=CAPTION_MAX_CHARS):
     ws = text.split()
     groups, cur = [], []
     for w in ws:
@@ -267,9 +274,46 @@ def split_caption_groups(text, max_words=4, max_chars=26):
     return groups
 
 
+def _token_spans(tokens, spans):
+    """Give each whitespace token of a caption the [start, end) of its spoken words. ``spans`` lists one
+    (start, end) per spoken word (WORD_RE words) of the caption in order; a token without letters or
+    digits (a dash, an ellipsis) shares the span of the token before it (or after it, when first)."""
+    out, i = [], 0
+    for tok in tokens:
+        n = len(words(tok))
+        if n and i < len(spans):
+            seg = spans[i:i + n]
+            out.append([seg[0][0], seg[-1][1]])
+            i += n
+        else:
+            out.append(None)
+    for k in range(len(out)):
+        if out[k] is None:
+            out[k] = list(out[k - 1]) if k and out[k - 1] else None
+    for k in range(len(out) - 1, -1, -1):
+        if out[k] is None and k + 1 < len(out) and out[k + 1]:
+            out[k] = list(out[k + 1])
+    return out
+
+
+def _estimated_spans(tokens, start, end):
+    """Spread a caption's tokens over [start, end) by length (longer words take longer to say)."""
+    weight = [len(re.sub(r'[^A-Za-z0-9]', '', t)) + 2 for t in tokens]
+    total = float(sum(weight)) or 1.0
+    out, acc = [], 0.0
+    for w in weight:
+        a = start + (end - start) * acc / total
+        acc += w
+        out.append([a, start + (end - start) * acc / total])
+    return out
+
+
 def captions_for(lines, fps, timings=None):
     """Caption groups per line. ``timings`` maps line_id -> list of word dicts
-    {word, start, end} in seconds relative to the video start (aligned)."""
+    {word, start, end} in seconds relative to the video start (aligned).
+
+    Every caption lists its words with frames ('words': [{text, start_frame, end_frame}]) so the active
+    word can be highlighted: measured when the line is aligned, else estimated from word lengths."""
     caps = []
     for ln in lines:
         groups = split_caption_groups(ln['text'])
@@ -285,8 +329,10 @@ def captions_for(lines, fps, timings=None):
                 i += n
                 if not seg:
                     continue
+                spans = _token_spans(g.split(), [(w['start'] * fps, w['end'] * fps) for w in seg])
                 caps.append({'line_id': ln['id'], 'text': g, 'start_frame': int(math.floor(seg[0]['start'] * fps)),
-                             'end_frame': int(math.ceil(seg[-1]['end'] * fps)), 'timing': 'aligned'})
+                             'end_frame': int(math.ceil(seg[-1]['end'] * fps)), 'timing': 'aligned',
+                             'word_spans': spans})
         else:
             span = ln['est_end_frame'] - ln['start_frame']
             total = max(1, len(ws_all))
@@ -295,7 +341,7 @@ def captions_for(lines, fps, timings=None):
                 n = max(1, len(words(g)))
                 dur = int(round(span * n / total))
                 caps.append({'line_id': ln['id'], 'text': g, 'start_frame': cursor, 'end_frame': cursor + dur,
-                             'timing': 'estimated'})
+                             'timing': 'estimated', 'word_spans': _estimated_spans(g.split(), cursor, cursor + dur)})
                 cursor += dur
     # Hold each caption until the next one starts if the gap is short, so text
     # does not flicker; enforce a minimum display time.
@@ -309,7 +355,25 @@ def captions_for(lines, fps, timings=None):
                 c['end_frame'] = nxt
             c['end_frame'] = min(c['end_frame'], nxt)
         c['id'] = f'c{i + 1:03d}'
+        c['words'] = _caption_words(c)
     return caps
+
+
+def _caption_words(c):
+    """Active-word timing inside the caption's display time: each word is active from its own start (the
+    first from the caption start) until the next word starts (the last until the caption ends), so exactly
+    one word is highlighted at any moment the caption shows."""
+    tokens = c['text'].split()
+    spans = c.pop('word_spans', None) or _estimated_spans(tokens, c['start_frame'], c['end_frame'])
+    a, b = c['start_frame'], c['end_frame']
+    starts = [min(b - 1, max(a, int(round(sp[0])))) if sp else a for sp in spans]
+    for k in range(1, len(starts)):
+        starts[k] = max(starts[k], starts[k - 1])
+    out = []
+    for k, tok in enumerate(tokens):
+        end = starts[k + 1] if k + 1 < len(tokens) else b
+        out.append({'text': tok, 'start_frame': starts[k] if k else a, 'end_frame': end})
+    return out
 
 
 def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_rate=1.0):
@@ -354,6 +418,7 @@ def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_
         'inspiration': copy.deepcopy(plan.get('inspiration') or {}),
         'notes': [],
         'pace': {'timeline': pace, 'speech_rate': speech_rate},
+        'style': plan_style(plan),
     }
     # Storytime: the cast id whose voice reads the narration lines (voice-over, no lip sync).
     narrator = plan.get('narrator')
@@ -379,6 +444,14 @@ def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_
     shots = []
     for i, s in enumerate(plan.get('shots') or []):
         cam = copy.deepcopy(s.get('camera') or {})
+        if cam.get('move') == 'zoom_punch':
+            s0, s1 = F(s.get('start_s')), F(s.get('end_s'))
+            punch = {'punch_frames': max(S.ZOOM_PUNCH_MIN_FRAMES, N(int(_num(cam.get('punch_frames'),
+                                                                                S.ZOOM_PUNCH_FRAMES))))}
+            punch['punch_frame'] = (F(cam['punch_t']) if cam.get('punch_t') is not None
+                                    else s0 + int(round((s1 - s0) * 0.3)))
+        else:
+            punch = {}
         shots.append({
             'id': str(s.get('id') or f's{i + 1}'),
             'start_frame': F(s.get('start_s')),
@@ -397,6 +470,7 @@ def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_
                 'ease': cam.get('ease', 'in_out'),
                 'shake': _num(cam.get('shake'), 0),
                 'lens_mm': (_num(cam.get('lens_mm'), 0) or None),
+                **punch,
             },
         })
     shots.sort(key=lambda s: s['start_frame'])
@@ -425,6 +499,8 @@ def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_
             entry = {'frame': f, 'pose': pose, 'explicit': {x for x in ('position', 'facing') if k.get(x) is not None}}
             if k.get('blend_frames') is not None:
                 entry['blend_frames'] = max(1, N(int(_num(k['blend_frames'], 8))))
+            if k.get('snap'):
+                entry['blend_frames'] = 1  # a face swap: the new pose is on from this frame
             if k.get('note'):
                 entry['note'] = str(k['note'])[:300]
             if keys and keys[-1]['frame'] == f:
@@ -433,6 +509,8 @@ def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_
                 keys.append(entry)
             prev = pose
         tracks[cid] = {'keys': keys}
+    if m['style']['expression_snap'] == 'cut':
+        _snap_expressions_to_cuts(m, tracks, max(1, N(DEFAULT_BLEND_FRAMES)), max(1, N(S.SNAP_WINDOW_FRAMES)))
 
     # Actions
     actions = []
@@ -536,7 +614,7 @@ def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_
         closed = []
         keys = tracks[cid]['keys']
         for k0, k1 in zip(keys, keys[1:] + [{'frame': D}]):
-            if k0['pose']['eyes']['open'] < 0.45:
+            if k0['pose']['eyes']['open'] < 0.45 or k0['pose'].get('expression') in S.NO_BLINK_EXPRESSIONS:
                 closed.append((k0['frame'], k1['frame']))
         for a in actions:
             if a['character'] == cid and a['type'] == 'turn':
@@ -566,12 +644,133 @@ def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_
     m['captions'] = captions_for(lines, fps)
     m['sfx'] = [{'id': f'x{i + 1}', 'cue': x.get('cue'), 'frame': F(x.get('t')),
                  'gain_db': _num(x.get('gain_db'), -6)} for i, x in enumerate(plan.get('sfx') or [])]
+    if m['style']['whoosh_on_cuts']:
+        _cut_whooshes(m, fps, pace)
     m['music'] = [{'frame': F(x.get('t')), 'cue': x.get('cue', 'playful')}
                   for x in (plan.get('music') or [{'t': 0, 'cue': 'playful'}])]
+    if len(m['music']) == 1:
+        _act_turn_sections(m, plan, F)
+    m['music_dropouts'] = _music_dropouts(m, plan, F, fps, pace)
+    m['effects'] = _effects(plan, F, N)
     m['cover_frame'] = min(D - 1, max(0, F(plan.get('cover_t'), min(2.0, duration_s / 3))))
 
     m['beats'] = derive_beats(m, plan.get('beats') or [])
     return m
+
+
+def plan_style(plan):
+    """The plan's edit style (schema.STYLE_DEFAULTS filled in; unknown values are kept for the validator)."""
+    st = dict(S.STYLE_DEFAULTS)
+    raw = plan.get('style') if isinstance(plan.get('style'), dict) else {}
+    for k in st:
+        if k in raw and raw[k] is not None:
+            st[k] = raw[k] if k == 'expression_snap' else bool(raw[k])
+    return st
+
+
+def _snap_expressions_to_cuts(m, tracks, blend0, window):
+    """Face swaps on the cut: an expression change whose blend would straddle a cut, or that lands within
+    ``window`` frames of one, moves onto the cut frame and switches there in one frame (the old face holds
+    to the end of the outgoing shot, the new one opens the next). Keys that also place or turn the character
+    (and automatic keys) keep their timing."""
+    cuts = sorted({sh['start_frame'] for sh in m['shots'] if sh['start_frame'] > 0})
+    if not cuts:
+        return
+    for cid, tr in tracks.items():
+        keys = tr['keys']
+        for i in range(1, len(keys)):
+            k, prev = keys[i], keys[i - 1]
+            if k.get('auto') or k.get('explicit') or k['pose'].get('expression') == prev['pose'].get('expression'):
+                continue
+            blend = k.get('blend_frames') or min(k['frame'] - prev['frame'], blend0)
+            nxt = keys[i + 1]['frame'] if i + 1 < len(keys) else m['duration_frames']
+            near = [c for c in cuts if k['frame'] - blend - window <= c <= k['frame'] + window
+                    and prev['frame'] < c < nxt]
+            if not near:
+                continue
+            c = min(near, key=lambda x: (abs(x - k['frame']), x))
+            if c != k['frame']:
+                k['authored_frame'] = k['frame']
+                k['frame'] = c
+            k['blend_frames'] = 1
+            k['snap'] = 'cut'
+
+
+def _cut_whooshes(m, fps, pace):
+    """A soft whoosh on cuts, peaking on the cut frame. Skipped where an authored sound already lands near
+    the cut, after a fade, and when the previous whoosh is too close (a whoosh on every 1 s cut is enough)."""
+    near, gap = fr(0.3 / pace, fps), fr(0.6 / pace, fps)
+    taken = [x['frame'] for x in m['sfx']]
+    last = None
+    for sh in m['shots']:
+        c = sh['start_frame']
+        if c <= 0 or sh.get('transition_in') == 'fade_in' or any(abs(t - c) <= near for t in taken):
+            continue
+        if last is not None and c - last < gap:
+            continue
+        m['sfx'].append({'id': f'xc{len(m["sfx"]) + 1}', 'cue': 'whoosh', 'frame': c, 'gain_db': S.CUT_WHOOSH_GAIN_DB,
+                         'auto': 'cut', 'align': 'peak'})
+        last = c
+
+
+ACT_TURNS = (('inciting', 'escalation'), ('climax', 'reveal'), ('payoff', 'button'))
+
+
+def _act_turn_sections(m, plan, F):
+    """A plan with one music cue gets a new section of that cue at each act turn (the first beat of the
+    escalation, the climax or reveal, and the payoff), so the bed changes where the story turns."""
+    cue = m['music'][0]['cue']
+    if cue == 'none':
+        return
+    beats = sorted((b for b in (plan.get('beats') or []) if isinstance(b, dict)),
+                   key=lambda b: _num(b.get('start_s', b.get('t', 0))))
+    after, section = m['music'][0]['frame'], 0
+    for group in ACT_TURNS:
+        f = next((F(b.get('start_s', b.get('t', 0))) for b in beats if b.get('purpose') in group
+                  and F(b.get('start_s', b.get('t', 0))) > after), None)
+        if f is None or f >= m['duration_frames']:
+            continue
+        section += 1
+        m['music'].append({'frame': f, 'cue': cue, 'section': section, 'auto': 'act_turn'})
+        after = f
+
+
+def _music_dropouts(m, plan, F, fps, pace):
+    """The music stops for a moment before the punchline. The plan may place it ('music_dropout':
+    {'t': when the music comes back, 'duration_s'}); otherwise it ends where the first line at or after the
+    payoff starts. 'style': {'music_dropout': false} or 'music_dropout': false turns it off."""
+    md = plan.get('music_dropout')
+    if md is False or not m['style']['music_dropout']:
+        return []
+    if isinstance(md, dict) and md.get('t') is not None:
+        end, src = F(md['t']), 'plan'
+        dur = fr(_num(md.get('duration_s'), S.MUSIC_DROPOUT_S) / pace, fps)
+    elif (plan.get('payoff') or {}).get('t_start') is not None:
+        p = m['payoff']['start_frame']
+        end = next((ln['start_frame'] for ln in m['lines'] if ln['start_frame'] >= p), p)
+        dur, src = fr(S.MUSIC_DROPOUT_S / pace, fps), 'payoff'
+    else:
+        return []
+    start = max(0, end - max(1, dur))
+    if end <= 0 or end > m['duration_frames']:
+        return []
+    return [{'start_frame': start, 'end_frame': end, 'source': src}]
+
+
+def _effects(plan, F, N):
+    out = []
+    for i, e in enumerate(plan.get('effects') or []):
+        if not isinstance(e, dict):
+            continue
+        typ = e.get('type')
+        frames = N(int(_num(e.get('frames'), S.EFFECT_DEFAULT_FRAMES.get(typ, 8))))
+        eff = {'id': str(e.get('id') or f'e{i + 1}'), 'type': typ, 'frame': F(e.get('t')),
+               'frames': max(S.EFFECT_MIN_FRAMES.get(typ, 1), frames)}
+        if typ == 'shake':
+            eff['strength'] = _num(e.get('strength'), 0.7)
+        out.append(eff)
+    out.sort(key=lambda e: e['frame'])
+    return out
 
 
 def _keep_jump_plausible(m, a, keys, story_main, fps, pace):
@@ -639,8 +838,13 @@ def _shot_at(m, f):
 
 def camera_state(shot, f):
     span = max(1, shot['end_frame'] - shot['start_frame'])
-    u = _ease((f - shot['start_frame']) / span, shot['camera']['ease'])
     cam = shot['camera']
+    if cam.get('move') == 'zoom_punch':
+        # Hold the opening framing, snap in over punch_frames (fast start, soft landing), then hold.
+        p0 = cam.get('punch_frame', shot['start_frame'])
+        u = _ease((f - p0) / max(1, cam.get('punch_frames', S.ZOOM_PUNCH_FRAMES)), 'out')
+    else:
+        u = _ease((f - shot['start_frame']) / span, cam['ease'])
     order = S.FRAMINGS
     a = order.index(cam['framing_start']) if cam['framing_start'] in order else order.index('medium')
     b = order.index(cam['framing_end']) if cam['framing_end'] in order else a

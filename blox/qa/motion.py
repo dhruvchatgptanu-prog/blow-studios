@@ -100,17 +100,29 @@ def run(ck, m, solved, tele, prefs, joined_path, dialog_by_line):
 
 def _integrity(ck, m, cid, recs):
     required = set(R.REQUIRED_PARTS)
+    optional = set(R.OPTIONAL_PARTS)
     missing = [f for f, r in recs.items() if r and not required.issubset(set(r.get('parts_visible', [])))]
     counts = [r['object_count'] for r in recs.values() if r]
     mode = max(set(counts), key=counts.count) if counts else 0
     odd = [f for f, r in recs.items() if r and r['object_count'] != mode]
-    status = 'fail' if (missing or odd) else 'pass'
+    # Costume pieces (hair, hat, eyewear, layers...) are optional per character, but the ones a character has
+    # must show in every frame: a hat or glasses popping off is an identity break. Unknown names mean the
+    # renderer built something the rig does not define.
+    seen = {f: frozenset(r.get('parts_visible', [])) for f, r in recs.items() if r}
+    unknown = sorted(set().union(*seen.values()) - required - optional) if seen else []
+    wear = [v & optional for v in seen.values()]
+    usual = max(set(wear), key=wear.count) if wear else frozenset()
+    costume_changed = [f for f, v in seen.items() if (v & optional) != usual]
+    bad = sorted(set(missing + odd + costume_changed + ([min(seen)] if unknown else [])))
+    status = 'fail' if bad else 'pass'
     ck.add(f'integrity:{cid}', f'{cid}: model integrity (no missing/extra limbs, no duplicated parts)', 'visual', status,
            'critical', {'frames_missing_parts': len(missing), 'frames_with_unexpected_object_count': len(odd),
-                        'object_count': mode, 'required_parts': len(required)}, 0.97, 'telemetry',
-           frames=(min(missing + odd), max(missing + odd)) if (missing or odd) else None,
-           target={'kind': 'shot', 'id': shot_at(m, min(missing + odd))['id']} if (missing or odd) else None,
-           repair={'action': 're_render_shot', 'shot': shot_at(m, min(missing + odd))['id']} if (missing or odd) else None)
+                        'object_count': mode, 'required_parts': len(required),
+                        'costume_parts': sorted(usual), 'frames_costume_changed': len(costume_changed),
+                        'unknown_parts': unknown}, 0.97, 'telemetry',
+           frames=(bad[0], bad[-1]) if bad else None,
+           target={'kind': 'shot', 'id': shot_at(m, bad[0])['id']} if bad else None,
+           repair={'action': 're_render_shot', 'shot': shot_at(m, bad[0])['id']} if bad else None)
 
 
 def _feet(ck, m, cid, recs, plan, q, scale):
@@ -482,10 +494,23 @@ def _voiceover(ck, m, cid, ln, recs, dialog_by_line):
            0.7, 'telemetry+audio', frames=(a, b), target={'kind': 'shot', 'id': shot['id'] if shot else None})
 
 
+LENS_JUMP_RATIO = 1.25  # lens change per frame above which an unplanned zoom reads as a jump
+
+
+def zoom_punch_frames(shot):
+    """Frames of a shot whose lens change is a planned zoom punch (the frames that land the snap)."""
+    cam = shot['camera']
+    if cam.get('move') != 'zoom_punch' or 'punch_frame' not in cam:
+        return set()
+    p0 = cam['punch_frame']
+    return set(range(p0 + 1, p0 + max(1, cam.get('punch_frames', 1)) + 1))
+
+
 def _camera(ck, m, tele):
-    jumps = []
+    jumps, intended = [], 0
     for s in m['shots']:
         prev = None
+        punch = zoom_punch_frames(s)
         for f in range(s['start_frame'], s['end_frame']):
             r = tele.get(f)
             if not r:
@@ -493,16 +518,26 @@ def _camera(ck, m, tele):
                 continue
             loc = r['camera']['location']
             fw = r['camera'].get('forward')
+            lens = r['camera'].get('lens')
             if prev:
                 d = math.dist(loc, prev[0])
                 ang = 0.0
                 if fw and prev[1]:
                     ang = math.degrees(math.acos(max(-1.0, min(1.0, sum(x * y for x, y in zip(fw, prev[1]))))))
-                if d > 0.3 or ang > 10:
-                    jumps.append({'frame': f, 'shot': s['id'], 'move_m': round(d, 3), 'turn_deg': round(ang, 2)})
-            prev = (loc, fw)
+                ratio = max(lens / prev[2], prev[2] / lens) if lens and prev[2] else 1.0
+                # A zoom punch changes the lens on purpose (that is the effect); its camera body must still
+                # hold still and must not swing, so the move and turn limits apply to its frames as well.
+                if f in punch and ratio > 1.0 + 1e-6:
+                    intended += 1
+                    ratio = 1.0
+                if d > 0.3 or ang > 10 or ratio > LENS_JUMP_RATIO:
+                    jumps.append({'frame': f, 'shot': s['id'], 'move_m': round(d, 3), 'turn_deg': round(ang, 2),
+                                  'lens_ratio': round(ratio, 3)})
+            prev = (loc, fw, lens)
     ck.add('camera_jumps', 'Smooth camera within shots (no jumps)', 'visual', 'fail' if jumps else 'pass', 'major',
-           {'jumps': jumps[:8], 'thresholds': {'move_m_per_frame': 0.3, 'turn_deg_per_frame': 10}}, 0.9, 'telemetry',
+           {'jumps': jumps[:8], 'thresholds': {'move_m_per_frame': 0.3, 'turn_deg_per_frame': 10,
+                                               'lens_ratio_per_frame': LENS_JUMP_RATIO},
+            'zoom_punch_frames': intended}, 0.9, 'telemetry',
            frames=(jumps[0]['frame'] - 1, jumps[0]['frame']) if jumps else None,
            target={'kind': 'shot', 'id': jumps[0]['shot']} if jumps else None,
            repair={'action': 're_render_shot', 'shot': jumps[0]['shot'], 'params': {'camera_smooth': True}} if jumps else None)

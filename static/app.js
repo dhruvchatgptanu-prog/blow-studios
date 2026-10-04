@@ -390,12 +390,12 @@ async function characters() {
   setView(`<p class="muted">Recurring, original cast. Changes apply to future renders. Voices must be catalogue voices or voices you have rights to use.</p><div class="grid g2">${Object.entries(r.characters).map(([id, c]) => `<div class="panel"><form data-char="${esc(id)}">
     <div class="row"><label>Name<input name="name" value="${esc(c.name)}"></label><label>Scale<input name="scale" type="number" step="0.05" min="0.6" max="1.2" value="${c.bible.scale}"></label><label class="check"><input type="checkbox" name="active" ${c.active ? 'checked' : ''}> Active</label></div>
     <label>Summary<input name="summary" value="${esc(c.bible.summary)}"></label><label>Personality<input name="personality" value="${esc(c.bible.personality)}"></label>
-    <h3>Palette</h3><div class="row">${r.vocab.palette_slots.map(k => `<label>${k}<input type="color" name="pal_${k}" value="${esc((c.bible.palette || {})[k] || '#cccccc')}"></label>`).join('')}</div>
+    <h3>Palette</h3><div class="row">${r.vocab.palette_slots.map(k => `<label>${k}${(r.vocab.optional_palette_slots || []).includes(k) ? `<span class="small muted"> <input type="checkbox" name="use_${k}" ${(c.bible.palette || {})[k] ? 'checked' : ''}> set</span>` : ''}<input type="color" name="pal_${k}" value="${esc((c.bible.palette || {})[k] || '#cccccc')}"></label>`).join('')}</div>
     <div class="row"><label>Top<select name="top">${r.vocab.tops.map(x => `<option ${x === c.bible.costume.top ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
-      <label>Hair<select name="hair">${r.vocab.hair.map(x => `<option value="${x || ''}" ${x === c.bible.costume.hair ? 'selected' : ''}>${x || 'none'}</option>`).join('')}</select></label>
+      <label>Hair<select name="hair">${r.vocab.hair.map(x => `<option value="${x || ''}" ${x === (c.bible.costume.hair || 'bald') ? 'selected' : ''}>${x || 'none'}</option>`).join('')}</select></label>
       <label>Hat<select name="hat">${r.vocab.hats.map(x => `<option value="${x || ''}" ${x === c.bible.costume.hat ? 'selected' : ''}>${x || 'none'}</option>`).join('')}</select></label>
+      <label>Eyewear<select name="eyewear">${(r.vocab.eyewear || [null]).map(x => `<option value="${x || ''}" ${x === (c.bible.costume.eyewear || null) ? 'selected' : ''}>${x || 'none'}</option>`).join('')}</select></label>
       <label>Badge<select name="badge">${r.vocab.badges.map(x => `<option value="${x || ''}" ${x === c.bible.costume.badge ? 'selected' : ''}>${x || 'none'}</option>`).join('')}</select></label>
-      <label>Eyewear<select name="eyewear">${(r.vocab.eyewear || [null]).map(x => `<option value="${x || ''}" ${x === (c.bible.costume.eyewear ?? null) ? 'selected' : ''}>${x || 'none'}</option>`).join('')}</select></label>
       <label class="check"><input type="checkbox" name="tie" ${c.bible.costume.tie ? 'checked' : ''}> Tie</label></div>
     <label>Visual rules (one per line)<textarea name="rules">${esc((c.bible.visual_rules || []).join('\n'))}</textarea></label>
     <h3>Voice</h3><div class="row"><label>Free voice (Piper) speaker 0–903<input name="piper_speaker" type="number" min="0" max="903" value="${c.voice.piper_speaker ?? ''}"></label><label>&nbsp;<button type="button" data-hear="${esc(id)}">Hear free voice</button></label></div><div id="hear-${esc(id)}"></div>
@@ -414,11 +414,11 @@ async function characters() {
   const delivery = f => { const v = {pitch_formants: f.pitch_formants.value}; DELIVERY.forEach(k => { if (f[k].value !== '') v[k] = Number(f[k].value); }); return v; };
   bind('form[data-char]', 'submit', async e => {
     const f = e.target, pal = {}, c = r.characters[f.dataset.char];
-    r.vocab.palette_slots.forEach(k => pal[k] = f['pal_' + k].value);
+    r.vocab.palette_slots.forEach(k => { if (!f['use_' + k] || f['use_' + k].checked) pal[k] = f['pal_' + k].value; });
     await api('characters/' + f.dataset.char, 'PUT', {name: f.name.value, active: f.active.checked,
       bible: {summary: f.summary.value, personality: f.personality.value, scale: Number(f.scale.value), palette: pal,
-        costume: {top: f.top.value, hair: f.hair.value || null, hat: f.hat.value || null, badge: f.badge.value || null,
-          eyewear: f.eyewear.value || null, tie: f.tie.checked},
+        costume: {top: f.top.value, hair: f.hair.value || null, hat: f.hat.value || null, eyewear: f.eyewear.value || null,
+          badge: f.badge.value || null, tie: f.tie.checked},
         costume_variants: c.bible.costume_variants,
         visual_rules: f.rules.value.split('\n').filter(Boolean)},
       voice: Object.assign({piper_speaker: f.piper_speaker.value === '' ? null : Number(f.piper_speaker.value),

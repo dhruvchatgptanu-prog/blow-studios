@@ -146,8 +146,29 @@ def run(ck, m, final, prefs, assembly, dialog_wav=None):
     log = _filter_log(final, vf=f'freezedetect=n=-62dB:d={q["max_freeze_s"]}')
     freezes = [(float(a), float(b)) for a, b in zip(re.findall(r'freeze_start: ([\d.]+)', log),
                                                     re.findall(r'freeze_end: ([\d.]+)', log))]
-    moving = []
+    moving, intended = judge_freezes(m, freezes, q['max_freeze_s'])
+    ck.add('freeze', 'No unexpected freezes', 'technical', 'fail' if moving else 'pass', 'major',
+           {'freezes_s': [[round(a, 2), round(b, 2)] for a, b in freezes], 'during_planned_motion': moving,
+            'planned_freeze_frames': intended}, 0.85,
+           'deterministic', frames=(int(moving[0]['segment_s'][0] * fps), int(moving[0]['segment_s'][1] * fps)) if moving else None,
+           target={'kind': 'shot', 'id': shot_of(moving[0]['segment_s'][0])} if moving else None,
+           repair={'action': 're_render_shot', 'shot': shot_of(moving[0]['segment_s'][0])} if moving else None)
+    return {'frames': nframes, 'silences': sil, 'freezes': freezes, 'loudness': loud}
+
+
+def judge_freezes(m, freezes, max_freeze_s):
+    """Split detected picture freezes [(start_s, end_s)] into (unexpected ones during planned motion or
+    speech, planned ones). Planned freeze frames (effects) hold the picture on purpose: only the part of a
+    detected freeze outside them is judged, and it still has to be long enough to count on its own."""
+    fps = m['fps']
+    planned = [((e['frame'] - 1) / fps, (e['frame'] + e['frames'] + 1) / fps) for e in m.get('effects', [])
+               if e.get('type') == 'freeze']
+    moving, intended = [], []
     for a, b in freezes:
+        unplanned = (b - a) - sum(max(0.0, min(b, y) - max(a, x)) for x, y in planned)
+        if planned and unplanned < max_freeze_s:
+            intended.append([round(a, 2), round(b, 2)])
+            continue
         fa, fb = int(a * fps), int(b * fps)
         acts = [x for x in m['tracks']['actions'] if x['start_frame'] < fb and x['end_frame'] > fa
                 and x['type'] not in ('idle',)]
@@ -155,12 +176,7 @@ def run(ck, m, final, prefs, assembly, dialog_wav=None):
         if acts or speech:
             moving.append({'segment_s': [round(a, 2), round(b, 2)], 'expected_motion': [x['type'] for x in acts],
                            'speech': [l['id'] for l in speech]})
-    ck.add('freeze', 'No unexpected freezes', 'technical', 'fail' if moving else 'pass', 'major',
-           {'freezes_s': [[round(a, 2), round(b, 2)] for a, b in freezes], 'during_planned_motion': moving}, 0.85,
-           'deterministic', frames=(int(moving[0]['segment_s'][0] * fps), int(moving[0]['segment_s'][1] * fps)) if moving else None,
-           target={'kind': 'shot', 'id': shot_of(moving[0]['segment_s'][0])} if moving else None,
-           repair={'action': 're_render_shot', 'shot': shot_of(moving[0]['segment_s'][0])} if moving else None)
-    return {'frames': nframes, 'silences': sil, 'freezes': freezes, 'loudness': loud}
+    return moving, intended
 
 
 def env_lag_ms(ref, test, sr=A.SR, max_lag_s=0.4):

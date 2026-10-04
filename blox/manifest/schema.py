@@ -49,7 +49,8 @@ COSTUME = {
     'badge': (None, 'star', 'diamond'),
 }
 
-MOUTH_SHAPES = ['neutral', 'smile', 'grin', 'open_smile', 'frown', 'o', 'gasp', 'grimace', 'smirk', 'pout', 'flat']
+MOUTH_SHAPES = ['neutral', 'smile', 'grin', 'open_smile', 'frown', 'o', 'gasp', 'grimace', 'smirk', 'pout', 'flat',
+                'scream', 'wide_grin', 'smirk_wide', 'tiny']
 ARM_POSES = ['rest', 'hips', 'chest', 'point', 'wave', 'raise', 'reach', 'cover_mouth', 'head_scratch', 'fist_pump',
              'arms_out', 'cross', 'hold_prop', 'shrug', 'thumbs_up', 'facepalm', 'chin']
 POSTURES = ['upright', 'slumped', 'crouch', 'ready', 'proud']
@@ -100,9 +101,33 @@ CAMERA_ANGLES = ['eye', 'low', 'high', 'overhead']
 CAMERA_SIDES = ['front', 'three_quarter_left', 'three_quarter_right', 'profile_left', 'profile_right',
                 'over_shoulder_left', 'over_shoulder_right', 'back']
 CAMERA_MOVES = ['static', 'push_in', 'pull_out', 'pan_left', 'pan_right', 'truck_left', 'truck_right',
-                'orbit_left', 'orbit_right', 'follow', 'crane_up', 'crane_down']
+                'orbit_left', 'orbit_right', 'follow', 'crane_up', 'crane_down', 'zoom_punch']
+# 'zoom_punch': the shot opens on framing_start, then at camera.punch_t (story seconds; default a third of
+# the way into the shot) the lens snaps to framing_end in a few frames and holds there. The camera itself
+# does not move (an optical snap zoom), so the punch can never read as a camera jump.
+ZOOM_PUNCH_FRAMES = 5       # story frames of the snap (default)
+ZOOM_PUNCH_MIN_FRAMES = 3   # video frames: faster than this is a cut, not a zoom
 EASES = ['linear', 'in', 'out', 'in_out']
 TRANSITIONS = ['cut', 'fade_in', 'whip']
+
+# Timeline effects (plan 'effects': [{type, t, frames, strength}]).
+EFFECTS = {
+    'shake': 'Impact camera shake: a sharp jolt that dies away over `frames` (default 8); strength 0-1 (default 0.7)',
+    'freeze': 'Freeze frame: the picture holds the frame at t for `frames` (default 15) while the sound runs on',
+}
+EFFECT_DEFAULT_FRAMES = {'shake': 8, 'freeze': 15}   # story frames
+EFFECT_MIN_FRAMES = {'shake': 4, 'freeze': 6}        # video frames after the pace
+EFFECT_MAX_FRAMES = {'shake': 30, 'freeze': 45}
+# Plan 'style': how the edit treats faces and sound.
+#  expression_snap: 'blend' (default) or 'cut' - an expression change near a cut snaps onto the cut frame
+#                   (a face swap with the new shot) instead of blending across it. A key may also set snap: true.
+#  whoosh_on_cuts:  add a soft whoosh on cuts (not where another sound effect already lands).
+#  music_dropout:   cut the music for a moment before the punchline (default true; see MUSIC_DROPOUT_S).
+EXPRESSION_SNAP = ['blend', 'cut']
+STYLE_DEFAULTS = {'expression_snap': 'blend', 'whoosh_on_cuts': False, 'music_dropout': True}
+SNAP_WINDOW_FRAMES = 8      # story frames around a cut within which an expression change snaps onto it
+MUSIC_DROPOUT_S = 0.6       # story seconds of silence in the music before the punchline (0.4 s at pace 1.5)
+CUT_WHOOSH_GAIN_DB = -15.0
 
 EMOTIONS = ['neutral', 'happy', 'excited', 'startled', 'worried', 'sad', 'angry', 'determined', 'smug', 'scared',
             'confused', 'embarrassed', 'laughing', 'proud', 'bored', 'disgusted', 'relieved', 'curious']
@@ -132,7 +157,8 @@ SPEECH_RATE_RANGE = (0.8, 1.6)
 MAX_LINE_SPEEDUP = 1.5
 
 SFX_CUES = ['whoosh', 'pop', 'boing', 'thud', 'ding', 'coin', 'click', 'rumble', 'sizzle', 'swoosh_up', 'fail_horn',
-            'sparkle', 'footstep', 'gasp_sting', 'drumroll', 'tada', 'beep']
+            'sparkle', 'footstep', 'gasp_sting', 'drumroll', 'tada', 'beep',
+            'stinger', 'bonk', 'stomp', 'door_chime', 'crowd_ooh', 'laugh_burst']
 MUSIC_CUES = ['playful', 'tension', 'triumph', 'sad', 'mystery', 'chill', 'none']
 
 # Expression presets map a label to concrete facial controls. A beat may use a
@@ -174,7 +200,22 @@ EXPRESSIONS = {
                  'mouth': {'shape': 'smile', 'open': 0.2}},
     'curious': {'brows': {'inner': 0.35, 'outer': 0.5, 'asym': 0.4}, 'eyes': {'open': 1.08, 'squint': 0.0},
                 'mouth': {'shape': 'pout', 'open': 0.05}},
+    # Big-reaction presets for fast comedy (face swaps on the cut). 'pupil' scales the pupils (1 = normal):
+    # tiny pupils in huge eyes read as shock from across the frame. The open mouths are in the shape
+    # itself, so their 'open' stays 0 (an extra jaw opening would push the lip past the chin).
+    'screaming': {'brows': {'inner': 1.0, 'outer': 0.9, 'asym': 0.0}, 'eyes': {'open': 1.35, 'squint': 0.0, 'pupil': 0.6},
+                  'mouth': {'shape': 'scream', 'open': 0.0}},
+    'smug_max': {'brows': {'inner': -0.35, 'outer': 0.55, 'asym': 0.85}, 'eyes': {'open': 0.5, 'squint': 0.55},
+                 'mouth': {'shape': 'smirk_wide', 'open': 0.0}},
+    'mischief': {'brows': {'inner': -0.7, 'outer': 0.55, 'asym': 0.25}, 'eyes': {'open': 0.78, 'squint': 0.5},
+                 'mouth': {'shape': 'wide_grin', 'open': 0.0}},
+    'frozen': {'brows': {'inner': 0.8, 'outer': 0.75, 'asym': 0.0}, 'eyes': {'open': 1.35, 'squint': 0.0, 'pupil': 0.45},
+               'mouth': {'shape': 'tiny', 'open': 0.0}},
 }
+# Optional face controls a pose may carry (absent = the default), with their allowed range.
+OPTIONAL_RANGES = {('eyes', 'pupil'): (0.3, 1.3)}
+# Expressions that hold the eyes open: no automatic blinks while they are on (a blink would break the take).
+NO_BLINK_EXPRESSIONS = {'screaming', 'frozen'}
 
 DEFAULT_POSE = {
     'position': [0.0, 0.0],
