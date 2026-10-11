@@ -251,26 +251,29 @@ def _prop_radius(p):
     return PROP_RADIUS.get(p.get('type'), 0.3) * sc
 
 
-def camera_zones(m, scales=None):
+def camera_zones(m, scales=None, tops=None):
     """Per shot: the subject's box, how far the camera can be from it (any azimuth) and its height range.
 
     Mirrors solver.solve_camera's framing maths (distance from framing and lens, aim height, pitch,
     crane, truck and follow moves) and also covers the one-step-wider framing a QA repair may ask for.
+    scales / tops: cast id -> scale / visual top (rig.visual_top, metres); a missing top is a bare head.
     """
     scales = scales or {}
+    tops = tops or {}
     aspect = m['height'] / m['width']
     sensor_v = SV.SENSOR_W * aspect if aspect > 1 else SV.SENSOR_W
-    chars = {c['id'] for c in m.get('cast', [])}
+    chars = {c['id']: float(scales.get(c['id'], 1.0)) for c in m.get('cast', [])}
+    char_tops = {cid: float(tops.get(cid) or R.visual_top(None, sc)) for cid, sc in chars.items()}
     props = {p['id']: p for p in (m.get('setting') or {}).get('props', [])}
     out = []
     for shot in m.get('shots', []):
         subj = shot['camera']['subject']
         f0, f1 = shot['start_frame'], max(shot['start_frame'] + 1, shot['end_frame'])
-        sc = float(scales.get(subj, 1.0)) if subj in chars else 1.0
+        sc = chars.get(subj, 1.0)
         face_target = subj in chars or subj == 'two_shot'
         if subj in chars:
             pts = _char_points(m, subj, f0, f1)
-            height = (R.HEIGHT + 0.12) * sc
+            top = char_tops[subj]
         elif subj == 'two_shot':
             per = {cid: _char_points(m, cid, f0, f1) for cid in chars}
             pts = [p for v in per.values() for p in v]
@@ -278,13 +281,13 @@ def camera_zones(m, scales=None):
             for f in range(f0, f1, SHOTS_PER_ZONE_STEP):
                 now = [pose_at(m['tracks']['characters'][cid]['keys'], f)['position'] for cid in chars]
                 spread = max([spread] + [math.dist(a, b) for a in now for b in now])
-            height = R.HEIGHT + 0.12 + spread * 1.1
+            top = max(char_tops.values(), default=R.HEIGHT) + spread * 1.1
         elif isinstance(subj, str) and subj.startswith('prop:') and subj[5:] in props:
             p = props[subj[5:]]
             pts = [(p['position'][0], p['position'][1])]
-            height = 0.9 * float(p.get('scale', 1) or 1)
+            top = 0.9 * float(p.get('scale', 1) or 1) - SV.FRAME_PAD
         else:
-            pts, height = [(0.0, 0.0)], R.HEIGHT
+            pts, top = [(0.0, 0.0)], R.HEIGHT
         pts = pts or [(0.0, 0.0)]
         reach, z_lo, z_hi = 0.0, 1e9, -1e9
         for variant in (shot, SV.apply_shot_repairs(shot, {'camera_wider': True})):
@@ -294,15 +297,15 @@ def camera_zones(m, scales=None):
             p0 = ANGLE_PITCH.get(cam['angle'], 0.0)
             pitches = [p0] + ([p0 + 14] if cam['move'] == 'crane_up' else []) + \
                       ([p0 - 14] if cam['move'] == 'crane_down' else [])
+            whole_head = SV.whole_head_shot(variant)
+            top_v = min(top, R.visual_top(None, sc)) if subj in chars and not whole_head else top
+            height = SV.framed_height(top_v, sc)
             for fr_name in (cam['framing_start'], cam['framing_end']):
-                visible = S.FRAMING_HEIGHT.get(fr_name, 0.72) * height
+                visible, aim = SV.compose(S.FRAMING_HEIGHT.get(fr_name, 0.72) * height, top_v, sc,
+                                          face=subj in chars, whole_head=whole_head)
                 dist = (visible / 2) / math.tan(vfov / 2)
                 if subj in chars and visible < height:
                     dist += R.HEAD_HALF_DEPTH * sc
-                aim = height - 0.38 * visible
-                if visible < 0.8 * height and subj in chars:
-                    aim = min(aim, R.FACE_CENTER_Z * sc + 0.06)
-                aim = max(aim, min(height * 0.5, visible * 0.32))
                 reach = max(reach, dist)
                 for pt in pitches:
                     z = aim + dist * math.sin(math.radians(pt))
@@ -320,9 +323,9 @@ def camera_zones(m, scales=None):
     return out
 
 
-def clearance(m, scales=None):
+def clearance(m, scales=None, tops=None):
     core = action_area(m)
-    zones = camera_zones(m, scales)
+    zones = camera_zones(m, scales, tops)
     clear = [core[0] - CORE_PAD, core[1] - CORE_PAD, core[2] + CORE_PAD, core[3] + CORE_PAD]
     for z in zones:
         b, r = z['box'], z['reach']
@@ -1577,13 +1580,15 @@ PRESETS = {'town_street': town_street, 'night_forest': night_forest, 'classroom'
 
 
 # ---------------------------------------------------------------- public API
-def layout(m, scales=None):
-    """Deterministic set layout for a compiled manifest (JSON-serialisable). scales: cast id -> scale."""
+def layout(m, scales=None, tops=None):
+    """Deterministic set layout for a compiled manifest (JSON-serialisable).
+
+    scales / tops: cast id -> scale / visual top (what the camera frames; solver.solve passes its own)."""
     st = m.get('setting') or {}
     preset = st.get('preset') if st.get('preset') in PRESETS else 'sky_obby'
     tod = st.get('time_of_day', 'noon')
     seed = _seed(m)
-    area = clearance(m, scales)
+    area = clearance(m, scales, tops)
     dr = Dresser(m, area, random.Random(seed))
     dr.lights = []
     night = tod == 'night'

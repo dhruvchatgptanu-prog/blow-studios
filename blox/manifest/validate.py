@@ -348,7 +348,9 @@ def _dialogue(r, m, measured):
     # At a production pace the slots shrink by the pace but voices speak only
     # speech_rate faster; line fitting may speed an estimated line up further,
     # to at most the pace and never above 1.5x in total (1.0 = no allowance,
-    # which is always the case at pace 1). Measured lines are already fitted.
+    # which is always the case at pace 1). Voiced lines are already fitted; a
+    # line measured at validation time (prefs measure_lines_on_validate) is
+    # exact but not yet fitted, so the allowance still applies to it.
     allow = line_fit_allowance(m)
     rate = float((m.get('pace') or {}).get('speech_rate', 1.0))
     end = {}
@@ -358,7 +360,7 @@ def _dialogue(r, m, measured):
         end[ln['id']] = ln['est_end_frame']
         if need > avail:
             kind = 'measured' if ln.get('measured_frames') else 'estimated'
-            if kind == 'estimated' and need <= avail * allow:
+            if (kind == 'estimated' or ln.get('measured_preflight')) and need <= avail * allow:
                 tempo = need / max(1, avail)
                 r.warn('dialogue_tempo', f'Line {ln["id"]} needs {need / fps:.2f}s at speech rate {rate:g} but has '
                                          f'{avail / fps:.2f}s; line fitting will speed it up {tempo:.2f}x '

@@ -179,9 +179,11 @@ def develop_step(v, p, d, chars):
         pr = p['production']
         if meta.get('backlog_id'):
             item = backlog.get(meta['backlog_id'], d)
+            all_chars = repo.characters(active_only=False, d=d)
             m = C.compile_plan(item['plan'], fps=pr['fps'], width=pr['width'], height=pr['height'],
-                               **C.pace_kwargs(p))
-            rep = V.validate(m, p, characters=repo.characters(active_only=False, d=d))
+                               characters=all_chars, **C.pace_kwargs(p))
+            production.preflight(m, all_chars, p)
+            rep = V.validate(m, p, characters=all_chars)
             if not rep['ok']:
                 raise Blocked('Backlog story no longer validates with the current settings: ' +
                               rep['errors'][0]['message'], state='needs_review')
@@ -197,7 +199,9 @@ def develop_step(v, p, d, chars):
             source = 'backlog'
         elif meta.get('template_seed') is not None:
             plan = template.make(meta['template_seed'])
-            m = C.compile_plan(plan, fps=pr['fps'], width=pr['width'], height=pr['height'], **C.pace_kwargs(p))
+            m = C.compile_plan(plan, fps=pr['fps'], width=pr['width'], height=pr['height'], characters=chars,
+                               **C.pace_kwargs(p))
+            production.preflight(m, chars, p)
             rep = V.validate(m, p)
             if not rep['ok']:
                 raise Blocked('Template plan failed validation: ' + rep['errors'][0]['message'], state='failed')

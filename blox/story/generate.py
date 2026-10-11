@@ -318,7 +318,8 @@ def plan_with_validation(key_base, concept, prefs, characters, cast_map, video_i
     for attempt in range(max_fixes + 1):
         plan = to_plan(raw)
         try:
-            m = compile_plan(plan, fps=pr['fps'], width=pr['width'], height=pr['height'], **pace_kwargs(prefs))
+            m = compile_plan(plan, fps=pr['fps'], width=pr['width'], height=pr['height'], characters=characters,
+                             **pace_kwargs(prefs))
             rep = validate(m, prefs)
         except (ValueError, KeyError, TypeError) as e:
             m, rep = None, {'ok': False, 'errors': [{'code': 'compile', 'message': str(e)[:300]}], 'warnings': []}

@@ -21,6 +21,7 @@ import tempfile
 from pathlib import Path
 
 from .. import config, media, netsafe
+from ..manifest import schema as S
 from ..util import Blocked
 
 VOICES = {
@@ -40,9 +41,9 @@ DEFAULT_MODEL = 'en-us-libritts-high'
 # listening was possible; see blox/demo.py for the measurements). Change them on the Characters page.
 DEFAULT_SPEAKERS = {'ch_bloxy': 744, 'ch_pip': 288, 'ch_rook': 456, 'ch_dot': 408, 'ch_tally': 504}
 
-PACE = {'slow': 1.12, 'normal': 1.0, 'fast': 0.9}
+PACE = S.DELIVERY_PACE_SCALE
 LIVELY = {'excited', 'startled', 'angry', 'laughing', 'scared', 'happy', 'proud'}
-SUBDUED = {'sad', 'bored', 'embarrassed', 'tired', 'worried', 'disappointed'}
+SUBDUED = S.SUBDUED_EMOTIONS
 # Piper's neutral variation (noise_scale, noise_w) and the shifts applied for lively and subdued emotions. A
 # character's ``piper_noise_scale`` / ``piper_noise_w`` replace the neutral values; the shifts still apply.
 NOISE = (0.667, 0.8)
@@ -177,7 +178,7 @@ def delivery(line, voice=None):
         noise, noise_w = noise + LIVELY_SHIFT[0], noise_w + LIVELY_SHIFT[1]
     elif emo in SUBDUED:
         noise, noise_w = noise + SUBDUED_SHIFT[0], noise_w + SUBDUED_SHIFT[1]
-        length *= 1.04
+        length *= S.SUBDUED_SCALE
     if line.get('kind') == 'narration':
         length *= vs.get('narration_length_scale', 1.0)
     length = calibrated_length(speech_rate(line) / length)

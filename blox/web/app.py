@@ -15,7 +15,7 @@ from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .. import (budget, breaker, config, db as dbmod, jobs, logs, migrations, orchestrator, paid,
-                prefs as prefsmod, repo, runtime, store, vault, videos)
+                prefs as prefsmod, production, repo, runtime, store, vault, videos)
 from ..animation import blender as BL
 from ..manifest import compile as C, director, schema as S, validate as V
 from ..research import service as research, transcripts, youtube_api as Y
@@ -247,11 +247,13 @@ def create_app():
         if not isinstance(plan_body, dict) or len(json.dumps(plan_body)) > C.MAX_PLAN_BYTES:
             raise ValueError('Plan must be a JSON object under 400 KB')
         pr = p['production']
-        m = C.compile_plan(plan_body, fps=pr['fps'], width=pr['width'], height=pr['height'], **C.pace_kwargs(p))
+        chars = repo.characters(active_only=False, d=d)
+        m = C.compile_plan(plan_body, fps=pr['fps'], width=pr['width'], height=pr['height'], characters=chars,
+                           **C.pace_kwargs(p))
+        production.preflight(m, chars, p)
         rep = V.validate(m, p)
         vid = videos.create(m['title'] or 'Untitled', 'demo' if source == 'demo' else 'manual', status='concept_selected', d=d,
                             metadata={'publish_metadata': m.get('metadata') or {'title': m['title']}}, actor='owner')
-        chars = repo.characters(active_only=False, d=d)
         names = {c['id']: chars.get(c['character_id'], {}).get('name', c['id']) for c in m['cast']}
         mid = repo.save_manifest(vid, m, source, director.script(m, names), rep, d)
         videos.merge_metadata(vid, {'plan': plan_body}, d)
@@ -274,9 +276,11 @@ def create_app():
         if not isinstance(plan_body, dict) or len(json.dumps(plan_body)) > C.MAX_PLAN_BYTES:
             raise ValueError('Plan must be a JSON object under 400 KB')
         pr = p['production']
-        m = C.compile_plan(plan_body, fps=pr['fps'], width=pr['width'], height=pr['height'], **C.pace_kwargs(p))
-        rep = V.validate(m, p)
         chars = repo.characters(active_only=False, d=d)
+        m = C.compile_plan(plan_body, fps=pr['fps'], width=pr['width'], height=pr['height'], characters=chars,
+                           **C.pace_kwargs(p))
+        production.preflight(m, chars, p)
+        rep = V.validate(m, p)
         names = {c['id']: chars.get(c['character_id'], {}).get('name', c['id']) for c in m['cast']}
         mid = repo.save_manifest(vid, m, 'owner_edit', director.script(m, names), rep, d)
         videos.merge_metadata(vid, {'plan': plan_body}, d)
@@ -297,8 +301,10 @@ def create_app():
         p = prefsmod.get()
         plan_body = (request.get_json(force=True) or {}).get('plan')
         pr = p['production']
-        m = C.compile_plan(plan_body, fps=pr['fps'], width=pr['width'], height=pr['height'], **C.pace_kwargs(p))
         chars = repo.characters(active_only=False)
+        m = C.compile_plan(plan_body, fps=pr['fps'], width=pr['width'], height=pr['height'], characters=chars,
+                           **C.pace_kwargs(p))
+        production.preflight(m, chars, p)
         rep = V.validate(m, p, characters=chars)
         names = {c['id']: chars.get(c.get('character_id'), {}).get('name', c['id']) for c in m['cast']}
         return jsonify(validation=rep, script=director.script(m, names), beats=len(m['beats']))
@@ -731,6 +737,13 @@ def create_app():
         clean_voice.update(_delivery(voice))
         if voice.get('casting_note'):
             clean_voice['casting_note'] = str(voice['casting_note'])[:400]
+        # A measured speaking rate belongs to the speaker and length scale it was measured with: it is kept
+        # across an edit of anything else and dropped when either changes (the default estimate then applies).
+        prev = (repo.characters(active_only=False).get(cid) or {}).get('voice') or {}
+        mv = C.measured_voice(voice)
+        if mv and C.measured_voice(prev) == mv and piper_mod.speaker_for(cid, prev) == piper_mod.speaker_for(cid, clean_voice) \
+                and prev.get('piper_length_scale') == clean_voice.get('piper_length_scale'):
+            clean_voice.update({k: float(voice[k]) for k in S.MEASURED_VOICE_KEYS})
         repo.save_character(cid, name, clean_bible, clean_voice, bool(body.get('active', True)))
         store.audit('character_saved', {'id': cid}, actor='owner')
         return jsonify(ok=True)

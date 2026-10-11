@@ -1280,6 +1280,15 @@ def telemetry(scene, cam, chars, props, rig, subjects=()):
                 zs.append(p[2])
         rec['bbox2d'] = [round(min(xs), 4), round(min(ys), 4), round(max(xs), 4), round(max(ys), 4)]
         rec['in_front_of_camera'] = min(zs) > 0
+        # The head group (head block, hair, hat, eyewear): QA checks that framings which show the whole head
+        # do not crop a bun, spikes or a crown at the top of the frame.
+        hx, hy = [], []
+        for ob in [head] + [o for pn in ('hair', 'hat', 'eyewear') for o in ch.costume_parts.get(pn, [])]:
+            for co in world_bbox(ob):
+                p = project(scene, cam, co)
+                hx.append(p[0])
+                hy.append(p[1])
+        rec['head2d'] = [round(min(hx), 4), round(min(hy), 4), round(max(hx), 4), round(max(hy), 4)]
         # Costume pieces count as visible parts when every object of the piece renders.
         for pname, obs in ch.costume_parts.items():
             if all(not ob.hide_render for ob in obs):

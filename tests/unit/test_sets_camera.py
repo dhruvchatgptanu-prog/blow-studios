@@ -27,7 +27,7 @@ def _setup(plan):
     bibles = {c['id']: next(ch['bible'] for ch in demo.CHARACTERS if ch['id'] == c['character_id'])
               for c in m['cast']}
     chars = {c['id']: SV.CharacterSolver(m, c['id'], bibles.get(c['id']), m['duration_frames']) for c in m['cast']}
-    lay = SETS.layout(m, {cid: c.scale for cid, c in chars.items()})
+    lay = SETS.layout(m, {cid: c.scale for cid, c in chars.items()}, {cid: c.visual_top for cid, c in chars.items()})
     return m, chars, lay
 
 
@@ -108,7 +108,7 @@ def test_solved_result_carries_the_layout_it_avoided():
     bibles = {c['id']: next(ch['bible'] for ch in demo.CHARACTERS if ch['id'] == c['character_id'])
               for c in m['cast']}
     solved = SV.solve(m, bibles)
-    assert solved['set'] == SETS.layout(m, solved['scales'])
+    assert solved['set'] == SETS.layout(m, solved['scales'], solved['visual_tops'])
     assert json.loads(json.dumps(solved['set'])) == solved['set']
 
 
