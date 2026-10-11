@@ -14,7 +14,7 @@ FULL_BODY = {'walk', 'run', 'jump', 'hop', 'crouch', 'stand_up', 'stumble', 'fal
 HEAD_ONLY = {'nod', 'head_shake', 'look_around'}
 
 # Platform tops used for "is the character standing on something" checks.
-GROUND_PRESETS = {'town_street', 'classroom', 'night_forest', 'bedroom', 'studio'}
+GROUND_PRESETS = {'town_street', 'classroom', 'night_forest', 'bedroom', 'studio', 'home', 'park'}
 
 
 class Report:

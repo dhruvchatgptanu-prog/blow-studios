@@ -341,5 +341,146 @@ LAST_PLATFORM = {
 }
 
 
+# A short family skit at home: three characters, static blocking, every shot type the set must clear (two-shot,
+# three-quarter, close-ups). Used by the set tests and the turnaround renders as the 'home' fixture story.
+LAST_COOKIE = {
+    'source': 'hand_authored_demo',
+    'title': 'The Last Cookie',
+    'logline': 'Bloxy opens an investigation into the missing last cookie; the youngest suspect confesses by accident.',
+    'duration_s': 30.0,
+    'story': {
+        'premise': 'The last cookie in the house is gone and everyone denies it.',
+        'conflict': 'Bloxy interrogates the siblings in the living room.',
+        'stakes': 'Whoever took it does the dishes for a week.',
+        'reveal': 'Dot was "checking the cookies were safe" in the kitchen.',
+        'ending': 'Pip deadpans that they were not safe.',
+        'ending_type': 'twist',
+    },
+    'hook': {'text': 'Bloxy demands to know who ate the last cookie.', 'question': 'Who took it?', 't_end': 3.0},
+    'payoff': {'text': 'Dot confesses without meaning to; Pip delivers the verdict.', 't_start': 21.75},
+    'setting': {
+        'preset': 'home', 'time_of_day': 'sunset', 'lighting': 'natural',
+        'description': 'The living room at home, late afternoon light through the windows, the kitchen through the '
+                       'opening.',
+        'props': [],
+    },
+    'cast': [{'id': 'bloxy', 'character_id': 'ch_bloxy'}, {'id': 'pip', 'character_id': 'ch_pip'},
+             {'id': 'dot', 'character_id': 'ch_dot'}],
+    'shots': [
+        {'id': 's1', 'start_s': 0.0, 'end_s': 6.0, 'camera': {'subject': 'two_shot', 'framing_start': 'medium_wide',
+                                                             'framing_end': 'medium_wide', 'move': 'static',
+                                                             'side': 'front'}},
+        {'id': 's2', 'start_s': 6.0, 'end_s': 12.0, 'camera': {'subject': 'pip', 'framing_start': 'medium',
+                                                             'framing_end': 'medium', 'move': 'static',
+                                                             'side': 'three_quarter_left'}},
+        {'id': 's3', 'start_s': 12.0, 'end_s': 17.25, 'camera': {'subject': 'dot', 'framing_start': 'medium_close',
+                                                             'framing_end': 'medium_close', 'move': 'static',
+                                                             'side': 'front'}},
+        {'id': 's4', 'start_s': 17.25, 'end_s': 21.75, 'camera': {'subject': 'bloxy', 'framing_start': 'medium',
+                                                              'framing_end': 'medium_close', 'move': 'push_in',
+                                                              'side': 'front'}},
+        {'id': 's5', 'start_s': 21.75, 'end_s': 26.25, 'camera': {'subject': 'dot', 'framing_start': 'close_up',
+                                                               'framing_end': 'close_up', 'move': 'static',
+                                                               'side': 'front'}},
+        {'id': 's6', 'start_s': 26.25, 'end_s': 30.0, 'camera': {'subject': 'pip', 'framing_start': 'medium_close',
+                                                               'framing_end': 'medium_close', 'move': 'static',
+                                                               'side': 'front'}},
+    ],
+    'beats': [
+        {'start_s': 0.0, 'purpose': 'hook', 'description': 'Bloxy faces the two suspects in the living room.'},
+        {'start_s': 1.5, 'purpose': 'hook'}, {'start_s': 3.0, 'purpose': 'hook'}, {'start_s': 4.5, 'purpose': 'hook'},
+        {'start_s': 6.0, 'purpose': 'setup', 'description': 'Pip denies everything, a little too fast.'},
+        {'start_s': 7.5, 'purpose': 'setup'}, {'start_s': 9.0, 'purpose': 'setup'}, {'start_s': 10.5, 'purpose': 'setup'},
+        {'start_s': 12.0, 'purpose': 'escalation', 'description': 'Dot, innocent, was only in the kitchen.'},
+        {'start_s': 13.5, 'purpose': 'escalation'}, {'start_s': 15.0, 'purpose': 'escalation'},
+        {'start_s': 16.5, 'purpose': 'escalation', 'description': 'Bloxy narrows the eyes: doing what?'},
+        {'start_s': 18.0, 'purpose': 'escalation'}, {'start_s': 19.5, 'purpose': 'escalation'},
+        {'start_s': 21.0, 'purpose': 'reveal', 'description': 'Dot admits to checking the cookies were safe.'},
+        {'start_s': 22.5, 'purpose': 'reveal'}, {'start_s': 24.0, 'purpose': 'reveal'},
+        {'start_s': 25.5, 'purpose': 'payoff', 'description': 'Pip: they were not.'},
+        {'start_s': 27.0, 'purpose': 'payoff'}, {'start_s': 28.5, 'purpose': 'button'},
+    ],
+    'performance': {
+        'bloxy': [
+            _k(0.0, position=[-1.0, 0.2], facing=45, expression='determined',
+               eye_target={'kind': 'character', 'id': 'pip'}, head={'pitch': -3}),
+            _k(6.0, expression='curious'),
+            _k(17.25, expression='determined', eye_target={'kind': 'character', 'id': 'dot'}),
+            _k(21.75, expression='startled'),
+            _k(26.7, expression='bored', eye_target={'kind': 'character', 'id': 'pip'}),
+        ],
+        'pip': [
+            _k(0.0, position=[1.0, 0.2], facing=-45, expression='neutral',
+               eye_target={'kind': 'character', 'id': 'bloxy'}),
+            _k(6.0, expression='worried', shoulders={'raise': 0.4}),
+            _k(12.0, expression='neutral', shoulders={'raise': 0.0}, eye_target={'kind': 'character', 'id': 'dot'}),
+            _k(26.25, expression='smug', eye_target={'kind': 'camera'}),
+        ],
+        'dot': [
+            _k(0.0, position=[0.0, 1.4], facing=0, expression='happy',
+               eye_target={'kind': 'character', 'id': 'bloxy'}),
+            _k(12.0, expression='curious'),
+            _k(17.25, expression='worried'),
+            _k(21.75, expression='embarrassed', head={'pitch': -10},
+               eye_target={'kind': 'point', 'point': [0.4, 0.4, 0.3]}),
+            _k(26.25, expression='embarrassed', eye_target={'kind': 'character', 'id': 'pip'}),
+        ],
+    },
+    'actions': [
+        {'character': 'bloxy', 'type': 'point', 't': 1.2, 'anticipation_frames': 4, 'main_frames': 10,
+         'follow_through_frames': 4, 'hold_frames': 30, 'params': {'hand': 'right'}},
+        {'character': 'pip', 'type': 'talk', 't': 6.3, 'anticipation_frames': 2, 'main_frames': 50,
+         'follow_through_frames': 4, 'params': {'hand': 'left'}},
+        {'character': 'pip', 'type': 'head_shake', 't': 6.15, 'anticipation_frames': 2, 'main_frames': 16,
+         'follow_through_frames': 4},
+        {'character': 'dot', 'type': 'talk', 't': 12.45, 'anticipation_frames': 2, 'main_frames': 36,
+         'follow_through_frames': 4, 'params': {'hand': 'right'}},
+        {'character': 'bloxy', 'type': 'talk', 't': 17.55, 'anticipation_frames': 2, 'main_frames': 30,
+         'follow_through_frames': 4, 'params': {'hand': 'left'}},
+        {'character': 'dot', 'type': 'shrug', 't': 22.35, 'anticipation_frames': 4, 'main_frames': 12,
+         'follow_through_frames': 6, 'hold_frames': 20},
+        {'character': 'bloxy', 'type': 'facepalm', 't': 27.0, 'anticipation_frames': 4, 'main_frames': 10,
+         'follow_through_frames': 6, 'hold_frames': 20, 'params': {'hand': 'right'}},
+    ],
+    'lines': [
+        {'id': 'l1', 'speaker': 'bloxy', 'text': 'Okay. Who ate the last cookie?', 't': 0.6,
+         'emotion': 'determined', 'pace': 'normal', 'volume': 'normal'},
+        {'id': 'l2', 'speaker': 'pip', 'text': 'Not me! I was upstairs the whole time.', 't': 6.3,
+         'emotion': 'worried', 'pace': 'fast', 'volume': 'loud'},
+        {'id': 'l3', 'speaker': 'dot', 'text': 'I was in the kitchen.', 't': 12.45, 'emotion': 'happy',
+         'pace': 'normal', 'volume': 'normal'},
+        {'id': 'l4', 'speaker': 'bloxy', 'text': 'Doing what?', 't': 17.55, 'emotion': 'determined',
+         'pace': 'slow', 'volume': 'normal'},
+        {'id': 'l5', 'speaker': 'dot', 'text': 'Checking the cookies were safe.', 't': 22.2,
+         'emotion': 'embarrassed', 'pace': 'slow', 'volume': 'soft'},
+        {'id': 'l6', 'speaker': 'pip', 'text': 'They were not.', 't': 26.7, 'emotion': 'smug', 'pace': 'normal',
+         'volume': 'normal', 'delivery': 'deadpan'},
+    ],
+    'sfx': [{'cue': 'gasp_sting', 't': 22.05}, {'cue': 'fail_horn', 't': 27.3}],
+    'music': [{'t': 0.0, 'cue': 'playful'}, {'t': 17.25, 'cue': 'tension'}, {'t': 26.25, 'cue': 'playful'}],
+    'cover_t': 1.8,
+    'metadata': {'title': 'The Last Cookie', 'description': 'Someone ate the last cookie. Nobody did it.',
+                 'tags': ['family', 'animation', 'funny']},
+    'inspiration': {'note': 'Hand-authored fixture story; no reference video was used.', 'sources': []},
+}
+
+
 def plan():
     return copy.deepcopy(LAST_PLATFORM)
+
+
+def home_plan():
+    """The family skit fixture at the 'home' set."""
+    return copy.deepcopy(LAST_COOKIE)
+
+
+def park_plan():
+    """The same skit taken outdoors: the fixture story for the 'park' set."""
+    p = copy.deepcopy(LAST_COOKIE)
+    p['title'] = 'The Last Cookie at the Park'
+    p['metadata']['title'] = p['title']
+    p['setting'].update(preset='park', time_of_day='noon',
+                        description='The plaza of a city park at noon, benches and trees around, a fountain nearby.')
+    p['lines'][2]['text'] = 'I was by the fountain.'
+    p['story']['reveal'] = 'Dot was "checking the cookies were safe" by the fountain.'
+    return p

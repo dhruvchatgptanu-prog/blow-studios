@@ -17,7 +17,7 @@ SCALES = {'bloxy': 1.0, 'pip': 0.9, 'hero': 1.0}
 
 def _plans():
     with open(BATCH) as f:
-        return json.load(f) + [demo.plan()]
+        return json.load(f) + [demo.plan(), demo.home_plan(), demo.park_plan()]
 
 
 def _manifest(i):

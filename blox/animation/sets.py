@@ -60,7 +60,7 @@ SLAB_TOP = -0.004
 WALK_TOP_MAX = 0.004
 
 GROUND_HEX = {'town_street': '#6DBE45', 'night_forest': '#3A6640', 'classroom': '#D9B98C',
-              'bedroom': '#B98A5E', 'studio': '#D9DCE3'}
+              'bedroom': '#B98A5E', 'studio': '#D9DCE3', 'home': '#B98A5E', 'park': '#6DBE45'}
 
 # Story props that are big, never held and so can hide a face: local boxes (cx, cy, cz, sx, sy, sz)
 # matching blender_scene.build_prop at scale 1.
@@ -499,7 +499,7 @@ def sky_and_lights(preset, tod, lighting):
     stops = (SKY_LAVA if preset == 'lava_obby' else SKY)[tod]
     if preset == 'night_forest' and tod != 'night':
         stops = [mix(s, '#1B2547', 0.25) for s in stops]
-    indoor = preset in ('classroom', 'bedroom', 'studio')
+    indoor = preset in ('classroom', 'bedroom', 'studio', 'home')
     if indoor:
         stops = SKY_INDOOR if tod != 'night' else ['#2A2E3E', '#3A3F55', '#2E3448', '#22273A']
     elev, energy, col = SUN[tod]
@@ -1574,8 +1574,731 @@ def studio(dr, night):
                math.degrees(a) + 90, check=False)
 
 
+# ---------------------------------------------------------------- home (family and sibling skits)
+# A ground-floor interior: the living room is built around the clearance box like the other rooms, an open
+# archway in its south wall leads to a hallway with the front door, an entry mat and a staircase up to a
+# landing, and an opening in the east wall shows a kitchen corner (counter, fridge). Characters walk the
+# ground floor (the validator treats the whole preset as supported ground); the stairs and landing are
+# scenery beyond the walls, never a surface the plan can stand a character on.
+HOME_WALLS = [('#F4EADB', '#D8C2A4'), ('#E9EFF3', '#B7C9D6'), ('#F7E8D3', '#E2B98B'), ('#EAF1E4', '#B3CBA2'),
+              ('#F3E5EA', '#D6B2C0')]
+HOME_FLOORS = [('#B98A5E', '#AD7F55'), ('#C9A074', '#BD9268'), ('#8F6540', '#866040')]
+SOFAS = ['#4A6FA5', '#6B8E5A', '#B5533C', '#8E6BAF', '#C98A3C', '#4F8FA3']
+ACCENTS = ['#E84A5F', '#FFCE54', '#4FC1E9', '#A0D468', '#AC92EC', '#FC6E51', '#F6F7FB']
+WINDOW_SKY = {'morning': '#F6D9BE', 'noon': '#9FD3F0', 'sunset': '#FFB070', 'night': '#1B2440'}
+# Light spilling in through each window: colour and energy by time of day (a point light just inside it).
+WINDOW_LIGHT = {'morning': ('#FFD9B3', 160.0), 'noon': ('#FFF7EB', 190.0), 'sunset': ('#FF9E61', 170.0),
+                'night': ('#7F93D1', 40.0)}
+HALL_DEPTH = 2.8
+KITCHEN_DEPTH = 3.2
+KITCHEN_HALF_W = 2.4
+WALL_T = 0.3
+STAIR_STEPS, STAIR_TREAD, STAIR_RISE, STAIR_W = 10, 0.27, 0.19, 0.95
+
+
+def view_window(rnd, w, h, tod, trim='#FFFFFF', curtains=None, rooftops=False):
+    """Framed window whose pane carries a painted outside view (a garden, or rooftops) tinted by the time of
+    day. The pane material is opaque, so the 'outside' is drawn on it in layers at distinct depths (sky,
+    ground, far, mid, near) that never share a plane."""
+    night = tod == 'night'
+    sky = WINDOW_SKY.get(tod, WINDOW_SKY['noon'])
+    parts = [P('box', 0, 0.02, 0, w + 0.24, 0.1, h + 0.24, trim, bevel=0.02),
+             P('box', 0, -0.035, 0, w, 0.01, h, sky, 'pane')]
+    SKYD, FAR, MID, NEAR = -0.0445, -0.0505, -0.0565, -0.0625
+    gh = h * 0.28
+    horizon = -h / 2 + gh
+    grass = '#2C4F33' if night else '#7CC46A'
+    hedge = '#1F3A2A' if night else '#4C9A2A'
+    parts.append(P('box', 0, SKYD, -h / 2 + gh / 2, w, 0.005, gh, grass, 'pane'))
+    if rooftops:
+        x = -w / 2 + 0.04
+        while x < w / 2 - 0.3:
+            bw = min(rnd.uniform(0.32, 0.55), w / 2 - x - 0.02)
+            bh = rnd.uniform(0.22, 0.42) * h
+            col = rnd.choice(['#2E3A59', '#3D4A6B', '#2A3350']) if night else jitter(rnd.choice(HOUSE_WALLS), rnd)
+            roof = '#1E2538' if night else rnd.choice(ROOFS)
+            parts.append(P('box', x + bw / 2, FAR, horizon + bh / 2 - 0.02, bw, 0.005, bh, col, 'pane'))
+            parts.append(P('pyr', x + bw / 2, FAR, horizon + bh - 0.02 + bh * 0.2, bw + 0.06, 0.005, bh * 0.4, roof,
+                           'pane'))
+            if night:
+                parts.append(P('box', x + bw / 2, MID, horizon + bh * 0.45, bw * 0.3, 0.005, bh * 0.25, '#FFD27A',
+                               'emit'))
+            x += bw + rnd.uniform(0.04, 0.12)
+    else:
+        parts.append(P('box', 0, FAR, horizon + h * 0.04, w, 0.005, h * 0.08, hedge, 'pane'))
+        hx = rnd.choice([-1, 1]) * w * 0.25
+        hw, hh = w * 0.3, h * 0.22
+        wall = '#2E3A59' if night else jitter(rnd.choice(HOUSE_WALLS), rnd)
+        parts += [P('box', hx, MID, horizon + hh / 2 + 0.01, hw, 0.005, hh, wall, 'pane'),
+                  P('pyr', hx, MID, horizon + hh + 0.01 + hh * 0.3, hw + 0.08, 0.005, hh * 0.6,
+                    '#1E2538' if night else rnd.choice(ROOFS), 'pane'),
+                  P('box', hx, NEAR, horizon + hh * 0.45, hw * 0.25, 0.005, hh * 0.3, '#FFD27A' if night else '#A7D8F2',
+                    'emit' if night else 'pane')]
+        tx = -hx * 1.4
+        th = h * 0.45
+        parts += [P('box', tx, NEAR, horizon + th * 0.25, w * 0.05, 0.005, th * 0.5, TRUNK, 'pane'),
+                  P('cyl', tx, NEAR, horizon + th * 0.68, w * 0.32, w * 0.32, 0.005,
+                    '#24422B' if night else rnd.choice(LEAVES), 'pane', rx=90)]
+    if night:
+        parts.append(P('cyl', -w * 0.3, SKYD, h * 0.3, h * 0.16, h * 0.16, 0.005, '#FFF4D6', 'emit', rx=90))
+        for _ in range(5):
+            parts.append(P('box', rnd.uniform(-w * 0.45, w * 0.45), SKYD, rnd.uniform(h * 0.1, h * 0.45), 0.02, 0.005,
+                           0.02, '#FFFFFF', 'emit'))
+    else:
+        if tod == 'sunset':
+            parts.append(P('cyl', w * 0.28, SKYD, horizon + h * 0.14, h * 0.2, h * 0.2, 0.005, '#FFD27A', 'emit',
+                           rx=90))
+        for i in range(2):
+            cx = (-1 if i else 1) * rnd.uniform(0.15, 0.35) * w
+            cz = rnd.uniform(0.15, 0.4) * h
+            parts += [P('cyl', cx, SKYD, cz, w * 0.26, h * 0.12, 0.005, '#FFFFFF', 'pane', rx=90),
+                      P('cyl', cx + w * 0.08, SKYD, cz + h * 0.04, w * 0.16, h * 0.1, 0.005, '#FFFFFF', 'pane',
+                        rx=90)]
+    parts += [P('box', 0, -0.07, 0, 0.07, 0.04, h, trim), P('box', 0, -0.07, 0, w, 0.04, 0.07, trim),
+              P('box', 0, -0.1, -h / 2 - 0.08, w + 0.4, 0.22, 0.08, trim, bevel=0.02)]
+    if curtains:
+        for s in (-1, 1):
+            parts.append(P('box', s * (w / 2 + 0.16), -0.14, 0.05, 0.36, 0.1, h + 0.4, curtains, bevel=0.03))
+        parts.append(P('box', 0, -0.14, h / 2 + 0.3, w + 0.95, 0.06, 0.06, '#8B8F98'))
+    return parts
+
+
+def wall_with_openings(w, h, t, col, low_col, openings=(), skirting=True):
+    """Parts of a wall (front facing -y, x along the wall, centred) with doorway openings cut from the floor:
+    openings are (x_from, x_to, z_top). Solid segments carry the wainscot and skirting."""
+    parts = []
+    edges = sorted(openings)
+    x = -w / 2
+    for a, b, ztop in edges:
+        seg = a - x
+        if seg > 0.01:
+            cx = x + seg / 2
+            parts.append(P('box', cx, 0, h / 2, seg, t, h, col))
+            if skirting:
+                parts += [P('box', cx, -t / 2 - 0.01, 0.55, seg, 0.02, 1.1, low_col),
+                          P('box', cx, -t / 2 - 0.03, 1.12, seg, 0.05, 0.07, shade(low_col, 0.85)),
+                          P('box', cx, -t / 2 - 0.03, 0.06, seg, 0.06, 0.12, '#FFFFFF')]
+        parts.append(P('box', (a + b) / 2, 0, (ztop + h) / 2, b - a, t, h - ztop, col))
+        parts.append(P('box', (a + b) / 2, -t / 2 - 0.02, ztop + 0.05, b - a + 0.16, 0.08, 0.1, '#FFFFFF', bevel=0.01))
+        x = b
+    seg = w / 2 - x
+    if seg > 0.01:
+        cx = x + seg / 2
+        parts.append(P('box', cx, 0, h / 2, seg, t, h, col))
+        if skirting:
+            parts += [P('box', cx, -t / 2 - 0.01, 0.55, seg, 0.02, 1.1, low_col),
+                      P('box', cx, -t / 2 - 0.03, 1.12, seg, 0.05, 0.07, shade(low_col, 0.85)),
+                      P('box', cx, -t / 2 - 0.03, 0.06, seg, 0.06, 0.12, '#FFFFFF')]
+    if skirting:
+        parts.append(P('box', 0, -t / 2 - 0.03, h - 0.07, w, 0.06, 0.14, '#FFFFFF'))   # cornice
+    return parts
+
+
+def sofa_parts(col, w=2.2, accents=('#FFCE54', '#4FC1E9')):
+    """Low sofa, front facing -y; everything stays under LOW_TOP so it can sit near a camera."""
+    base = shade(col, 0.82)
+    parts = [P('box', 0, 0.02, 0.2, w, 0.92, 0.4, base, bevel=0.05),
+             P('box', 0, 0.33, 0.57, w, 0.3, 0.42, col, bevel=0.06),
+             P('box', -w / 2 + 0.14, -0.04, 0.5, 0.28, 0.84, 0.28, col, bevel=0.06),
+             P('box', w / 2 - 0.14, -0.04, 0.5, 0.28, 0.84, 0.28, col, bevel=0.06)]
+    n = 2 if w < 2.0 else 3
+    cw = (w - 0.56) / n
+    for i in range(n):
+        parts.append(P('box', -w / 2 + 0.28 + cw * (i + 0.5), -0.1, 0.47, cw - 0.04, 0.7, 0.14, shade(col, 1.08),
+                       bevel=0.05))
+    parts += [P('box', -w / 2 + 0.6, 0.12, 0.6, 0.4, 0.14, 0.36, accents[0], bevel=0.06, rz=8),
+              P('box', w / 2 - 0.6, 0.12, 0.6, 0.4, 0.14, 0.36, accents[1], bevel=0.06, rz=-6)]
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            parts.append(P('box', sx * (w / 2 - 0.12), sy * 0.38, 0.03, 0.08, 0.08, 0.06, '#3B3F47'))
+    return parts
+
+
+def armchair_parts(col, accent):
+    return sofa_parts(col, 1.1, (accent, accent))[:-6] + [
+        P('box', 0, 0.12, 0.6, 0.5, 0.14, 0.36, accent, bevel=0.06)]
+
+
+def coffee_table_parts(rnd, wood):
+    parts = [P('box', 0, 0, 0.4, 1.2, 0.6, 0.05, wood, bevel=0.015),
+             P('box', 0, 0, 0.12, 1.0, 0.44, 0.04, shade(wood, 0.9))]
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            parts.append(P('box', sx * 0.52, sy * 0.22, 0.2, 0.06, 0.06, 0.38, shade(wood, 0.8)))
+    parts += [P('cyl', -0.25, 0.05, 0.45, 0.3, 0.3, 0.05, rnd.choice(ACCENTS)),
+              P('box', 0.3, -0.05, 0.44, 0.3, 0.22, 0.03, rnd.choice(ACCENTS), rz=rnd.uniform(-20, 20)),
+              P('box', 0.3, -0.05, 0.47, 0.26, 0.2, 0.03, rnd.choice(ACCENTS), rz=rnd.uniform(-20, 20)),
+              P('cyl', 0.0, 0.18, 0.46, 0.09, 0.09, 0.08, '#FFFFFF', 'gloss')]
+    return parts
+
+
+def tv_wall_parts(rnd, wood, w=1.8, h=1.0):
+    """Wall screen showing abstract shapes only, on a low media unit. Screen local -y faces the room."""
+    parts = [P('box', 0, 0, 0.26, 2.2, 0.45, 0.52, wood, bevel=0.02),
+             P('box', -0.55, -0.23, 0.26, 1.0, 0.02, 0.4, shade(wood, 1.1)),
+             P('box', 0.55, -0.23, 0.26, 1.0, 0.02, 0.4, shade(wood, 1.1)),
+             P('box', 0, -0.25, 0.26, 0.04, 0.02, 0.2, '#B9BCC4', 'gloss'),
+             P('box', -0.75, 0.0, 0.6, 0.3, 0.2, 0.12, '#22252B', 'gloss', 0.02),
+             P('box', 0.8, 0.0, 0.62, 0.22, 0.22, 0.2, rnd.choice(ACCENTS), bevel=0.04),
+             P('box', 0, 0.12, 0.55 + h / 2 + 0.45, w, 0.08, h, '#22252B', 'gloss', 0.02),
+             P('box', 0, 0.075, 0.55 + h / 2 + 0.45, w - 0.12, 0.01, h - 0.12, '#1F3A6E', 'glow')]
+    zc = 0.55 + h / 2 + 0.45
+    for i in range(rnd.randint(3, 5)):
+        s = rnd.uniform(0.12, 0.3)
+        x, z = rnd.uniform(-w / 2 + 0.3, w / 2 - 0.3), zc + rnd.uniform(-h / 2 + 0.25, h / 2 - 0.25)
+        col = rnd.choice(ACCENTS)
+        y = 0.068 - i * 0.002
+        if rnd.random() < 0.5:
+            parts.append(P('box', x, y, z, s * 1.4, 0.005, s, col, 'glow'))
+        else:
+            parts.append(P('cyl', x, y, z, s, s, 0.005, col, 'glow', rx=90))
+    return parts
+
+
+def picture_frame(rnd, w, h):
+    frame = rnd.choice(['#3B3F47', '#8B5A2B', '#F6F4EE', '#C8A27A'])
+    parts = [P('box', 0, 0, 0, w, 0.04, h, frame, bevel=0.01),
+             P('box', 0, -0.025, 0, w - 0.1, 0.01, h - 0.1, rnd.choice(['#FFFFFF', '#FFF3C4', '#D7ECFF', '#E2F7D7']))]
+    for i in range(rnd.randint(1, 3)):
+        s = rnd.uniform(0.2, 0.45) * min(w, h)
+        x, z = rnd.uniform(-w / 3, w / 3), rnd.uniform(-h / 3, h / 3)
+        col = rnd.choice(ACCENTS[:-1])
+        if rnd.random() < 0.5:
+            parts.append(P('cyl', x, -0.032 - i * 0.002, z, s, s, 0.005, col, rx=90))
+        else:
+            parts.append(P('box', x, -0.032 - i * 0.002, z, s * 1.3, 0.005, s, col))
+    return parts
+
+
+def plant_parts(rnd, tall=False):
+    pot = rnd.choice(['#C96F4A', '#E8E2D8', '#5A6B7A', '#D9B98C'])
+    if tall:
+        parts = [P('box', 0, 0, 0.25, 0.5, 0.5, 0.5, pot, bevel=0.03), P('cyl', 0, 0, 0.85, 0.08, 0.08, 0.8, '#5A7A3A')]
+        for i in range(5):
+            a = i * 72 + rnd.uniform(-15, 15)
+            parts.append(P('box', 0.3 * math.cos(math.radians(a)), 0.3 * math.sin(math.radians(a)), 1.05 + i * 0.1,
+                           0.62, 0.3, 0.05, rnd.choice(['#4C9A2A', '#5DAE3E', '#3F8A55']), bevel=0.02, rz=a,
+                           ry=-25))
+        return parts
+    return [P('box', 0, 0, 0.2, 0.4, 0.4, 0.4, pot, bevel=0.03),
+            P('box', 0, 0, 0.62, 0.55, 0.55, 0.5, '#4C9A2A', bevel=0.12),
+            P('box', 0.12, -0.05, 0.9, 0.35, 0.35, 0.3, '#5DAE3E', bevel=0.1)]
+
+
+def floor_lamp_parts(shade_col, night):
+    return [P('cyl', 0, 0, 0.03, 0.4, 0.4, 0.06, '#3B3F47'), P('cyl', 0, 0, 0.8, 0.05, 0.05, 1.5, '#3B3F47'),
+            P('cyl', 0, 0, 1.62, 0.45, 0.45, 0.35, shade_col, 'emit' if night else 'glow')]
+
+
+def side_table_parts(wood, shade_col, night):
+    return [P('box', 0, 0, 0.52, 0.5, 0.5, 0.04, wood, bevel=0.01),
+            P('box', -0.2, -0.2, 0.25, 0.05, 0.05, 0.5, wood), P('box', 0.2, -0.2, 0.25, 0.05, 0.05, 0.5, wood),
+            P('box', -0.2, 0.2, 0.25, 0.05, 0.05, 0.5, wood), P('box', 0.2, 0.2, 0.25, 0.05, 0.05, 0.5, wood),
+            P('cyl', 0, 0, 0.6, 0.16, 0.16, 0.12, '#3B3F47'), P('cyl', 0, 0, 0.8, 0.04, 0.04, 0.3, '#3B3F47'),
+            P('cyl', 0, 0, 1.06, 0.34, 0.34, 0.26, shade_col, 'emit' if night else 'glow')]
+
+
+def wall_shelf_parts(rnd, wood):
+    parts = [P('box', 0, 0, 0, 1.4, 0.26, 0.04, wood, bevel=0.01),
+             P('box', -0.5, -0.02, 0.17, 0.2, 0.2, 0.3, '#C96F4A', bevel=0.02),
+             P('box', -0.5, -0.02, 0.42, 0.34, 0.3, 0.22, '#5DAE3E', bevel=0.08),
+             P('box', 0.45, -0.02, 0.16, 0.36, 0.03, 0.28, '#3B3F47'),
+             P('box', 0.45, -0.04, 0.16, 0.3, 0.01, 0.22, rnd.choice(ACCENTS))]
+    x = -0.2
+    while x < 0.2:
+        bw = rnd.uniform(0.05, 0.09)
+        parts.append(P('box', x, -0.01, 0.14, bw, 0.2, rnd.uniform(0.18, 0.26), rnd.choice(ACCENTS), bevel=0.005))
+        x += bw + 0.015
+    return parts
+
+
+def front_door_parts(col, night):
+    return [P('box', 0, 0.02, 1.1, 1.3, 0.08, 2.25, '#FFFFFF', bevel=0.02),
+            P('box', 0, -0.03, 1.05, 1.1, 0.06, 2.1, col, bevel=0.02),
+            P('box', -0.3, -0.07, 0.6, 0.36, 0.02, 0.7, shade(col, 0.9), bevel=0.01),
+            P('box', 0.3, -0.07, 0.6, 0.36, 0.02, 0.7, shade(col, 0.9), bevel=0.01),
+            P('box', -0.3, -0.07, 1.5, 0.36, 0.02, 0.7, shade(col, 0.9), bevel=0.01),
+            P('box', 0.3, -0.07, 1.5, 0.36, 0.02, 0.7, shade(col, 0.9), bevel=0.01),
+            P('box', 0, -0.07, 1.95, 0.8, 0.02, 0.2, '#1B2440' if night else '#9FD3F0', 'pane'),
+            P('box', 0.42, -0.1, 1.0, 0.1, 0.05, 0.05, '#E8C547', 'gloss'),
+            P('box', 0.42, -0.1, 1.12, 0.04, 0.04, 0.1, '#E8C547', 'gloss')]
+
+
+def coat_rack_parts(rnd):
+    parts = [P('box', 0, 0, 0, 1.4, 0.06, 0.1, '#8B5A2B')]
+    for i in range(4):
+        x = -0.5 + i * 0.34
+        parts.append(P('box', x, -0.06, -0.02, 0.04, 0.08, 0.04, '#B9BCC4', 'gloss'))
+        if rnd.random() < 0.8:
+            parts.append(P('box', x, -0.14, -0.42, 0.3, 0.16, 0.76, rnd.choice(ACCENTS[:-1] + ['#3B3F47']), bevel=0.05))
+    return parts
+
+
+def shoe_rack_parts(rnd):
+    parts = [P('box', 0, 0, 0.16, 0.9, 0.32, 0.32, '#A0703F', bevel=0.01),
+             P('box', 0, -0.02, 0.17, 0.86, 0.3, 0.03, shade('#A0703F', 0.85))]
+    for i in range(3):
+        parts.append(P('box', -0.3 + i * 0.3, -0.03, 0.38, 0.11, 0.26, 0.1, rnd.choice(ACCENTS[:-1]), bevel=0.03))
+    return parts
+
+
+def stairs_parts(wood, carpet, rail='#F6F4EE'):
+    """Closed-riser staircase rising along +x to a landing, handrail and balusters on the open (-y) side.
+    Every tread top sits at its own height, so nothing shares a plane."""
+    n, tr, rs, w = STAIR_STEPS, STAIR_TREAD, STAIR_RISE, STAIR_W
+    parts = []
+    for k in range(n):
+        x, z = k * tr + tr / 2, (k + 1) * rs
+        parts += [P('box', x, 0, z / 2, tr, w, z, wood, bevel=0.01),
+                  P('box', x, 0.05, z + 0.005, tr + 0.01, w * 0.55, 0.008, carpet),
+                  P('box', x, -w / 2 + 0.06, z + 0.45, 0.04, 0.04, 0.9, rail)]
+    L = 1.1
+    xl, zl = n * tr + L / 2, (n + 1) * rs     # the landing is one riser above the last tread
+    parts += [P('box', xl, 0, zl / 2, L, w, zl, wood, bevel=0.01),
+              P('box', xl, 0.05, zl + 0.005, L - 0.05, w * 0.55, 0.008, carpet),
+              P('box', xl, -w / 2 + 0.06, zl + 0.5, L, 0.06, 0.06, shade(wood, 0.8)),
+              P('box', xl, -w / 2 + 0.06, zl + 0.95, L, 0.06, 0.06, shade(wood, 0.8))]
+    for k in range(3):
+        parts.append(P('box', n * tr + 0.2 + k * 0.35, -w / 2 + 0.06, zl + 0.45, 0.04, 0.04, 0.9, rail))
+    run = n * tr
+    ang = math.degrees(math.atan2(zl, run))
+    parts.append(P('box', run / 2, -w / 2 + 0.06, zl / 2 + 0.95, math.hypot(run, zl) + 0.1, 0.07, 0.07,
+                   shade(wood, 0.8), ry=-ang))
+    for x, z in ((0.05, 0.0), (run, zl)):
+        parts += [P('box', x, -w / 2 + 0.06, z + 0.55, 0.12, 0.12, 1.1, shade(wood, 0.8), bevel=0.02),
+                  P('ball', x, -w / 2 + 0.06, z + 1.17, 0.18, 0.18, 0.18, shade(wood, 0.8))]
+    return parts
+
+
+def kitchen_counter_parts(rnd, L, door_col):
+    top = '#D9DCE3'
+    parts = [P('box', 0, 0, 0.44, L, 0.6, 0.88, '#EDEDE8', bevel=0.01),
+             P('box', 0, 0, 0.905, L + 0.04, 0.64, 0.04, top, 'gloss', 0.01)]
+    n = max(2, int(L / 0.6))
+    dw = (L - 0.1) / n
+    for i in range(n):
+        x = -L / 2 + 0.05 + dw * (i + 0.5)
+        parts += [P('box', x, -0.31, 0.44, dw - 0.04, 0.02, 0.8, door_col, bevel=0.01),
+                  P('box', x, -0.335, 0.62, 0.16, 0.02, 0.03, '#B9BCC4', 'gloss')]
+    sx, hx = 0.0, L / 4
+    parts += [P('box', sx, 0.02, 0.93, 0.6, 0.42, 0.012, '#AEB4BC', 'gloss'),
+              P('box', sx, 0.24, 1.03, 0.03, 0.03, 0.2, '#C9CDD3', 'gloss'),
+              P('box', sx, 0.15, 1.13, 0.03, 0.2, 0.03, '#C9CDD3', 'gloss')]
+    for ax in (-1, 1):
+        for ay in (-1, 1):
+            parts.append(P('cyl', hx + ax * 0.15, ay * 0.13, 0.932, 0.19, 0.19, 0.012, '#23252B', 'gloss'))
+    bx = -L / 3
+    parts += [P('cyl', bx, -0.02, 0.955, 0.3, 0.3, 0.06, '#E8C547'),
+              P('ball', bx - 0.05, -0.05, 1.02, 0.1, 0.1, 0.1, '#E84A5F'), P('ball', bx + 0.05, 0.02, 1.02, 0.1, 0.1, 0.1,
+                                                                            '#A0D468'),
+              P('ball', bx, 0.04, 1.1, 0.09, 0.09, 0.09, '#FFCE54'),
+              P('cyl', bx - 0.5, 0.1, 1.0, 0.1, 0.1, 0.16, rnd.choice(ACCENTS), 'gloss')]
+    return parts
+
+
+def upper_cabinets_parts(L, door_col):
+    parts = [P('box', 0, 0, 0.35, L, 0.36, 0.7, '#EDEDE8', bevel=0.01)]
+    n = max(2, int(L / 0.6))
+    dw = (L - 0.1) / n
+    for i in range(n):
+        x = -L / 2 + 0.05 + dw * (i + 0.5)
+        parts += [P('box', x, -0.19, 0.35, dw - 0.04, 0.02, 0.62, door_col, bevel=0.01),
+                  P('box', x, -0.215, 0.12, 0.16, 0.02, 0.03, '#B9BCC4', 'gloss')]
+    return parts
+
+
+def fridge_parts(col='#E6E9EE'):
+    return [P('box', 0, 0, 0.95, 0.76, 0.72, 1.9, col, 'gloss', 0.03),
+            P('box', 0, -0.365, 1.35, 0.76, 0.01, 0.015, shade(col, 0.75)),
+            P('box', -0.3, -0.39, 1.0, 0.03, 0.04, 0.6, '#B9BCC4', 'gloss'),
+            P('box', -0.3, -0.39, 1.6, 0.03, 0.04, 0.4, '#B9BCC4', 'gloss'),
+            P('box', 0.2, -0.37, 1.55, 0.14, 0.01, 0.12, '#FFCE54'), P('box', 0.05, -0.37, 1.7, 0.1, 0.01, 0.1, '#4FC1E9')]
+
+
+def _hang(dr, inner, wall, along, z, kind, parts, **tpl_kw):
+    """Register parts and hang them on a wall of the inner box, with the template's own depth."""
+    key = dr.tpl(kind, parts, **tpl_kw)
+    return _on_wall(dr, inner, wall, along, z, key, dr.templates[key]['size'][1], kind)
+
+
+def home(dr, night):
+    """Living room around the action, an open archway south to a hallway (front door, entry mat, stairs to a
+    landing), an opening east into a kitchen corner (counter, fridge). Windows carry painted views and spill
+    time-of-day light; at night the lamps, the ceiling lights and the screen take over."""
+    rnd = dr.rnd
+    tod = dr.m['setting'].get('time_of_day', 'noon')
+    tod = tod if tod in WINDOW_SKY else 'noon'
+    props = {p.get('type') for p in dr.m['setting'].get('props', [])}
+    wall_h = max(3.4, dr.area['band'][1] + 0.4)
+    wall_col, low_col = rnd.choice(HOME_WALLS)
+    planks = rnd.choice(HOME_FLOORS)
+    wood = rnd.choice(['#A0703F', '#C8A27A', '#8B5A2B', '#D8B48A'])
+    sofa_col = rnd.choice(SOFAS)
+    curtain = rnd.choice(['#E3B87F', '#9CC5A1', '#D6B2C0', '#B7C9D6', '#F2B5B5'])
+    t = WALL_T
+    c = dr.area['clear']
+    band = 1.4
+    hx = max((c[2] - c[0]) / 2 + band, 4.6)
+    hy = max((c[3] - c[1]) / 2 + band, 4.2)
+    cx, cy = dr.cx, dr.cy
+    inner = [cx - hx, cy - hy, cx + hx, cy + hy]
+    x0, y0, x1, y1 = inner
+    W, H = 2 * hx, 2 * hy
+    # Rooms beyond the living room walls: hall to the south (through the arch), kitchen to the east.
+    yh1, yh0 = y0 - t, y0 - t - HALL_DEPTH
+    xk0, xk1 = x1 + t, x1 + t + KITCHEN_DEPTH
+    ky0, ky1 = cy - KITCHEN_HALF_W, cy + KITCHEN_HALF_W
+    hall = [x0, yh0, x1, yh1]
+    kitchen = [xk0, ky0, xk1, ky1]
+    arch = (cx - 1.4, cx + 1.4, 2.3)
+    kdoor = (cy - 0.9, cy + 1.1, 2.2)
+    # Floors: one slab under the house, planks in the living room, tiles in the hall and the kitchen, all
+    # flush with z = 0 and never overlapping each other (they meet under the walls).
+    fx0, fy0, fx1, fy1 = x0 - t - 1.0, yh0 - t - 1.0, xk1 + t + 1.0, y1 + t + 1.0
+    dr.put('floor', dr.tpl('floor', [P('box', 0, 0, -0.1, fx1 - fx0, fy1 - fy0, 0.2, shade(planks[0], 0.7))],
+                           decal=True, shadow=False), (fx0 + fx1) / 2, (fy0 + fy1) / 2, SLAB_TOP - 0.2, check=False)
+    rows = []
+    pw = 0.22
+    ny = int(H / pw) + 1
+    for j in range(ny):
+        y = -H / 2 + pw * (j + 0.5)
+        length = W
+        rows.append(P('box', 0, y, 0.004, length, pw - 0.01, 0.008, planks[j % 2]))
+        rows.append(P('box', rnd.uniform(-W / 3, W / 3), y, 0.006, 0.02, pw - 0.01, 0.008, shade(planks[0], 0.8)))
+    rows = [r for r in rows if r[2] <= H / 2 - pw * 0.5 + 1e-6]
+    dr.put('planks', dr.tpl('planks', rows, decal=True, shadow=False), cx, cy, -0.008, check=False)
+    dr.put('threshold', dr.tpl('threshold', [P('box', 0, 0, 0.004, arch[1] - arch[0] + 0.3, t, 0.008, planks[1])],
+                               decal=True, shadow=False), cx, (y0 + yh1) / 2, -0.008, check=False)
+
+    def tiles(x0_, y0_, x1_, y1_, cols, step=0.6):
+        out = []
+        nx, ny_ = int((x1_ - x0_) / step), int((y1_ - y0_) / step)
+        sx, sy = (x1_ - x0_) / max(nx, 1), (y1_ - y0_) / max(ny_, 1)
+        for i in range(nx):
+            for j in range(ny_):
+                out.append(P('box', -(x1_ - x0_) / 2 + sx * (i + 0.5), -(y1_ - y0_) / 2 + sy * (j + 0.5), 0.004,
+                             sx - 0.01, sy - 0.01, 0.008, cols[(i + j) % 2]))
+        return out
+    dr.put('halltiles', dr.tpl('halltiles', tiles(*hall, ('#D9D4C8', '#C9C2B4')), decal=True, shadow=False),
+           (hall[0] + hall[2]) / 2, (hall[1] + hall[3]) / 2, -0.008, check=False)
+    dr.put('kitchentiles', dr.tpl('kitchentiles', tiles(xk0 - t, ky0, xk1, ky1, ('#EDEDE8', '#B9CBD8'), 0.5),
+                                  decal=True, shadow=False), (xk0 - t + xk1) / 2, cy, -0.008, check=False)
+    # Walls (none casts shadows so the key light reaches in): the living room's south wall has the arch, its
+    # east wall the kitchen opening; the hall and the kitchen close with plain walls.
+    def wall(name, x, y, w, rot, openings=(), skirt=True):
+        parts = wall_with_openings(w, wall_h, t, wall_col, low_col, openings, skirt)
+        dr.put('wall', dr.tpl('wall', parts, shadow=False), x, y, 0.0, rot, check=False)
+    wall('n', cx, y1 + t / 2, W + 2 * t, 0.0)
+    # South wall: openings are given in the wall's local x, which for rot 180 runs from +x to -x.
+    wall('s', cx, y0 - t / 2, W + 2 * t, 180.0, [(cx - arch[1], cx - arch[0], arch[2])])
+    wall('w', x0 - t / 2, (yh0 + y1) / 2, y1 - yh0 + 2 * t, 90.0)
+    # East wall (rot -90): local x runs from +y to -y, centred on the wall's middle.
+    ymid = (yh0 + y1) / 2
+    wall('e', x1 + t / 2, ymid, y1 - yh0 + 2 * t, -90.0, [(ymid - kdoor[1], ymid - kdoor[0], kdoor[2])])
+    wall('hall_s', cx, yh0 - t / 2, W + 2 * t, 180.0)
+    wall('kitchen_n', (xk0 + xk1) / 2, ky1 + t / 2, KITCHEN_DEPTH + t, 0.0, skirt=False)
+    wall('kitchen_s', (xk0 + xk1) / 2, ky0 - t / 2, KITCHEN_DEPTH + t, 180.0, skirt=False)
+    wall('kitchen_e', xk1 + t / 2, cy, 2 * KITCHEN_HALF_W + 2 * t, -90.0, skirt=False)
+    dr.put('ceiling', dr.tpl('ceiling', [P('box', 0, 0, 0.1, fx1 - fx0 - 1.4, fy1 - fy0 - 1.4, 0.2, '#F1ECE3')],
+                             shadow=False), (fx0 + fx1) / 2, (fy0 + fy1) / 2, wall_h, check=False)
+    # Exposed beams across the living room ceiling (above the camera band by construction, so unchecked).
+    beam = dr.tpl('beam', [P('box', 0, 0, 0.07, W + 0.2, 0.18, 0.14, mix(shade(wood, 0.9), '#F1ECE3', 0.3), bevel=0.02)],
+                  shadow=False)
+    nb = max(3, int(H / 2.2))
+    for i in range(nb):
+        dr.put('beam', beam, cx, y0 + H * (i + 0.5) / nb, wall_h - 0.16, 0.0, check=False, solid=False)
+    # Living room: the screen wall (north), windows west and north, the sofa corner south-west of the arch.
+    _hang(dr, inner, 'n', 0.0, 0.0, 'tv', tv_wall_parts(rnd, wood))
+    _hang(dr, inner, 'n', -W * 0.27, 1.0, 'window', view_window(rnd, 1.8, 1.4, tod, curtains=curtain))
+    _hang(dr, inner, 'n', W * 0.3, 0.0, 'bookcase', bookcase(rnd, 1.6, 1.9, wood))
+    _hang(dr, inner, 'n', 1.3, 1.75, 'frame', picture_frame(rnd, 0.55, 0.65), shadow=False)
+    _hang(dr, inner, 'n', W * 0.3, 2.4, 'shelf', wall_shelf_parts(rnd, wood))
+    _hang(dr, inner, 'n', 0.0, 2.45, 'shelf', wall_shelf_parts(rnd, wood))
+    drop = max(0.6, wall_h - 2.1)
+    hanging = [P('cyl', 0, 0, 0.8 + drop / 2, 0.02, 0.02, drop, '#3B3F47'),
+               P('box', 0, 0, 0.62, 0.42, 0.42, 0.36, '#C96F4A', bevel=0.03),
+               P('box', 0, 0, 0.85, 0.7, 0.7, 0.3, '#4C9A2A', bevel=0.12)]
+    for i in range(4):
+        a = i * 90 + 20
+        hanging.append(P('box', 0.28 * math.cos(math.radians(a)), 0.28 * math.sin(math.radians(a)), 0.4, 0.12, 0.12,
+                         0.55, '#5DAE3E', bevel=0.04, rz=a))
+    hk = dr.tpl('hanging_plant', hanging)
+    dr.put('hanging_plant', hk, x1 - 0.6, y1 - 0.6, wall_h - dr.templates[hk]['size'][2] - 0.02, 0.0)
+    nwin = 2 if H < 11 else 3
+    for i in range(nwin):
+        along = -H / 2 + H * (i + 0.5) / nwin
+        _hang(dr, inner, 'w', along, 1.0, 'window', view_window(rnd, 1.6, 1.5, tod, curtains=curtain,
+                                                                 rooftops=(i == nwin - 1)))
+    _hang(dr, inner, 'w', 0.0 if nwin == 2 else -H / 6, 0.0, 'side_table',
+          side_table_parts(wood, '#FFE7B0', night))
+    _hang(dr, inner, 'w', H / 2 - 0.5, 0.0, 'plant', plant_parts(rnd, tall=True))
+    north_of_door = -(hy + (kdoor[1] - cy)) / 2
+    _hang(dr, inner, 'e', north_of_door, 1.55, 'frame', picture_frame(rnd, 0.6, 0.8), shadow=False)
+    _hang(dr, inner, 'e', north_of_door, 2.4, 'shelf', wall_shelf_parts(rnd, wood))
+    _hang(dr, inner, 'e', -(hy - 0.5), 0.0, 'plant', plant_parts(rnd, tall=True))
+    clock = [P('cyl', 0, 0.02, 0, 0.5, 0.5, 0.06, '#3B3F47', rx=90), P('cyl', 0, -0.02, 0, 0.42, 0.42, 0.03,
+                                                                         '#FFFFFF', rx=90),
+             P('box', 0, -0.045, 0.08, 0.025, 0.01, 0.16, '#22252B'), P('box', 0.06, -0.045, 0, 0.12, 0.01, 0.025,
+                                                                           '#22252B')]
+    # Sofa and armchair face the screen from the south wall, either side of the arch; the coffee table sits in
+    # front of the sofa when the cameras leave it room.
+    # Lounge: low pieces (under LOW_TOP) may stand close behind the action where every camera looks over them,
+    # so the sofa faces the action from the north and the armchair from the east; where a low camera zone
+    # forbids that they fall back to the south wall with a coffee table in front.
+    core = dr.area['core']
+    ccx, ccy = (core[0] + core[2]) / 2, (core[1] + core[3]) / 2
+    sofa_x = -(arch[1] - arch[0]) / 2 - 1.5
+    sofa_key = dr.tpl('sofa', sofa_parts(sofa_col, 2.2, rnd.sample(ACCENTS, 2)))
+    sd = dr.templates[sofa_key]['size'][1]
+    island = any(dr.put('sofa', sofa_key, ccx + dx, core[3] + CORE_PAD + sd / 2 + 0.1, 0.0, 0.0, gap=0.1)
+                 for dx in (0.0, -1.2, 1.2))
+    if not island:
+        _on_wall(dr, inner, 's', -sofa_x, 0.0, sofa_key, sd, 'sofa')
+        ctable = dr.tpl('coffee_table', coffee_table_parts(rnd, wood))
+        for dy in (1.55, 1.75, 1.95):
+            if dr.put('coffee_table', ctable, cx + sofa_x, y0 + dy, 0.0, 0.0, gap=0.1):
+                break
+    if 'lamp' not in props:
+        _hang(dr, inner, 's', -(sofa_x - 1.4), 0.0, 'floor_lamp', floor_lamp_parts('#FFE7B0', night))
+    chair_x = (arch[1] - arch[0]) / 2 + 1.2
+    chair_key = dr.tpl('armchair', armchair_parts(rnd.choice([c_ for c_ in SOFAS if c_ != sofa_col]),
+                                                  rnd.choice(ACCENTS)))
+    ad = dr.templates[chair_key]['size'][1]
+    if not any(dr.put('armchair', chair_key, core[2] + CORE_PAD + ad / 2 + 0.1, ccy + dy, 0.0, -90.0, gap=0.1)
+               for dy in (0.0, -1.0, 1.0)):
+        _on_wall(dr, inner, 's', -chair_x, 0.0, chair_key, ad, 'armchair')
+    side_key = dr.tpl('end_table', coffee_table_parts(rnd, wood)[:6])
+    dr.scatter('end_table', side_key, 1, -0.6, 0.8, gap=0.25, rot=0.0)
+    bean = dr.tpl('beanbag', [P('box', 0, 0, 0.25, 0.9, 0.9, 0.5, rnd.choice(['#AC92EC', '#4FC1E9', '#FC6E51']),
+                               bevel=0.2)])
+    dr.scatter('beanbag', bean, 1, -0.8, 0.8, gap=0.3)
+    toys = [P('box', 0, 0, 0.25, 1.0, 0.55, 0.5, rnd.choice(ACCENTS[:-1]), bevel=0.04),
+            P('box', 0, 0, 0.53, 1.04, 0.59, 0.08, rnd.choice(ACCENTS[:-1]), bevel=0.02)]
+    dr.scatter('toy_box', dr.tpl('toy_box', toys), 1, -0.8, 0.8, gap=0.3, rot=0.0)
+    _hang(dr, inner, 's', -(chair_x + 1.1), 0.0, 'plant', plant_parts(rnd))
+    _hang(dr, inner, 's', -sofa_x, 1.9, 'frame', picture_frame(rnd, 0.8, 0.55), shadow=False)
+    _hang(dr, inner, 's', -chair_x, 1.75, 'frame', picture_frame(rnd, 0.6, 0.7), shadow=False)
+    _hang(dr, inner, 'e', (hy + (cy - kdoor[0])) / 2, 1.8, 'clock', clock, shadow=False)
+    # Dining nook by the kitchen opening: a low table with stools (nothing taller than the table).
+    dine = [P('box', 0, 0, 0.7, 1.3, 0.85, 0.05, wood, bevel=0.015),
+            P('box', -0.55, 0, 0.34, 0.08, 0.7, 0.68, shade(wood, 0.85)), P('box', 0.55, 0, 0.34, 0.08, 0.7, 0.68,
+                                                                             shade(wood, 0.85)),
+            P('cyl', 0.1, 0.05, 0.75, 0.3, 0.3, 0.05, rnd.choice(ACCENTS)), P('box', -0.35, -0.1, 0.735, 0.4, 0.28,
+                                                                                0.02, '#FFFFFF')]
+    for sx in (-0.4, 0.4):
+        for sy in (-0.75, 0.75):
+            dine += [P('cyl', sx, sy, 0.44, 0.38, 0.38, 0.06, rnd.choice(ACCENTS[:-1])),
+                     P('cyl', sx, sy, 0.2, 0.06, 0.06, 0.42, '#3B3F47')]
+    dk = dr.tpl('dining', dine)
+    for dx in (1.7, 2.3, 2.9):
+        if dr.put('dining', dk, x1 - dx, (kdoor[0] + kdoor[1]) / 2 - 0.2, 0.0, 0.0, gap=0.2):
+            break
+    # Rug under the action, thin layers above the planks (border 1 mm, centre 3 mm).
+    rug_col = rnd.choice(['#C98A6A', '#8FA7C4', '#A3B98A', '#D9B27A', '#C4A0B8'])
+    rug = [P('box', 0, 0, 0.001, 4.2, 3.0, 0.002, rug_col),
+           P('box', 0, 0, 0.003, 3.7, 2.5, 0.002, mix(rug_col, '#F6F0E0', 0.35))]
+    dr.put('rug', dr.tpl('rug', rug, decal=True, shadow=False), (core[0] + core[2]) / 2, (core[1] + core[3]) / 2,
+           -0.001, check=False)
+    # Hallway: front door with the entry mat straight through the arch, coat rack and shoes west of it, the
+    # stairs rising east to a landing with a door to the upstairs.
+    door_x = cx - 0.5
+    _hang(dr, hall, 's', -(door_x - cx), 0.0, 'front_door', front_door_parts(rnd.choice(DOORS), night), shadow=False)
+    mat = [P('box', 0, 0, 0.0015, 0.9, 0.55, 0.003, '#7A5230'), P('box', 0, 0, 0.004, 0.7, 0.38, 0.002, '#A0703F')]
+    dr.put('door_mat', dr.tpl('door_mat', mat, decal=True, shadow=False), door_x, yh0 + 0.42, 0.0, check=False)
+    _hang(dr, hall, 's', -(door_x - 2.0 - cx), 1.6, 'coat_rack', coat_rack_parts(rnd))
+    _hang(dr, hall, 's', -(door_x - 2.0 - cx), 0.0, 'shoe_rack', shoe_rack_parts(rnd))
+    stairs = dr.tpl('stairs', stairs_parts(wood, rug_col))
+    sx0 = cx + 0.5
+    s_w, s_d, s_h = dr.templates[stairs]['size']
+    dr.put('stairs', stairs, sx0 + s_w / 2, yh0 + s_d / 2 + 0.01, 0.0, 0.0, gap=0.0)
+    landing_z = STAIR_STEPS * STAIR_RISE
+    _hang(dr, hall, 's', -(sx0 + s_w - 0.55 - cx), min(landing_z + 0.75, wall_h - 0.75), 'frame',
+          picture_frame(rnd, 0.6, 0.45), shadow=False)
+    _hang(dr, hall, 's', -(sx0 - 0.9 - cx), 1.7, 'frame', picture_frame(rnd, 0.5, 0.6), shadow=False)
+    # Kitchen corner seen through the east opening: counter with sink, hob and fruit, cabinets above, fridge.
+    kdoor_col = rnd.choice(['#9CC5A1', '#F2B5B5', '#B7C9D6', '#FFE08A', '#D8B48A'])
+    _hang(dr, kitchen, 'e', 0.3, 0.0, 'counter', kitchen_counter_parts(rnd, 3.6, kdoor_col))
+    _hang(dr, kitchen, 'e', 1.45, 1.5, 'cabinets', upper_cabinets_parts(1.3, kdoor_col))
+    _hang(dr, kitchen, 'e', -0.85, 1.5, 'cabinets', upper_cabinets_parts(1.1, kdoor_col))
+    _hang(dr, kitchen, 'e', -KITCHEN_HALF_W + 0.45, 0.0, 'fridge', fridge_parts())
+    _hang(dr, kitchen, 'e', 0.3, 1.45, 'window', view_window(rnd, 0.9, 0.7, tod), shadow=False)
+    _hang(dr, kitchen, 'n', 0.6, 0.0, 'plant', plant_parts(rnd))
+    # Ceiling lights (flush discs) in every room; at night they and the lamps light the house.
+    lamp = [P('cyl', 0, 0, 0, 0.8, 0.8, 0.06, '#FFFBEA', 'emit')]
+    lk = dr.tpl('ceiling_light', lamp, decal=True, shadow=False)
+    pendant = [P('cyl', 0, 0, 0.3, 0.025, 0.025, 0.16, '#3B3F47'),
+               P('cyl', 0, 0, 0.13, 0.5, 0.5, 0.26, rnd.choice(['#E3B87F', '#9CC5A1', '#F2B5B5', '#B7C9D6']), bevel=0.02),
+               P('cyl', 0, 0, 0.004, 0.3, 0.3, 0.008, '#FFF4D6', 'glow')]
+    pk = dr.tpl('pendant', pendant, shadow=False)
+    spots = [(cx - W / 4, cy), (cx + W / 4, cy), (cx, (yh0 + yh1) / 2), ((xk0 + xk1) / 2, cy)]
+    for i, (lx, ly) in enumerate(spots):
+        if i < 2:
+            dr.put('pendant', pk, lx, ly, wall_h - 0.38, 0.0, check=False)   # above the camera band by construction
+        else:
+            dr.put('ceiling_light', lk, lx, ly, wall_h - 0.05, check=False)
+        if night:
+            dr.lights.append({'type': 'POINT', 'pos': [_r(lx), _r(ly), _r(wall_h - 1.1)], 'energy': 300,
+                              'color': '#FFD9A6'})
+    if night:
+        for lx, ly, lz in ((cx + sofa_x - 1.4, y0 + 0.4, 1.6), (x0 + 0.4, cy if nwin == 2 else cy - H / 6, 1.05)):
+            dr.lights.append({'type': 'POINT', 'pos': [_r(lx), _r(ly), _r(lz)], 'energy': 60, 'color': '#FFD9A0'})
+    # Time-of-day light through the windows: a tinted point light just inside each one.
+    col, energy = WINDOW_LIGHT[tod]
+    for p in dr.pieces:
+        if p['kind'] != 'window':
+            continue
+        yaw = math.radians(p['rot'])
+        # The window's local -y points into the room; the light sits 0.6 m inside, at the pane's middle.
+        ix = p['pos'][0] + math.sin(yaw) * 0.6
+        iy = p['pos'][1] - math.cos(yaw) * 0.6
+        dr.lights.append({'type': 'POINT', 'pos': [_r(ix), _r(iy), _r(p['pos'][2] + p['size'][2] / 2)],
+                          'energy': energy, 'color': col})
+
+
+# ---------------------------------------------------------------- park (outdoor hangouts)
+PARK_FENCE = 30.0
+
+
+def fountain_parts(night):
+    stone, water = '#B9BCC4', '#7FC8F0'
+    wmat = 'glow' if night else 'pane'
+    return [P('cyl', 0, 0, 0.25, 4.4, 4.4, 0.5, stone, bevel=0.04),
+            P('cyl', 0, 0, 0.47, 4.0, 4.0, 0.06, water, wmat),
+            P('cyl', 0, 0, 1.1, 0.7, 0.7, 1.3, shade(stone, 0.9)),
+            P('cyl', 0, 0, 1.85, 1.8, 1.8, 0.24, stone, bevel=0.03),
+            P('cyl', 0, 0, 1.98, 1.6, 1.6, 0.04, water, wmat),
+            P('cyl', 0, 0, 2.2, 0.16, 0.16, 0.4, shade(stone, 0.9)),
+            P('ball', 0, 0, 2.5, 0.3, 0.3, 0.3, water, wmat)]
+
+
+def playground_parts(rnd):
+    cols = rnd.sample(OBBY, 4)
+    parts = [P('box', -2.2, 0.6, 0.4, 1.2, 1.2, 0.8, cols[0], 'stud', 0.05),
+             P('box', -2.2, 0.6, 1.2, 0.8, 0.8, 0.8, cols[1], 'stud', 0.05),
+             P('box', -1.0, 0.6, 0.6, 1.2, 1.2, 1.2, cols[2], 'stud', 0.05),
+             # slide from the tall block down to the right
+             P('box', 0.6, 0.6, 0.72, 2.4, 0.7, 0.08, cols[3], 'gloss', 0.02, ry=-28),
+             P('box', 0.6, 0.25, 0.9, 2.4, 0.06, 0.2, shade(cols[3], 0.85), ry=-28),
+             P('box', 0.6, 0.95, 0.9, 2.4, 0.06, 0.2, shade(cols[3], 0.85), ry=-28)]
+    # Swing frame: two A-frames, a top bar, two seats.
+    for sx in (-1.6, 1.6):
+        for sy in (-1, 1):
+            parts.append(P('box', sx, -1.6 + sy * 0.55, 1.15, 0.1, 0.1, 2.4, '#3B3F47', rx=sy * 26))
+    parts.append(P('box', 0, -1.6, 2.25, 3.5, 0.1, 0.1, '#3B3F47'))
+    for sx in (-0.6, 0.6):
+        parts += [P('box', sx - 0.2, -1.6, 1.4, 0.02, 0.02, 1.6, '#8B8F98'), P('box', sx + 0.2, -1.6, 1.4, 0.02, 0.02, 1.6, '#8B8F98'),
+                  P('box', sx, -1.6, 0.6, 0.5, 0.2, 0.05, rnd.choice(OBBY), bevel=0.01)]
+    return parts
+
+
+def flowerbed_parts(rnd):
+    parts = [P('cyl', 0, 0, 0.03, 2.4, 2.4, 0.06, '#5A3A22'),
+             P('cyl', 0, 0, 0.08, 2.6, 2.6, 0.02, '#A9ADB6')]
+    for i in range(9):
+        a, d = i * 40 + rnd.uniform(-10, 10), rnd.uniform(0.3, 1.0)
+        x, y = d * math.cos(math.radians(a)), d * math.sin(math.radians(a))
+        parts += [P('box', x, y, 0.18, 0.04, 0.04, 0.24, '#4C9A2A'),
+                  P('ball', x, y, 0.32, 0.18, 0.18, 0.14, rnd.choice(['#E84A5F', '#FFCE54', '#FC6E51', '#AC92EC', '#F6F7FB']))]
+    return parts
+
+
+def park(dr, night):
+    """A paved plaza under the action in a city park: gravel paths out in four directions, a fountain, benches,
+    planters and lamp posts along the paths, flower beds, a pond, trees all around, a playground corner, then
+    a low fence with houses beyond it, hills, a hazy skyline and clouds."""
+    rnd = dr.rnd
+    c = dr.area['clear']
+    cx, cy = dr.cx, dr.cy
+    dr.put('ground', dr.tpl('ground', [P('box', 0, 0, -0.1, 360, 360, 0.2, GROUND_HEX['park'])], decal=True,
+                            shadow=False), cx, cy, SLAB_TOP - 0.2, check=False)
+    # Plaza paving over the clearance box plus a border (border top 2 mm below the paving, seams 2 mm proud).
+    pw, pd = c[2] - c[0] + 3.0, c[3] - c[1] + 3.0
+    tiles = [P('box', 0, 0, 0.004, pw, pd, 0.008, '#A9A092')]
+    nx, ny = max(2, int((pw - 1.0) / 1.5)), max(2, int((pd - 1.0) / 1.5))
+    tw, td = (pw - 1.0) / nx, (pd - 1.0) / ny
+    for i in range(nx):
+        for j in range(ny):
+            tiles.append(P('box', -(pw - 1.0) / 2 + tw * (i + 0.5), -(pd - 1.0) / 2 + td * (j + 0.5), 0.006, tw - 0.04,
+                           td - 0.04, 0.008, '#C7BDAC' if (i + j) % 2 else '#B8AE9D'))
+    dr.put('plaza', dr.tpl('plaza', tiles, decal=True, shadow=False), cx, cy, -0.010, check=False)
+    # Paths to the four sides of the park, with benches, planters and lamps along them.
+    bench = dr.tpl('bench', [P('box', 0, 0, 0.45, 1.6, 0.5, 0.08, '#B07A45', bevel=0.02),
+                             P('box', 0, 0.22, 0.76, 1.6, 0.06, 0.42, '#B07A45', bevel=0.02),
+                             P('box', -0.7, 0, 0.21, 0.08, 0.45, 0.42, '#3B3F47'),
+                             P('box', 0.7, 0, 0.21, 0.08, 0.45, 0.42, '#3B3F47')])
+    planter = dr.tpl('planter', [P('box', 0, 0, 0.25, 1.4, 0.7, 0.5, '#B9A48A', bevel=0.04),
+                                 P('box', -0.35, 0, 0.6, 0.5, 0.5, 0.3, '#E84A5F', bevel=0.1),
+                                 P('box', 0.3, 0.05, 0.62, 0.55, 0.5, 0.32, '#FFCE54', bevel=0.1)])
+    lamp_key = dr.tpl('lamp', lamp_parts(night))
+    bin_key = dr.tpl('bin', [P('cyl', 0, 0, 0.45, 0.5, 0.5, 0.9, '#3E6E4A', bevel=0.02),
+                             P('cyl', 0, 0, 0.93, 0.56, 0.56, 0.06, '#2E5238')])
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        half = pw / 2 if dx else pd / 2
+        L = PARK_FENCE - half
+        along = dx != 0
+        path = dr.tpl('path', [P('box', 0, 0, 0.004, L if along else 2.6, 2.6 if along else L, 0.008, '#B9A98A')],
+                      decal=True, shadow=False)
+        dr.put('path', path, cx + dx * (half + L / 2), cy + dy * (half + L / 2), -0.008, check=False)
+        facing = math.degrees(math.atan2(dy, dx))     # path direction
+        for k, d in enumerate((3.0, 9.0, 15.0, 21.0)):
+            for side in (-1, 1):
+                px = cx + dx * (half + d) + (-dy) * side * 1.9
+                py = cy + dy * (half + d) + dx * side * 1.9
+                # Benches face the path; lamps and planters alternate between them.
+                if k % 2 == 0:
+                    dr.put('bench', bench, px, py, 0.0, facing + 90 * side, gap=0.1)
+                else:
+                    dr.put('planter' if side > 0 else 'bin', planter if side > 0 else bin_key, px, py, 0.0, facing)
+            lx = cx + dx * (half + d + 3.0) + (-dy) * 1.9
+            ly = cy + dy * (half + d + 3.0) + dx * 1.9
+            dr.put('lamp', lamp_key, lx, ly, 0.0, facing + 90)
+    for qx, qy in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+        x, y = cx + qx * (pw / 2 + 0.5), cy + qy * (pd / 2 + 0.5)
+        if dr.put('lamp', lamp_key, x, y, 0.0, rnd.uniform(0, 360)) and night:
+            dr.lights.append({'type': 'POINT', 'pos': [_r(x), _r(y), 3.4], 'energy': 120, 'color': '#FFE2B0'})
+        dr.put('planter', planter, cx + qx * (pw / 2 - 1.2), cy + qy * (pd / 2 - 0.1), 0.0, 0.0)
+    fountain = dr.tpl('fountain', fountain_parts(night))
+    # The fountain takes one of the plaza's free diagonals (the paths and their furniture hold the axes).
+    diagonals = [(-1, -1), (1, -1), (1, 1), (-1, 1)]
+    rnd.shuffle(diagonals)
+    for qx, qy in diagonals:
+        if dr.put('fountain', fountain, cx + qx * (pw / 2 + 3.8), cy + qy * (pd / 2 + 3.8), 0.0, 0.0, gap=0.5):
+            break
+    dr.scatter('playground', dr.tpl('playground', playground_parts(rnd)), 1, 3.0, 9.0, gap=1.0, rot=None)
+    sand = dr.tpl('sandbox', [P('box', 0, 0, 0.001, 3.0, 3.0, 0.002, '#E8D7A8'),
+                              P('box', 0, 1.45, 0.1, 3.0, 0.1, 0.2, '#A0703F'), P('box', 0, -1.45, 0.1, 3.0, 0.1, 0.2, '#A0703F'),
+                              P('box', 1.45, 0, 0.1, 0.1, 3.0, 0.2, '#A0703F'), P('box', -1.45, 0, 0.1, 0.1, 3.0, 0.2, '#A0703F')])
+    dr.scatter('sandbox', sand, 1, 3.0, 9.0, gap=0.6, rot=0.0)
+    pond = dr.tpl('pond', [P('cyl', 0, 0, 0.001, 9.0, 7.0, 0.002, '#6FB7E0', 'gloss'),
+                           P('cyl', 0, 0, 0.0025, 9.6, 7.6, 0.001, '#C9B99A')], decal=True, shadow=False)
+    dr.scatter('pond', pond, 1, 8.0, 14.0, gap=0.0, rot=None)
+    beds = [dr.tpl('flowerbed', flowerbed_parts(rnd)) for _ in range(2)]
+    dr.scatter('flowerbed', beds, 6, 1.0, 10.0, gap=0.4)
+    tree_keys = [dr.tpl('tree', tree_parts(s, rnd, rnd.choice(LEAVES))) for s in ('round', 'round', 'poplar', 'pine')]
+    bush_keys = [dr.tpl('bush', tree_parts('bush', rnd, rnd.choice(LEAVES))) for _ in range(2)]
+    dr.scatter('tree', tree_keys, 16, 2.5, 9.0, scale=(0.8, 1.15), sectors=16, gap=0.5)
+    dr.scatter('tree', tree_keys, 28, 9.0, 26.0, scale=(0.9, 1.3), sectors=20, gap=0.6)
+    dr.scatter('bush', bush_keys, 18, 0.5, 12.0, scale=(0.8, 1.2), gap=0.3)
+    # Low fence around the park with gaps for the paths, houses on the streets beyond, then the far ring.
+    F = PARK_FENCE
+    seg = dr.tpl('fence', fence_parts(6.0, rnd.choice([WHITE, '#F3EBDD'])))
+    for i in range(10):
+        a = -F + 3.0 + i * 6.0
+        if abs(a) > 4.5:
+            for (x, y, rot) in ((cx + a, cy - F, 0.0), (cx + a, cy + F, 0.0), (cx - F, cy + a, 90.0), (cx + F, cy + a, 90.0)):
+                dr.put('fence', seg, x, y, 0.0, rot, check=False)
+    def house():
+        return house_parts(rnd, night)
+    front = F + 5.0
+    _row(dr, 'house', house, cx - F - 6, cx + F + 6, cy + front, 'x', 0.0, rnd)
+    _row(dr, 'house', house, cx - F - 6, cx + F + 6, cy - front, 'x', 180.0, rnd)
+    _row(dr, 'house', house, cy - F, cy + F, cx - front, 'y', 90.0, rnd)
+    _row(dr, 'house', house, cy - F, cy + F, cx + front, 'y', -90.0, rnd)
+    _far_ring(dr, 'town', night)
+
+
 PRESETS = {'town_street': town_street, 'night_forest': night_forest, 'classroom': classroom, 'bedroom': bedroom,
-           'studio': studio, 'sky_obby': lambda dr, night: obby(dr, night, False),
+           'studio': studio, 'home': home, 'park': park, 'sky_obby': lambda dr, night: obby(dr, night, False),
            'lava_obby': lambda dr, night: obby(dr, night, True)}
 
 
