@@ -9,9 +9,11 @@ import json
 import math
 import os
 
+from . import config, media
 from .animation import blender as BL, solver as SV
 from .assembly import assemble
 from .manifest import compile as C, schema as S, validate as V
+from .util import Blocked, stable_hash
 from .voice import tts
 
 
@@ -23,6 +25,71 @@ def cast_characters(m, characters):
         out[c['id']] = {'id': c['character_id'], 'name': ch.get('name', c['id']), 'voice': ch.get('voice', {}),
                         'bible': ch.get('bible', {})}
     return out
+
+
+# Voice engines a validation-time measurement may use: free and offline, so validating a story never spends.
+FREE_TTS = ('piper', 'local_test')
+
+
+def measure_lines(m, characters, prefs, work_dir=None):
+    """Voice every line through the real line chain and put its exact length on the line.
+
+    Sets ``measured_frames`` (and est_end_frame) like the voice stage does, flagged ``measured_preflight`` so
+    the validator still allows the line-fitting tempo on it. Durations are cached by the line's voice spec
+    under ``work_dir`` (data/work/measure), so validating the same story again costs nothing. Returns the
+    ids of the lines measured; a paid voice provider measures nothing.
+    """
+    pr = prefs['production']
+    if pr['tts_provider'] not in FREE_TTS:
+        return []
+    cast = cast_characters(m, characters)
+    work_dir = work_dir or os.path.join(config.DATA_DIR, 'work', 'measure')
+    os.makedirs(work_dir, exist_ok=True)
+    index_path = os.path.join(work_dir, 'durations.json')
+    try:
+        with open(index_path) as f:
+            index = json.load(f)
+    except (OSError, ValueError):
+        index = {}
+    measured = {}
+    for ln in m['lines']:
+        who = cast.get(ln['speaker']) if ln['speaker'] != 'narrator' else {'name': 'Narrator', 'voice': {}}
+        key = stable_hash([pr['tts_provider'], pr.get('piper_model'), pr['tts_model'], ln['text'], ln['pace'],
+                           ln['emotion'], ln['volume'], ln.get('kind', 'dialogue'), ln.get('speech_rate', 1.0),
+                           (who or {}).get('voice') or {}, (who or {}).get('id'), pr['pronunciations']])
+        if key not in index:
+            res = tts.synthesize_line(ln, who, prefs, work_dir, 'measure')
+            index[key] = res['duration_s']
+            for path in (res['file'], res['raw']):
+                try:
+                    os.unlink(path)
+                except OSError:
+                    pass
+            with open(index_path, 'w') as f:
+                json.dump(index, f)
+        measured[ln['id']] = {'duration_s': float(index[key]), 'words': None}
+    C.update_line_timing(m, measured)
+    for ln in m['lines']:
+        if ln['id'] in measured:
+            ln['measured_preflight'] = True
+    return sorted(measured)
+
+
+def preflight(m, characters, prefs):
+    """Measure the lines at validation time when the owner asked for it (prefs measure_lines_on_validate).
+
+    A missing or failing voice engine never blocks validation: the estimates stand and a note says why."""
+    if not prefs['production'].get('measure_lines_on_validate'):
+        return m
+    try:
+        ids = measure_lines(m, characters, prefs)
+    except (Blocked, media.MediaError, OSError, ValueError) as e:
+        m.setdefault('notes', []).append(f'Lines were not measured at validation ({str(e)[:160]}); estimates used')
+        return m
+    if ids:
+        m.setdefault('notes', []).append(f'{len(ids)} lines measured with the {prefs["production"]["tts_provider"]} '
+                                         'voices at validation')
+    return m
 
 
 def voice_lines(m, cast, prefs, work_dir, video_id, only=None, attempts=None, on_line=None):
@@ -156,7 +223,8 @@ def render_shots(m, cast, solved, prefs, work_dir, quality='final', only=None, o
 def produce_local(plan, characters, prefs, work_dir, video_id='local', quality='preview', log=print):
     """One-shot local production of a plan (used by the demo CLI and tests)."""
     pr = prefs['production']
-    m = C.compile_plan(plan, fps=pr['fps'], width=pr['width'], height=pr['height'], **C.pace_kwargs(prefs))
+    m = C.compile_plan(plan, fps=pr['fps'], width=pr['width'], height=pr['height'], characters=characters,
+                       **C.pace_kwargs(prefs))
     rep = V.validate(m, prefs)
     if not rep['ok']:
         raise ValueError('Manifest invalid: ' + '; '.join(e['message'] for e in rep['errors'][:5]))

@@ -91,6 +91,40 @@ LAYER_TOPS = {'jacket', 'vest', 'cardigan'}
 # (which ones a character has depends on its costume) but, once built, they stay visible in every frame.
 OPTIONAL_PARTS = ['hood', 'collar', 'jacket', 'vest', 'cardigan', 'hair', 'hat', 'eyewear', 'tie', 'badge']
 
+# Heights of the head group, local to the head joint (z up), as blender_scene builds the costume. The camera
+# solver frames a character by its visual top (the highest point of head, hair and hat), so the two must
+# agree: a unit test reads the builder's constants and compares.
+HEAD_JOINT_Z = sum(OFFSET[j][2] for j in ('pelvis', 'spine', 'chest', 'neck', 'head'))  # 1.50 standing
+HEAD_TOP = HEIGHT - HEAD_JOINT_Z                                                           # 0.60: the head block
+# Top of the hair cap of each style: where a crown or a bow sits (blender_scene.HAIR_TOP).
+HAIR_TOP = {'messy_block': 0.695, 'short_block': 0.60, 'bun': 0.67, 'pigtails': 0.67, 'spiky': 0.665,
+            'long_block': 0.685, 'bald': 0.60}
+# Highest point of each style when nothing covers it: a bun and spikes rise well above their cap.
+HAIR_PEAK = {'messy_block': 0.695, 'short_block': 0.61, 'bun': 0.965, 'pigtails': 0.67, 'spiky': 0.963,
+             'long_block': 0.685, 'bald': 0.60}
+# Hats that cover the crown: their own top (the bun and the spikes are left out under them).
+HAT_TOP = {'cap': 0.725, 'cap_backwards': 0.725, 'beanie': 0.84}
+# Hats that sit on the hair: how far their highest point (crown points, bow loops) rises above HAIR_TOP.
+HAT_RISE = {'crown': 0.22, 'bow': 0.197}
+
+
+def head_top(costume):
+    """Head-local z of the highest point of the head group (head block, hair, hat) a costume builds."""
+    c = costume or {}
+    hair = c.get('hair') or 'bald'
+    hat = c.get('hat')
+    if hat in HAT_TOP:
+        return max(HEAD_TOP, HAT_TOP[hat])
+    top = max(HEAD_TOP, HAIR_PEAK.get(hair, HEAD_TOP))
+    if hat in HAT_RISE:
+        top = max(top, HAIR_TOP.get(hair, HEAD_TOP) + HAT_RISE[hat])
+    return top
+
+
+def visual_top(costume, scale=1.0):
+    """Height above the ground of a standing character's highest point, hair and hat included (metres)."""
+    return (HEAD_JOINT_Z + head_top(costume)) * float(scale or 1.0)
+
 
 def costume_parts(costume):
     """Costume piece names (OPTIONAL_PARTS) a costume builds, in OPTIONAL_PARTS order."""

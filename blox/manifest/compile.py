@@ -166,18 +166,69 @@ def words(text):
     return WORD_RE.findall(text or '')
 
 
-def estimate_line_frames(line, fps, speech_rate=None):
+def measured_voice(voice):
+    """(words per second, line overhead s, speech rate measured at) of a measured voice config, else None.
+
+    A voice is measured when it carries all of schema.MEASURED_VOICE_KEYS with sane values (see demo.CHARACTERS
+    for how the built-in cast was measured); anything else gets the conservative default estimate."""
+    if not isinstance(voice, dict):
+        return None
+    try:
+        wps, overhead, rate = (float(voice[k]) for k in S.MEASURED_VOICE_KEYS)
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not all(math.isfinite(x) for x in (wps, overhead, rate)):
+        return None
+    if not (0.5 <= wps <= 12.0 and 0.0 <= overhead <= 2.0 and 0.5 <= rate <= 2.0):
+        return None
+    return wps, overhead, rate
+
+
+def estimate_line_frames(line, fps, speech_rate=None, voice=None):
     """Planned length of a line. The voice speaks natively at ``speech_rate``
     (default: the rate the line was compiled with), which shortens words and
-    their punctuation pauses alike."""
+    their punctuation pauses alike.
+
+    With a measured ``voice`` (measured_voice) the length is the speaker's own
+    overhead plus its words at the measured rate, scaled from the rate it was
+    measured at, with the engine's pace and emotion multipliers and a small
+    safety margin; otherwise the conservative default rates (schema.PACE_WPS).
+    """
     rate = line.get('speech_rate', 1.0) if speech_rate is None else speech_rate
     rate = _num(rate, 1.0) or 1.0
     n = max(1, len(words(line['text'])))
+    mv = measured_voice(voice)
+    if mv:
+        wps, overhead, rate0 = mv
+        mult = S.DELIVERY_PACE_SCALE.get(line.get('pace', 'normal'), 1.0)
+        if line.get('emotion') in S.SUBDUED_EMOTIONS:
+            mult *= S.SUBDUED_SCALE
+        if line.get('kind') == 'narration':
+            mult *= min(1.2, max(0.8, _num(voice.get('narration_length_scale'), 1.0) or 1.0))
+        secs = (overhead + n / wps) * mult * rate0 / rate
+        secs = secs * (1.0 + S.MEASURED_MARGIN) + S.MEASURED_MARGIN_S
+        return int(math.ceil(secs * fps))
     wps = S.PACE_WPS.get(line.get('pace', 'normal'), 2.7)
     punct = (len(re.findall(r'[,;:]', line['text'])) * 0.18
              + len(re.findall(r'\.\.\.|…|[.!?]+', line['text'])) * 0.25)
     secs = (n / wps + punct) / rate + 0.15
     return int(math.ceil(secs * fps))
+
+
+def cast_voices(m_or_plan, characters=None, voices=None):
+    """cast id -> voice config for a plan or manifest: ``voices`` (cast id -> voice) first, else the character
+    rows (character id -> {'voice': ...}, as repo.characters returns them) through the cast's character_id."""
+    out = {}
+    for c in m_or_plan.get('cast') or []:
+        if not isinstance(c, dict) or not c.get('id'):
+            continue
+        v = (voices or {}).get(c['id'])
+        if v is None and characters:
+            row = characters.get(c.get('character_id'))
+            v = row.get('voice') if isinstance(row, dict) else None
+        if isinstance(v, dict):
+            out[c['id']] = v
+    return out
 
 
 def check_pace(pace, speech_rate):
@@ -376,7 +427,7 @@ def _caption_words(c):
     return out
 
 
-def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_rate=1.0):
+def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_rate=1.0, voices=None):
     """Plan dict -> compiled manifest dict. Raises ValueError on malformed input.
 
     Semantic problems are left for ``validate`` to report so the owner sees all
@@ -387,10 +438,16 @@ def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_
     faster than normal the voices speak, used for line length estimates and
     passed to the voice engines on every line. The defaults compile at real
     time.
+
+    ``characters`` (character id -> row with 'voice', as repo.characters gives
+    them) or ``voices`` (cast id -> voice config) let a line be estimated with
+    its speaker's measured speaking rate (see estimate_line_frames); a speaker
+    without one keeps the conservative default.
     """
     if not isinstance(plan, dict):
         raise ValueError('Plan must be an object')
     pace, speech_rate = check_pace(pace, speech_rate)
+    line_voices = cast_voices(plan, characters, voices)
     duration_s = _num(plan.get('duration_s'), 0)
     if duration_s <= 0:
         raise ValueError('Plan needs a positive duration_s')
@@ -633,7 +690,9 @@ def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_
                 'emotion': ln.get('emotion', 'neutral'), 'pace': ln.get('pace', 'normal'),
                 'volume': ln.get('volume', 'normal'), 'pause_after_ms': int(_num(ln.get('pause_after_ms'), 0) / pace),
                 'delivery': str(ln.get('delivery', ''))[:300], 'speech_rate': speech_rate}
-        line['est_frames'] = estimate_line_frames(line, fps)
+        voice = line_voices.get(speaker)
+        line['estimate'] = 'measured_voice' if measured_voice(voice) else 'default'
+        line['est_frames'] = estimate_line_frames(line, fps, voice=voice)
         line['est_end_frame'] = line['start_frame'] + line['est_frames']
         lines.append(line)
     lines.sort(key=lambda l: l['start_frame'])
@@ -989,6 +1048,7 @@ def update_line_timing(m, measured):
             continue
         ln['measured_frames'] = int(math.ceil(info['duration_s'] * fps))
         ln['est_end_frame'] = ln['start_frame'] + ln['measured_frames']
+        ln.pop('measured_preflight', None)  # the voiced line replaces a validation-time measurement
         if info.get('words'):
             off = ln['start_frame'] / fps
             timings[ln['id']] = [{'word': w['word'], 'start': off + w['start'], 'end': off + w['end']}

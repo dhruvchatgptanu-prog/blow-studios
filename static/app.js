@@ -423,7 +423,8 @@ async function characters() {
         visual_rules: f.rules.value.split('\n').filter(Boolean)},
       voice: Object.assign({piper_speaker: f.piper_speaker.value === '' ? null : Number(f.piper_speaker.value),
         openai_voice: f.openai_voice.value, elevenlabs_voice_id: f.elevenlabs_voice_id.value, local_test_voice: f.local_test_voice.value,
-        openai_instructions: f.openai_instructions.value, rights_note: f.rights_note.value, casting_note: c.voice.casting_note}, delivery(f))});
+        openai_instructions: f.openai_instructions.value, rights_note: f.rights_note.value, casting_note: c.voice.casting_note,
+        measured_wps: c.voice.measured_wps, line_overhead_s: c.voice.line_overhead_s, measured_rate: c.voice.measured_rate}, delivery(f))});
     toast('Character saved');
   });
   bind('[data-hear]', 'click', async e => {
@@ -531,6 +532,7 @@ async function settings() {
     <label class="check"><input type="checkbox" data-sec="production" data-key="depth_of_field" ${pr.depth_of_field ? 'checked' : ''}> Soft background behind faces (depth of field, about 25% slower renders)</label>
     ${sel('production', 'story_source', pr.story_source || 'auto', [['auto', 'Automatic: LLM API if connected, otherwise the story backlog'], ['backlog', 'Story backlog only (no AI API cost)'], ['llm', 'LLM API only (paid)']])}
     <label class="check"><input type="checkbox" data-sec="production" data-key="allow_template_stories" ${pr.allow_template_stories ? 'checked' : ''}> Allow offline template stories (dry runs)</label>
+    <label class="check"><input type="checkbox" data-sec="production" data-key="measure_lines_on_validate" ${pr.measure_lines_on_validate ? 'checked' : ''}> Voice every line with the free voices when a story is validated (exact line lengths instead of estimates; a few seconds of CPU per new story)</label>
     <label>Pronunciations (JSON object)<textarea data-sec="production" data-key="pronunciations" data-json="1">${esc(JSON.stringify(pr.pronunciations, null, 1))}</textarea></label></div></div>
   <div class="grid g2"><div class="panel"><h2>Research</h2><label class="check"><input type="checkbox" data-sec="research" data-key="enabled" ${r.enabled ? 'checked' : ''}> Research enabled</label>
     <label>Queries (comma separated)<input data-sec="research" data-key="queries" data-list="1" value="${esc(r.queries.join(', '))}"></label>

@@ -11,7 +11,7 @@ import numpy as np
 
 from .. import config, media
 from ..animation import rig as R
-from ..manifest import schema as S
+from ..manifest import compile as C, schema as S
 from ..voice import audio as A
 
 GW, GH = 216, 384
@@ -93,6 +93,7 @@ def run(ck, m, solved, tele, prefs, joined_path, dialog_by_line):
         _expressions(ck, m, cid, recs, gray, prefs)
         _lipsync(ck, m, cid, recs, gray, dialog_by_line)
     _camera(ck, m, tele)
+    _head_crop(ck, m, tele, solved)
     _sightlines(ck, m, tele, solved)
     _props(ck, m, tele, solved)
     _identity(ck, m, tele, joined_path)
@@ -543,6 +544,53 @@ def _camera(ck, m, tele):
            repair={'action': 're_render_shot', 'shot': jumps[0]['shot'], 'params': {'camera_smooth': True}} if jumps else None)
 
 
+HEAD_CROP_TOL = 0.004   # of the frame height: projection rounding on a bevelled corner of the hair
+
+
+def _head_crop(ck, m, tele, solved):
+    """Framings that show the whole head keep the hair and the hat inside the top of the frame.
+
+    The head group's screen box (telemetry 'head2d': head block, hair, hat and eyewear of the evaluated
+    scene) must not rise above the frame top while the shot's subject stands on the ground. An extreme
+    close-up crops on purpose and a jump is the follow move's business, so those frames are left out.
+    """
+    from ..animation import solver as SV
+    cast = [c['id'] for c in m['cast']]
+    scales = solved.get('scales', {})
+    cropped, checked = [], 0
+    for s in m['shots']:
+        if not SV.whole_head_shot(s):
+            continue
+        subj = s['camera']['subject']
+        subjects = [subj] if subj in cast else (cast if subj == 'two_shot' else [])
+        for f in range(s['start_frame'], s['end_frame']):
+            r = tele.get(f)
+            if not r:
+                continue
+            for cid in subjects:
+                rec = r['characters'].get(cid)
+                if not rec or 'head2d' not in rec or not rec.get('in_front_of_camera', True):
+                    continue
+                if rec['root'][2] > 0.05 * scales.get(cid, 1.0):
+                    continue  # airborne
+                x0, y0, x1, _y1 = rec['head2d']
+                if x1 < 0 or x0 > 1:
+                    continue  # off the side of the frame (walking out), not cropped at the top
+                checked += 1
+                if y0 < -HEAD_CROP_TOL:
+                    cropped.append({'frame': f, 'shot': s['id'], 'character': cid, 'head_top_y': y0,
+                                    'framing': C.camera_state(s, f)['framing']})
+    worst = min(cropped, key=lambda c: c['head_top_y']) if cropped else None
+    ck.add('head_in_frame', 'Hair and hats stay inside the frame in whole-head framings', 'visual',
+           'fail' if cropped else 'pass', 'major',
+           {'frames_checked': checked, 'frames_cropped': len(cropped), 'worst': worst, 'examples': cropped[:6],
+            'tolerance': HEAD_CROP_TOL, 'method': 'screen box of the head group (head, hair, hat, eyewear) vs '
+                                                  'the frame top, in framings that show the whole head'},
+           0.9, 'telemetry', frames=(worst['frame'], worst['frame'] + 1) if worst else None,
+           target={'kind': 'shot', 'id': worst['shot']} if worst else None,
+           repair={'action': 're_render_shot', 'shot': worst['shot'], 'params': {'camera_wider': True}} if worst else None)
+
+
 def _sightlines(ck, m, tele, solved):
     """The shot's subject must not be hidden behind (or have the camera inside) another character.
 
@@ -550,6 +598,7 @@ def _sightlines(ck, m, tele, solved):
     with each body approximated by an upright cylinder.
     """
     scales = solved.get('scales', {})
+    tops = solved.get('visual_tops') or {}
     for s in m['shots']:
         subj = s['camera']['subject']
         frames = [f for f in range(s['start_frame'], s['end_frame']) if tele.get(f)]
@@ -568,7 +617,9 @@ def _sightlines(ck, m, tele, solved):
                     continue
                 sc = scales.get(oid, 1.0)
                 ctr, z0 = np.array(o['root'][:2], dtype=float), float(o['root'][2])
-                top = z0 + 2.22 * sc
+                # The blocker's body cylinder reaches its hair or hat (solver.line_hits_others), never lower
+                # than the plain head height used before visual tops were solved.
+                top = z0 + max(2.22 * sc, float(tops.get(oid) or 0.0) + 0.06 * sc)
                 pts = cam + np.outer(np.linspace(0.0, stop, 48), seg)
                 inside = (np.hypot(pts[:, 0] - ctr[0], pts[:, 1] - ctr[1]) < 0.42 * sc) & \
                          (pts[:, 2] >= z0 - 0.05) & (pts[:, 2] <= top)
@@ -601,7 +652,7 @@ def _scenery_sightlines(ck, m, tele, solved):
     from ..animation import sets as SETS
     lay = solved.get('set')
     if lay is None and (m.get('setting') or {}).get('preset') and m.get('tracks'):
-        lay = SETS.layout(m, solved.get('scales'))
+        lay = SETS.layout(m, solved.get('scales'), solved.get('visual_tops'))
     if lay is None:
         return
     set_boxes = SETS.piece_boxes(lay)

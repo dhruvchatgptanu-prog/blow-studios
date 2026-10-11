@@ -55,7 +55,7 @@ def build_plan(m, cast_specs, solved, frame_start, frame_end, out_dir, telemetry
     h = int(m['height'] * q['scale']) // 2 * 2
     frames = {cid: solved['characters'][cid][frame_start:frame_end] for cid in solved['characters']}
     # The set layout the camera solver avoided; recomputed (deterministically) for older solved files.
-    lay = solved.get('set') or SETS.layout(m, solved.get('scales'))
+    lay = solved.get('set') or SETS.layout(m, solved.get('scales'), solved.get('visual_tops'))
     return {
         'version': 1,
         'fps': m['fps'], 'width': w, 'height': h,

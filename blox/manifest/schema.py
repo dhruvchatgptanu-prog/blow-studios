@@ -97,6 +97,9 @@ FRAMINGS = ['extreme_wide', 'wide', 'full', 'medium_wide', 'medium', 'medium_clo
 FRAMING_HEIGHT = {'extreme_wide': 6.0, 'wide': 3.0, 'full': 1.35, 'medium_wide': 1.0, 'medium': 0.72,
                   'medium_close': 0.52, 'close_up': 0.40, 'extreme_close_up': 0.25}
 FACE_READABLE = {'full', 'medium_wide', 'medium', 'medium_close', 'close_up', 'extreme_close_up'}
+# Framings that show the whole head, hair and hat included: the camera keeps the subject's visual top in frame
+# (see animation.solver.compose) and QA checks it. An extreme close-up deliberately crops to the eyes and mouth.
+WHOLE_HEAD_FRAMINGS = {f for f in FRAMINGS if f != 'extreme_close_up'}
 CAMERA_ANGLES = ['eye', 'low', 'high', 'overhead']
 CAMERA_SIDES = ['front', 'three_quarter_left', 'three_quarter_right', 'profile_left', 'profile_right',
                 'over_shoulder_left', 'over_shoulder_right', 'back']
@@ -142,8 +145,20 @@ LINE_KINDS = ['dialogue', 'narration']
 def lip_synced(line, cid=None):
     """True when a line is spoken on screen (by ``cid``, if given). Narration is voice-over: no lip sync."""
     return line.get('kind', 'dialogue') != 'narration' and (cid is None or line.get('speaker') == cid)
-# Speaking rate used for planning, words per second.
+# Speaking rate used for planning, words per second (the conservative default for a voice nobody measured).
 PACE_WPS = {'slow': 2.1, 'normal': 2.7, 'fast': 3.3}
+# Native delivery of the free voice engine (voice.piper applies these through its length scale): a slow line
+# takes 12% longer, a fast one 10% less, a subdued emotion 4% longer. The measured line estimate uses the same.
+DELIVERY_PACE_SCALE = {'slow': 1.12, 'normal': 1.0, 'fast': 0.9}
+SUBDUED_EMOTIONS = {'sad', 'bored', 'embarrassed', 'tired', 'worried', 'disappointed'}
+SUBDUED_SCALE = 1.04
+# A measured voice (character voice config): 'measured_wps' words per second and 'line_overhead_s' of fixed time
+# per line, measured through the full line chain at speech rate 'measured_rate' (compile.estimate_line_frames
+# scales them to the production rate). The estimate keeps a small margin over the fit, since words vary in
+# length, so a line estimated to fit does fit, with the line-fitting tempo allowance still to spare.
+MEASURED_VOICE_KEYS = ('measured_wps', 'line_overhead_s', 'measured_rate')
+MEASURED_MARGIN = 0.06      # fraction of the estimated line
+MEASURED_MARGIN_S = 0.08    # seconds per line
 
 # Production pace. Plans are authored in "story time"; compiling divides every
 # time quantity by the timeline pace, so pace 1.5 plays the same story in two

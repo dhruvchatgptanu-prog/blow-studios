@@ -28,7 +28,7 @@ def add(plans, source, p, d=None):
     if len(plans) > MAX_BATCH:
         raise ValueError(f'At most {MAX_BATCH} stories per import')
     pr = p['production']
-    from .. import repo
+    from .. import production, repo
     chars = repo.characters(active_only=False, d=d)
     out = []
     for plan in plans:
@@ -37,7 +37,9 @@ def add(plans, source, p, d=None):
             out.append({'title': title, 'status': 'rejected', 'reason': 'Not a JSON object under 400 KB'})
             continue
         try:
-            m = C.compile_plan(plan, fps=pr['fps'], width=pr['width'], height=pr['height'], **C.pace_kwargs(p))
+            m = C.compile_plan(plan, fps=pr['fps'], width=pr['width'], height=pr['height'], characters=chars,
+                               **C.pace_kwargs(p))
+            production.preflight(m, chars, p)
             rep = validate(m, p, characters=chars)
         except (ValueError, KeyError, TypeError) as e:
             out.append({'title': title, 'status': 'rejected', 'reason': f'Could not compile: {e}'[:300]})

@@ -29,6 +29,13 @@ CASTING = {
                 'measured (1.1 st spread), between Pip and Bloxy on the pitch ladder; slower (x1.1) with subdued '
                 'variation (0.5/0.6) for deadpan verdicts.',
 }
+# Measured speaking rates (voice 'measured_wps', 'line_overhead_s' at 'measured_rate'): 16 varied lines (1-23
+# words, mixed punctuation and emotions) per character were synthesised through the full line chain
+# (tts.synthesize_line: Piper at speech rate 1.3, pitch shift, trim, gap squeeze, loudness) and a line's length
+# fitted as overhead + words / wps on the pace-normal lines (2026-10-11). Real rates ran 4.3-5.3 words/s
+# against the 2.7 w/s planning default; the fit's per-line spread (words vary in length) is covered by the
+# estimate's margin (schema.MEASURED_MARGIN) and the line-fitting tempo allowance. Measured for these speakers
+# and length scales: migration m0006 fills them only into rows that still use them.
 
 CHARACTERS = [
     {
@@ -50,6 +57,7 @@ CHARACTERS = [
                   'openai_instructions': 'Young, bright, energetic adventurer. Expressive, natural, not cartoonish.',
                   'elevenlabs_voice_id': '', 'local_test_voice': 'kal16', 'pitch_semitones': 0,
                   'piper_speaker': 744, 'piper_noise_scale': 0.72, 'piper_noise_w': 0.88,
+                  'measured_wps': 5.02, 'line_overhead_s': 0.07, 'measured_rate': 1.3,
                   'casting_note': CASTING['ch_bloxy'],
                   'rights_note': 'Piper LibriTTS model (CC BY 4.0) / provider catalogue voices'},
     },
@@ -70,6 +78,7 @@ CHARACTERS = [
                   'openai_instructions': 'Calm, dry, gently teasing friend. Natural conversational timing.',
                   'elevenlabs_voice_id': '', 'local_test_voice': 'slt', 'pitch_semitones': 0,
                   'piper_speaker': 288, 'piper_length_scale': 1.04, 'piper_noise_scale': 0.6, 'piper_noise_w': 0.7,
+                  'measured_wps': 5.49, 'line_overhead_s': 0.10, 'measured_rate': 1.3,
                   'casting_note': CASTING['ch_pip'],
                   'rights_note': 'Piper LibriTTS model (CC BY 4.0) / provider catalogue voices'},
     },
@@ -101,6 +110,7 @@ CHARACTERS = [
                                          'he loses. Playful, never mean.',
                   'elevenlabs_voice_id': '', 'local_test_voice': 'rms', 'pitch_semitones': 2,
                   'piper_speaker': 456, 'piper_noise_scale': 0.75, 'piper_noise_w': 0.92,
+                  'measured_wps': 4.58, 'line_overhead_s': 0.20, 'measured_rate': 1.3,
                   'casting_note': CASTING['ch_rook'],
                   'rights_note': 'Piper LibriTTS model (CC BY 4.0) / provider catalogue voices'},
     },
@@ -128,6 +138,7 @@ CHARACTERS = [
                                          'when she lands the last word.',
                   'elevenlabs_voice_id': '', 'local_test_voice': 'slt', 'pitch_semitones': 4,
                   'pitch_formants': 'shift', 'piper_speaker': 408, 'piper_noise_scale': 0.75, 'piper_noise_w': 0.9,
+                  'measured_wps': 5.04, 'line_overhead_s': 0.14, 'measured_rate': 1.3,
                   'casting_note': CASTING['ch_dot'],
                   'rights_note': 'Piper LibriTTS model (CC BY 4.0) / provider catalogue voices'},
     },
@@ -153,6 +164,7 @@ CHARACTERS = [
                   'openai_instructions': 'Low, flat, deadpan teacher and referee. Measured verdicts, never loud.',
                   'elevenlabs_voice_id': '', 'local_test_voice': 'awb', 'pitch_semitones': -2,
                   'piper_speaker': 504, 'piper_length_scale': 1.1, 'piper_noise_scale': 0.5, 'piper_noise_w': 0.6,
+                  'measured_wps': 4.88, 'line_overhead_s': 0.10, 'measured_rate': 1.3,
                   'casting_note': CASTING['ch_tally'],
                   'rights_note': 'Piper LibriTTS model (CC BY 4.0) / provider catalogue voices'},
     },

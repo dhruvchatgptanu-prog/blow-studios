@@ -349,6 +349,8 @@ class CharacterSolver:
         self.fps = m['fps']
         self.n = n_frames
         self.scale = float((bible or {}).get('scale', 1.0) or 1.0)
+        # Highest point of the head group (hair and hat as the Blender builder makes them): what the camera frames.
+        self.visual_top = R.visual_top((bible or {}).get('costume'), self.scale)
         self.keys = m['tracks']['characters'][cid]['keys']
         self.actions = [a for a in m['tracks']['actions'] if a['character'] == cid]
         self.blinks = set(m['tracks']['blinks'].get(cid, []))
@@ -1663,6 +1665,51 @@ def shot_lens(shot):
     return float(LENS_BY_FRAMING[order[tight]])
 
 
+# Composition. A character is framed by its visual top (rig.visual_top: head, hair and hat) plus FRAME_PAD of
+# clearance; the framing's visible height is a fraction of that framed height (schema.FRAMING_HEIGHT), and the
+# aim keeps HEADROOM of the visible height above it. Tight framings centre on the face; when they must show
+# the whole head (schema.WHOLE_HEAD_FRAMINGS) they widen and lift just enough to keep TIGHT_HEADROOM above the
+# hair or hat while the chin stays above the frame bottom, so a bun or a crown is never cropped.
+FRAME_PAD = 0.06
+HEADROOM = 0.12
+# Tight framings are measured at the face plane; the hair top sits a head's depth behind it and so projects
+# with a little extra room, hence the smaller fraction. The chin floor leaves the neck visible under the chin
+# and is set so that hair within the classic allowance (messy, long, a cap: up to 12.5 cm) keeps its nominal framing:
+# only a bun, spikes, a crown, a bow or a beanie widen a close-up.
+TIGHT_HEADROOM = 0.10
+CHIN_FLOOR = 1.41     # z (scale 1) the bottom of a whole-head tight framing stays below: under the chin
+TIGHT_RATIO = 0.8     # visible height below this fraction of the framed height is a tight framing
+
+
+def framed_height(top, scale=1.0):
+    """The subject height the framings are fractions of: the visual top plus clearance."""
+    return top + FRAME_PAD * scale
+
+
+def whole_head_shot(shot):
+    """True when a shot's framings all show the whole head (hair and hat included)."""
+    cam = shot['camera']
+    return cam['framing_start'] in S.WHOLE_HEAD_FRAMINGS and cam['framing_end'] in S.WHOLE_HEAD_FRAMINGS
+
+
+def compose(visible, top, scale=1.0, face=True, whole_head=True):
+    """(visible height, aim height) at a subject for a nominal visible height.
+
+    top: the subject's visual top (metres above its feet); face: a single character (tight framings centre on
+    the face; two-shots and props use the standard aim); whole_head: the shot shows the whole head.
+    """
+    height = framed_height(top, scale)
+    tight = face and visible < TIGHT_RATIO * height
+    if tight and whole_head:
+        visible = max(visible, (top - CHIN_FLOOR * scale) / (1.0 - TIGHT_HEADROOM))
+    aim = height - (0.5 - HEADROOM) * visible
+    if tight:
+        aim = min(aim, R.FACE_CENTER_Z * scale + 0.06)
+        if whole_head:
+            aim = max(aim, top + TIGHT_HEADROOM * visible - visible / 2)
+    return visible, max(aim, min(height * 0.5, visible * 0.32))
+
+
 # Impact shake: the look-at point jolts by up to this fraction of the camera distance (an angle of about
 # 3.4 degrees at full strength) and the camera body by a quarter of that, dying away over the effect.
 SHAKE_LOOK = 0.06
@@ -1815,7 +1862,7 @@ def line_hits_others(cam, face, chars, subj, f, near_subject=0.35):
             continue
         ctr = np.array([o.root_xy[f][0], o.root_xy[f][1]])
         rad = 0.42 * o.scale
-        top = (R.HEIGHT + 0.12) * o.scale + o.root_z[f]
+        top = framed_height(o.visual_top, o.scale) + o.root_z[f]
         for t in np.linspace(0.0, stop, 48):
             p = cam + seg * t
             if o.root_z[f] - 0.05 <= p[2] <= top and np.hypot(p[0] - ctr[0], p[1] - ctr[1]) < rad:
@@ -1832,7 +1879,8 @@ def solve_camera(m, chars, n, repair=None, set_layout=None):
     from ..manifest.compile import camera_state
     from . import sets as SETS
     if set_layout is None:
-        set_layout = SETS.layout(m, {cid: c.scale for cid, c in chars.items()})
+        set_layout = SETS.layout(m, {cid: c.scale for cid, c in chars.items()},
+                                 {cid: c.visual_top for cid, c in chars.items()})
     set_boxes = SETS.piece_boxes(set_layout)
     # Faces: set pieces and big story props. Props as subjects: set pieces only (a key may sit in a chest).
     scenery_faces = SETS.box_arrays(set_boxes + SETS.prop_boxes(m))
@@ -1849,30 +1897,43 @@ def solve_camera(m, chars, n, repair=None, set_layout=None):
         subj = cam['subject']
         f0 = shot['start_frame']
 
+        # The subject's visual top (hair and hat included) is what the framings are fractions of and what
+        # the aim keeps in frame; a two-shot frames its tallest member plus the spread between them.
         def subject_xyz(f):
             if subj in chars:
                 c = chars[subj]
-                return np.array([c.root_xy[f][0], c.root_xy[f][1], 0.0]), (R.HEIGHT + 0.12) * c.scale, c.yaw[f0]
+                return np.array([c.root_xy[f][0], c.root_xy[f][1], 0.0]), c.visual_top, c.yaw[f0]
             if subj == 'two_shot':
                 pts = [np.array([c.root_xy[f][0], c.root_xy[f][1], 0.0]) for c in chars.values()]
                 cen = sum(pts) / len(pts)
                 spread = max(np.linalg.norm(a - b) for a in pts for b in pts) if len(pts) > 1 else 0.0
-                return cen, R.HEIGHT + 0.12 + spread * 1.1, 0.0
+                return cen, max(c.visual_top for c in chars.values()) + spread * 1.1, 0.0
             if isinstance(subj, str) and subj.startswith('prop:'):
                 for p in m['setting'].get('props', []):
                     if p['id'] == subj[5:]:
-                        return np.array(p['position'], dtype=float), 0.9 * p.get('scale', 1), 0.0
+                        return np.array(p['position'], dtype=float), 0.9 * p.get('scale', 1) - FRAME_PAD, 0.0
             return np.zeros(3), R.HEIGHT, 0.0
 
-        base_target, height, facing0 = subject_xyz(f0)
+        base_target, top, facing0 = subject_xyz(f0)
+        sc = chars[subj].scale if subj in chars else 1.0
+        whole_head = whole_head_shot(shot)
+        if subj in chars and not whole_head:
+            # A shot that crops to the eyes and mouth frames the plain head: the face fills it the same
+            # whatever the hair.
+            top = min(top, R.visual_top(None, sc))
+        height = framed_height(top, sc)
+
+        def aim_for(v):
+            """(visible height, aim height) for a nominal visible height: see compose."""
+            return compose(v, top, sc, face=subj in chars, whole_head=whole_head)
+
         zoom = cam['move'] == 'zoom_punch'
-        visible0 = S.FRAMING_HEIGHT.get(cam['framing_start'], 0.72) * height
+        visible0, aim0 = aim_for(S.FRAMING_HEIGHT.get(cam['framing_start'], 0.72) * height)
         az0 = wrap(facing0 + CAMERA_SIDE_DEG.get(cam['side'], 0))
         follow = Spring(0.15 if (((repair or {}).get('shots') or {}).get(shot['id']) or {}).get('camera_smooth') else 0.3, 0.6)
         follow.reset(base_target)
         follow_z = Spring(0.3, 0.6)
         follow_z.reset([0.0])
-        face_z = R.FACE_CENTER_Z * (chars[subj].scale if subj in chars else 1.0)
         rnd = (zlib.crc32(shot['id'].encode()) % 1000) / 1000.0
         shot_rp = (((repair or {}).get('shots') or {}).get(shot['id'])) or {}
 
@@ -1883,29 +1944,21 @@ def solve_camera(m, chars, n, repair=None, set_layout=None):
 
         def frame_at(f, az_offset):
             st = camera_state(shot, f)
-            visible = st['visible_height_ratio'] * height
+            visible, aim_z = aim_for(st['visible_height_ratio'] * height)
             lens_f = lens
-            framed = visible
+            framed, aim_framed = visible, aim_z
             if zoom:
                 # Optical snap zoom: the camera stays where the opening framing puts it; the lens narrows
                 # so the face plane shows `visible` instead of the opening height.
                 lens_f = round(lens * visible0 / visible, 3)
-                framed = visible0
+                framed, aim_framed = visible0, aim0
             dist = (framed / 2) / math.tan(vfov / 2)
             if subj in chars and framed < height:
                 # Measure tight framings to the face plane, not the body axis.
                 dist += R.HEAD_HALF_DEPTH * chars[subj].scale
-            # Composition: keep 12% headroom above the head; very tight shots
-            # centre on the face; wide shots keep the feet in frame.
-            def aim_for(v):
-                a = height - 0.38 * v
-                if v < 0.8 * height and subj in chars:
-                    a = min(a, face_z + 0.06)
-                return max(a, min(height * 0.5, v * 0.32))
-            aim_z = aim_for(visible)
             # The camera body stays where the framing it was placed for puts it: a zoom punch tilts to
             # recompose on the face but does not rise with it (zero for every other move).
-            body_dz = aim_for(framed) - aim_z
+            body_dz = aim_framed - aim_z
             if cam['move'] == 'follow':
                 cur, _, _ = subject_xyz(f)
                 target = follow.step(cur)
@@ -2000,7 +2053,8 @@ def solve(m, bibles, alignments=None, repair=None, envelopes=None):
     for cs in chars.values():
         cs.others = chars
     from . import sets as SETS
-    set_layout = SETS.layout(m, {cid: cs.scale for cid, cs in chars.items()})
+    tops = {cid: cs.visual_top for cid, cs in chars.items()}
+    set_layout = SETS.layout(m, {cid: cs.scale for cid, cs in chars.items()}, tops)
     camera = solve_camera(m, chars, n, repair, set_layout)
     viseme_kinds = {}
     for cid, cs in chars.items():
@@ -2024,8 +2078,8 @@ def solve(m, bibles, alignments=None, repair=None, envelopes=None):
         cs.plan_speech({ln['id']: line_word_frames(m, ln, alignments) for ln in m['lines'] if S.lip_synced(ln, cid)})
     frames = {cid: cs.solve(lambda f: camera[f]['location']) for cid, cs in chars.items()}
     return {'n': n, 'fps': m['fps'], 'camera': camera, 'characters': frames, 'viseme_timing': viseme_kinds,
-            'scales': {cid: cs.scale for cid, cs in chars.items()}, 'props': solve_props(m, frames, n),
-            'set': set_layout}
+            'scales': {cid: cs.scale for cid, cs in chars.items()}, 'visual_tops': tops,
+            'props': solve_props(m, frames, n), 'set': set_layout}
 
 
 def solve_props(m, frames, n):
