@@ -14,7 +14,7 @@ from flask import Flask, abort, jsonify, redirect, render_template, request, sen
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from .. import (budget, breaker, config, db as dbmod, jobs, logs, migrations, orchestrator, paid,
+from .. import (budget, breaker, channel_kit, config, db as dbmod, jobs, logs, migrations, orchestrator, paid,
                 prefs as prefsmod, repo, runtime, store, vault, videos)
 from ..animation import blender as BL
 from ..manifest import compile as C, director, schema as S, validate as V
@@ -25,6 +25,8 @@ from ..voice import piper as piper_mod
 from ..youtube import oauth
 from . import security
 from .assets import register as register_assets
+from .channel_kit_api import register as register_channel_kit
+from .notes_api import register as register_notes
 
 log = logs.get('blox.web')
 
@@ -843,6 +845,8 @@ def create_app():
             {'EXPRESSIONS': list(S.EXPRESSIONS), 'COORDINATE_SYSTEM': S.COORDINATE_SYSTEM})
 
     register_assets(app)
+    register_notes(app)
+    register_channel_kit(app)
 
     # ------------------------------------------------------------ media
     @app.get('/media/<path:name>')
@@ -861,7 +865,8 @@ def create_app():
                 d.one('SELECT 1 AS x FROM renders WHERE file=? OR cover_file=? OR thumbnail_file=?', (name, name, name))
                 or d.one('SELECT 1 AS x FROM shots WHERE file=? OR preview_file=?', (name, name))
                 or d.one('SELECT 1 AS x FROM audio_lines WHERE file=?', (name,))
-                or name.startswith('work/character_previews/'))
+                or name.startswith('work/character_previews/')
+                or name in channel_kit.registered_files())
         try:
             real = Path(os.path.realpath(path))
             base = Path(os.path.realpath(config.DATA_DIR))

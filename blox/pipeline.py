@@ -53,7 +53,8 @@ def build_brief(p, d=None):
                         'evidence': 'transcript' if tr else ('frames' if an else 'metadata_only')})
         if len(sources) >= 8:
             break
-    return {'sources': sources, 'created_at': now(),
+    from .research import notes as owner_notes
+    return {'sources': sources, 'created_at': now(), 'owner_notes': owner_notes.hints(d),
             'note': ('Top candidates in the monitored sample.' if sources else
                      'No research data yet; the brief uses only the channel niche and identity.')}
 
@@ -143,7 +144,8 @@ def develop_step(v, p, d, chars):
         recent = [{'premise': o['premise'], 'ending': o['ending']} for o in own]
         from .learning import brief_notes
         attempt = int(meta.get('concept_attempt', 0))
-        concepts = G.generate_concepts(f'concepts:{vid}:{attempt}', patterns, p, chars, recent, brief_notes(d), vid)
+        concepts = G.generate_concepts(f'concepts:{vid}:{attempt}', patterns, p, chars, recent, brief_notes(d), vid,
+                                       owner_notes=brief.get('owner_notes'))
         refs = [{'id': s['id'], 'text': ' '.join(filter(None, [s['title'], s['description'], s.get('transcript')]))}
                 for s in srcs]
         emb = _embedder(vid)

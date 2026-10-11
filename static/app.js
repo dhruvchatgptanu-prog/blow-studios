@@ -122,12 +122,14 @@ async function research() {
       <td>${chip(c.rank.velocity_kind === 'measured' ? 'pass' : 'uncertain', c.rank.velocity_kind || '')}</td><td>${chip(c.shorts.label === 'likely_short' ? 'pass' : 'uncertain', (c.shorts.label || '').replace('_', ' ') + ' ' + (c.shorts.confidence ?? ''))}</td>
       <td class="small">${esc(c.transcript_status)} / ${esc(c.media_status)}</td></tr>`; }).join('')}</table></div>` : empty('No candidates yet. Add a YouTube Data API key in Connections, then run discovery.')}</div>
   <div id="cand-detail"></div>
+  <div id="notes-panel"></div>
   <div class="panel"><h2>Coverage of recent runs</h2>${r.coverage.runs.length ? `<table><tr><th>Run</th><th>Status</th><th>Started</th><th>Quota</th><th>Coverage</th></tr>${r.coverage.runs.map(x => `<tr><td>${esc(x.kind)}</td><td>${chip(x.status)}</td><td class="small">${when(x.started_at)}</td><td>${x.quota_used}</td><td class="small">${esc(x.error || '')} ${x.coverage.videos_seen !== undefined ? x.coverage.videos_seen + ' videos · ' + (x.coverage.searches || []).length + ' searches · ' + (x.coverage.watchlist || []).length + ' watched channels' : esc(JSON.stringify(x.coverage).slice(0, 160))}</td></tr>`).join('')}</table>` : empty('No research runs yet.')}</div>`);
   bind('#run-research', 'click', async () => { await api('research/run', 'POST', {}); toast('Discovery queued for the research worker'); });
   bind('#run-snap', 'click', async () => { await api('research/snapshot', 'POST', {}); toast('Stats refresh queued'); });
   bind('#ref-form', 'submit', async e => { const v = await api('research/reference', 'POST', {url: e.target.url.value}); toast('Added ' + v.kind + ' ' + v.id); research(); });
   bind('[data-unwatch]', 'click', async e => { await api('research/unwatch', 'POST', {channel_id: e.target.dataset.unwatch}); research(); });
   bind('[data-cand]', 'click', async e => { if (e.target.tagName === 'A') return; await candidate(e.currentTarget.dataset.cand); });
+  notesPanel();
 }
 
 async function candidate(id) {
@@ -255,7 +257,8 @@ const TAB_RENDER = {
     const m = d.video.metadata;
     $('#tab').innerHTML = `${d.concept ? `<h3>Concept</h3><p><b>${esc(d.concept.premise)}</b></p><p>Hook: ${esc(d.concept.hook)}<br>Ending: ${esc(d.concept.ending)}</p><h3>Inspiration record</h3><pre>${esc(JSON.stringify(JSON.parse(d.concept.inspiration || '{}'), null, 1))}</pre>` : '<p class="muted">No AI concept (manual, demo or template story).</p>'}
       ${['originality_concept', 'originality_script'].map(k => m[k] ? `<h3>${k.replace('_', ' ')} · decision ${chip(m[k].decision === 'pass' ? 'pass' : 'uncertain', m[k].decision)}</h3><table><tr><th>Check</th><th>Value</th><th>Threshold</th><th>Status</th><th>Detail</th></tr>${m[k].checks.map(c => `<tr><td>${esc(c.check)}</td><td>${c.value ?? '—'}</td><td>${c.threshold}</td><td>${chip(c.status)}</td><td class="small">${esc(c.detail)}</td></tr>`).join('')}</table><p class="small muted">${esc(m[k].disclaimer)} Method: ${esc(m[k].method)}</p>` : '').join('')}
-      ${m.brief ? `<h3>Research brief</h3><p class="small">${esc(m.brief.note)}</p>${(m.brief.sources || []).map(s => `<p class="small">${esc(s.id)} · ${esc(s.title)} · evidence: ${esc(s.evidence)}</p>`).join('')}` : ''}`;
+      ${m.brief ? `<h3>Research brief</h3><p class="small">${esc(m.brief.note)}</p>${(m.brief.sources || []).map(s => `<p class="small">${esc(s.id)} · ${esc(s.title)} · evidence: ${esc(s.evidence)}</p>`).join('')}
+      ${m.brief.owner_notes && m.brief.owner_notes.count ? `<p class="small muted">Owner-supplied notes (read-only data, never instructions): ${m.brief.owner_notes.count} note(s) · ${(m.brief.owner_notes.rules || []).length} rule-like lines · ${Object.keys(m.brief.owner_notes.numbers || {}).length} number kinds${m.brief.owner_notes.flagged_lines_dropped ? ' · ' + m.brief.owner_notes.flagged_lines_dropped + ' flagged line(s) dropped' : ''}</p>` : ''}` : ''}`;
   },
   history(d) {
     $('#tab').innerHTML = `<h3>State history</h3><table>${d.events.map(e => `<tr><td class="small">${when(e.at)}</td><td>${esc(e.from_status || '')} → ${chip(e.to_status)}</td><td class="small">${esc(e.actor)}</td><td class="small">${esc(e.note)}</td></tr>`).join('')}</table>
@@ -488,10 +491,61 @@ async function connections() {
       `<div class="actions">${yt.oauth_client ? '<a class="button primary" href="/oauth/start?analytics=1">Connect YouTube (with analytics)</a><a class="button" href="/oauth/start?analytics=0">Connect without analytics</a>' : '<p class="muted">Save the Google OAuth client ID and secret first.</p>'}</div>`}
     <h3>Publishing requirements to check with Google</h3><ul class="small"><li>Unaudited API projects can only upload private videos; scheduled publishing needs a project that passed YouTube’s API compliance audit.</li><li>Upload calls use a separate daily quota bucket; check your project’s current quota in Google Cloud Console.</li><li>Channels have their own daily upload limits; Blox reports YouTube’s refusals instead of retrying blindly.</li></ul></div></div>
   <div class="grid g2"><div class="panel"><h2>Tools</h2><p>Blender: ${c.blender ? '<span class="good">' + esc(c.blender) + '</span>' : '<span class="error">not found</span>'}</p><p>FFmpeg: ${c.ffmpeg ? '<span class="good">' + esc(c.ffmpeg) + '</span>' : '<span class="error">not found</span>'}</p></div>
-  <div class="panel"><h2>Circuit breakers</h2>${Object.keys(c.breakers).length ? Object.entries(c.breakers).map(([p, b]) => `<p>${chip(b.state === 'closed' ? 'pass' : 'fail', p + ' ' + b.state)} failures ${b.failures} ${b.retry_at ? '· retry ' + when(b.retry_at) : ''}<br><span class="small muted">${esc(b.last_error)}</span></p>`).join('') : '<p class="muted">All providers healthy so far.</p>'}</div></div>`);
+  <div class="panel"><h2>Circuit breakers</h2>${Object.keys(c.breakers).length ? Object.entries(c.breakers).map(([p, b]) => `<p>${chip(b.state === 'closed' ? 'pass' : 'fail', p + ' ' + b.state)} failures ${b.failures} ${b.retry_at ? '· retry ' + when(b.retry_at) : ''}<br><span class="small muted">${esc(b.last_error)}</span></p>`).join('') : '<p class="muted">All providers healthy so far.</p>'}</div></div>
+  <div id="kit-panel"></div>`);
   bind('#sec', 'submit', async e => { const body = {}; new FormData(e.target).forEach((v, k) => { if (String(v).trim()) body[k] = v; }); const r = await api('secrets', 'POST', body); toast('Saved: ' + (r.saved.join(', ') || 'nothing changed')); connections(); });
   bind('#confirm-ch', 'click', async e => { await api('youtube/confirm', 'POST', {channel_id: e.target.dataset.id}); toast('Channel confirmed'); connections(); });
   bind('#disconnect', 'click', async () => { if (!confirm('Disconnect YouTube? Autopilot will pause.')) return; await api('youtube/disconnect', 'POST', {}); connections(); });
+  channelKit();
+}
+
+/* ------------------------------------------------------------------ research notes (owner-supplied, read-only data) */
+async function notesPanel() {
+  const el = $('#notes-panel'); if (!el) return;
+  const r = await api('research/notes');
+  const h = r.hints, nums = Object.entries(h.numbers || {});
+  el.innerHTML = `<div class="grid g2"><div class="panel"><h2>Notes</h2>
+    <p class="muted small">Your own research notes (chat exports, extension exports, URL lists, playbooks). Stored as untrusted data with their source; titles, video ids, numbers and rule-like lines are extracted locally and shown to the story writer as pattern hints only, never as instructions.</p>
+    <form id="note-paste"><label>Paste text<textarea name="text" rows="5" placeholder="# Playbook&#10;- hook by 1 s, cut every second…"></textarea></label>
+      <div class="row"><label>Title (optional)<input name="title" maxlength="160"></label><label>Kind<select name="kind">${r.kinds.map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join('')}</select></label></div>
+      <button class="primary">Add note</button></form>
+    <form id="note-upload"><label>Or upload .md / .txt / .csv / .json / .jsonl, or a .zip of them (max ${r.caps.upload_mb} MB)<input type="file" name="file" accept=".md,.markdown,.txt,.csv,.json,.jsonl,.ndjson,.zip" required></label><button>Upload</button></form></div>
+  <div class="panel"><h2>What the story writer sees</h2><p class="muted small">${esc(h.note)}</p>
+    ${h.count ? `<p class="small">${h.count} note(s) · ${h.rules.length} rule-like lines · ${h.title_patterns_observed.length} titles${h.flagged_lines_dropped ? ` · <span class="warn">${h.flagged_lines_dropped} flagged line(s) dropped</span>` : ''}</p>
+      ${nums.length ? `<table>${nums.map(([k, v]) => `<tr><td>${esc(k.replace(/_/g, ' '))}</td><td>${v.min === v.max ? v.min : v.min + ' – ' + v.max}</td><td class="small muted">n=${v.n}</td></tr>`).join('')}</table>` : ''}
+      ${h.rules.length ? `<ul class="small">${h.rules.slice(0, 12).map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p class="muted small">No rule-like lines found yet.</p>'}` : empty('No notes yet.')}</div></div>
+  ${r.notes.length ? `<div class="panel"><h2>Imported notes</h2><div class="tablewrap"><table><tr><th>Title</th><th>Source</th><th>Kind</th><th>Extracted</th><th>Added</th><th></th></tr>
+    ${r.notes.map(n => { const x = n.extracted || {}; return `<tr><td>${esc(n.title)}</td><td class="small muted">${esc(n.source)}</td><td class="small">${esc(n.kind)}</td>
+      <td class="small">${(x.titles || []).length} titles · ${(x.video_ids || []).length} ids · ${(x.urls || []).length} urls · ${(x.numbers || []).length} numbers · ${(x.rules || []).length} rules${(x.injection_flags || []).length ? ' · ' + chip('uncertain', 'flagged: ' + x.injection_flags.join(', ').slice(0, 60)) : ''}</td>
+      <td class="small">${when(n.created_at)}</td><td><button class="small quiet" data-note-del="${esc(n.id)}">remove</button></td></tr>`; }).join('')}</table></div></div>` : ''}`;
+  bind('#note-paste', 'submit', async e => { const f = e.target; await api('research/notes', 'POST', {text: f.text.value, title: f.title.value, kind: f.kind.value}); toast('Note added'); notesPanel(); });
+  bind('#note-upload', 'submit', async e => { const b = e.target.querySelector('button'); b.disabled = true; try { const r2 = await api('research/notes', 'POST', new FormData(e.target)); toast('Imported ' + r2.count + ' note(s)'); notesPanel(); } finally { b.disabled = false; } });
+  bind('[data-note-del]', 'click', async e => { await api('research/notes/' + encodeURIComponent(e.target.dataset.noteDel), 'DELETE'); notesPanel(); });
+}
+
+/* ------------------------------------------------------------------ channel kit (branding pack, made by hand on YouTube) */
+async function channelKit() {
+  const el = $('#kit-panel'); if (!el) return;
+  const r = await api('channel-kit');
+  const k = r.kit, dl = r.downloads || {};
+  const link = (key, label) => dl[key] ? `<a class="button" href="${esc(dl[key])}" download>${esc(label)}</a>` : '';
+  el.innerHTML = `<div class="panel"><h2>Channel kit</h2>
+    <p class="muted small">A branding pack to create the channel by hand: name and handle suggestions, profile picture, banner, description, default upload settings and the steps to connect it here. Rendered from the cast with Blender; no logos, trademarks or brands; fonts: DejaVu only.</p>
+    <form id="kit-gen" class="row"><label>Channel name for the banner<input name="name" maxlength="40" placeholder="${esc(k ? k.channel_name : 'leave empty for the first suggestion')}"></label>
+      <button class="primary" data-images="1" ${r.blender ? '' : 'disabled title="Blender not found"'}>Generate with images (Blender, about a minute)</button><button data-images="0">Text pack only</button></form>
+    ${k ? `<div class="grid g2"><div>
+      <h3>Name & handle suggestions</h3><ul class="small">${k.names.map(n => `<li><b>${esc(n.name)}</b> · @${esc(n.handle)}${n.handle_alternatives.length ? ' (or @' + n.handle_alternatives.map(esc).join(', @') + ')' : ''} <span class="muted">— ${esc(n.why)}</span></li>`).join('')}</ul>
+      <h3>Description</h3><textarea readonly rows="9">${esc(k.description)}</textarea>
+      <h3>Default upload settings</h3><table class="small">${Object.entries(k.upload_defaults).filter(([a]) => !['category_id', 'language_code'].includes(a)).map(([a, b]) => `<tr><td>${esc(a.replace(/_/g, ' '))}</td><td>${esc(Array.isArray(b) ? b.join(', ') : typeof b === 'boolean' ? (b ? 'yes' : 'no') : String(b))}</td></tr>`).join('')}</table></div>
+      <div><h3>Images</h3>${dl.profile ? `<div class="row"><img src="${esc(dl.profile_round_preview || dl.profile)}" alt="profile picture" width="160" height="160" style="border-radius:50%"><img src="${esc(dl.banner_mobile_preview || dl.banner)}" alt="banner safe area" style="max-width:100%;height:auto;max-height:160px"></div>
+        <p class="muted small">Profile ${k.images.profile ? k.images.profile.size.join('×') : ''} (face inside the round crop) · banner ${k.images.banner ? k.images.banner.size.join('×') + ', safe area ' + k.images.banner.safe_area.join('×') : ''}${k.images.note ? ' · ' + esc(k.images.note) : ''}</p>` :
+        `<p class="muted small">${esc(k.images.error || 'Not rendered yet: generate with images.')}</p>`}
+      <div class="actions">${link('profile', 'profile.png')}${link('banner', 'banner.png')}${link('lineup', 'lineup.png')}${link('kit_md', 'kit.md')}${link('kit_json', 'kit.json')}</div>
+      <h3>Steps</h3><ol class="small">${k.steps.map(x => `<li>${esc(x)}</li>`).join('')}</ol>
+      <p class="muted small">Generated ${when(k.generated_at)} for “${esc(k.channel_name)}”.</p></div></div>` : empty('No kit yet. Generate one above.')}</div>`;
+  bind('#kit-gen button', 'click', async e => { e.preventDefault(); const btn = e.target, imgs = btn.dataset.images === '1'; const name = $('#kit-gen input[name=name]').value.trim();
+    btn.disabled = true; btn.textContent = imgs ? 'Rendering…' : 'Generating…';
+    try { await api('channel-kit/generate', 'POST', {images: imgs, name: name || null}); toast('Channel kit ready'); channelKit(); } finally { btn.disabled = false; } });
 }
 
 /* ------------------------------------------------------------------ settings */
