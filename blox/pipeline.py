@@ -526,6 +526,8 @@ def assemble(ctx):
                                     'ducking': out['mix']['ducking']},
                             'captions': out['captions'], 'thumbnail_16x9': repo.rel(out['thumbnail_16x9']),
                             'native_render_size': out['native_render_size'],
+                            'joined_clean': repo.rel(out['joined_clean']), 'hook_overlay': out.get('hook_overlay'),
+                            'cover_frame': out.get('cover_frame'), 'cover_choice': out.get('cover_choice'),
                             'shot_native_sizes': [{'shot': r['shot_key'], 'renderer': r['renderer'],
                                                    'native': [r['native_w'], r['native_h']],
                                                    'upscaled': bool((r['detail'] or {}).get('upscaled'))}
@@ -543,7 +545,9 @@ def assembly_from_render(r):
             'height': det['height'], 'captions': det.get('captions', []),
             'mix': {'paths': {k: repo.absp(x) for k, x in mix['paths'].items()}, 'placements': mix['placements']},
             'native_render_size': det.get('native_render_size'),
-            'shot_native_sizes': det.get('shot_native_sizes', [])}
+            'shot_native_sizes': det.get('shot_native_sizes', []),
+            'joined_clean': repo.absp(det['joined_clean']) if det.get('joined_clean') else None,
+            'hook_overlay': det.get('hook_overlay'), 'cover_frame': det.get('cover_frame')}
 
 
 @handler('video.qa')

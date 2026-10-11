@@ -137,6 +137,8 @@ DEFAULTS = {
         'music_gain_db': -20,
         'duck_db': 10,
         'captions': True,
+        # Hook text on screen: the plan's hook.text in a top band over the opening (plans may turn it off).
+        'hook_text_overlay': True,
         # Soft background behind the subject's face (camera depth of field). Off by default: it adds
         # about a quarter to the render time of each frame on a CPU-only machine.
         'depth_of_field': False,
@@ -363,6 +365,7 @@ def validate(p):
     pr['music_gain_db'] = finite(pr['music_gain_db'], -40, 0, 'music gain')
     pr['duck_db'] = finite(pr['duck_db'], 0, 30, 'ducking')
     _bool(pr['captions'], 'captions')
+    _bool(pr['hook_text_overlay'], 'hook text overlay')
     _bool(pr['depth_of_field'], 'depth of field')
     text(pr['caption_font'], 60, 'caption font')
     pr['caption_font_size_ratio'] = finite(pr['caption_font_size_ratio'], 0.02, 0.08, 'caption size')

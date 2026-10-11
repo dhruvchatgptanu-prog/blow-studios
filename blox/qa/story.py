@@ -1,4 +1,5 @@
 """Story, dialogue, caption and compliance checks."""
+import os
 import re
 
 import numpy as np
@@ -156,6 +157,7 @@ def run(ck, m, line_audio, assembly, prefs, video_id=None, render_id='r', asr=No
             'alignment_sources': kinds}, 0.85 if 'measured' in ''.join(kinds) else 0.6, 'deterministic',
            repair={'action': 'rebuild_captions'} if timing_bad else None)
     _caption_pixels(ck, m, assembly, prefs)
+    _hook_pixels(ck, m, assembly, prefs)
     # Continuity and contradictions as encoded in the manifest
     rep = V.validate(m, prefs, measured=True)
     ck.add('manifest_consistency', 'No contradictory events or continuity errors in the plan', 'story',
@@ -207,3 +209,61 @@ def _caption_pixels(ck, m, assembly, prefs):
            'fail' if bad else 'pass', 'major', {'safe_area': sa, 'measured': measured[:8], 'problems': bad[:6]}, 0.9,
            'pixel', frames=(bad[0]['frame'], bad[0]['frame'] + 1) if bad else None,
            repair={'action': 'rebuild_captions'} if bad else None)
+
+
+def _hook_pixels(ck, m, assembly, prefs):
+    """Locate the on-screen hook text (the joined picture minus the clean one, mid-band) and check it sits where
+    it was planned: in the top band inside the safe area, clear of every caption shown while it is up."""
+    hk = m.get('hook') or {}
+    cid = 'hook_text_on_screen'
+    title = 'Hook text on screen in the top band, clear of the captions (measured in pixels)'
+    if not hk.get('on_screen') or not hk.get('text'):
+        ck.add(cid, title, 'captions', 'skipped', 'info', {'reason': 'The plan keeps the hook text off screen'},
+               1.0, 'pixel')
+        return
+    ov = assembly.get('hook_overlay')
+    clean = assembly.get('joined_clean')
+    if not ov or not clean or os.path.abspath(clean) == os.path.abspath(assembly['joined']):
+        ck.add(cid, title, 'captions', 'fail', 'major', {'reason': 'The hook band was not drawn on the picture'},
+               0.9, 'pixel', frames=(0, hk['overlay']['end_frame']), repair={'action': 're_assemble'})
+        return
+    sa = prefs['production']['safe_area']
+    fps, w, h = m['fps'], assembly['width'], assembly['height']
+    f = (ov['start_frame'] + ov['end_frame']) // 2   # the hold between the pop-in and the fade-out
+    evidence = {'text': ov['text'], 'frames': [ov['start_frame'], ov['end_frame']], 'planned_box': ov['box_norm'],
+                'frame': f}
+    try:
+        a = MO.decode_rgb_frame(assembly['joined'], f, fps).astype(np.int16)
+        b = MO.decode_rgb_frame(clean, f, fps).astype(np.int16)
+    except Exception as e:
+        ck.add(cid, title, 'captions', 'uncertain', 'major', {**evidence, 'reason': str(e)[:200]}, 0.3, 'pixel')
+        return
+    diff = np.abs(a - b).max(axis=2) > 60
+    ys, xs = np.where(diff)
+    problems = []
+    box = None
+    if len(xs) < 20:
+        problems.append('hook text pixels not found in the picture')
+    else:
+        box = [round(np.percentile(xs, 0.5) / w, 3), round(np.percentile(ys, 0.5) / h, 3),
+               round(np.percentile(xs, 99.5) / w, 3), round(np.percentile(ys, 99.5) / h, 3)]
+        tol = 0.015
+        if box[1] < sa['top'] - tol:
+            problems.append('text above the safe area')
+        if box[0] < sa['left'] - tol or box[2] > 1 - sa['left'] + tol:
+            problems.append('text outside the band width')
+        if box[3] > sa['bottom'] + tol:
+            problems.append('text below the safe area')
+        pb = ov['box_norm']
+        if box[1] < pb[1] - 0.03 or box[3] > pb[3] + 0.03 or box[0] < pb[0] - 0.03 or box[2] > pb[2] + 0.03:
+            problems.append('text outside the planned band')
+        for c in assembly.get('captions') or []:
+            if c['start_frame'] >= ov['end_frame'] or c['end_frame'] <= ov['start_frame']:
+                continue
+            cb = [c['box'][0] / w, c['box'][1] / h, c['box'][2] / w, c['box'][3] / h]
+            if min(box[2], cb[2]) > max(box[0], cb[0]) and min(box[3], cb[3]) > max(box[1], cb[1]):
+                problems.append(f'band meets caption {c["id"]} ({c["position"]})')
+                break
+    evidence.update(measured_box=box, problems=problems, safe_area=sa)
+    ck.add(cid, title, 'captions', 'fail' if problems else 'pass', 'major', evidence, 0.9, 'pixel',
+           frames=(ov['start_frame'], ov['end_frame']), repair={'action': 're_assemble'} if problems else None)

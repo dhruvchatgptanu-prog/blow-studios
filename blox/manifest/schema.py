@@ -129,6 +129,23 @@ SNAP_WINDOW_FRAMES = 8      # story frames around a cut within which an expressi
 MUSIC_DROPOUT_S = 0.6       # story seconds of silence in the music before the punchline (0.4 s at pace 1.5)
 CUT_WHOOSH_GAIN_DB = -15.0
 
+# On-screen hook text. ``hook.text`` (at most HOOK_TEXT_MAX_WORDS words) is rendered in a band near the top of
+# the frame while the hook plays (``hook.on_screen``; default from prefs production.hook_text_overlay) in the
+# caption style but larger, and composited on the cover image. The band ends with the hook (hook.end_frame) and
+# never later than HOOK_OVERLAY_MAX_STORY_S of story (2.5 finished seconds at pace 1.5). The pop-in and the
+# fade-out are video frames, not story time.
+HOOK_TEXT_MAX_WORDS = 6
+HOOK_OVERLAY_MAX_STORY_S = 3.75
+HOOK_OVERLAY_MIN_S = 1.0        # finished seconds: shorter than this cannot be read
+HOOK_POP_FRAMES = 4
+HOOK_FADE_FRAMES = 6
+# Expressions that make a cover: how much a face with this expression counts beyond its size (0 = a plain face).
+COVER_EXPRESSION_WEIGHT = {'screaming': 1.0, 'frozen': 1.0, 'startled': 0.9, 'scared': 0.9, 'excited': 0.8,
+                           'laughing': 0.8, 'smug_max': 0.8, 'mischief': 0.8, 'angry': 0.7, 'disgusted': 0.6,
+                           'confused': 0.5, 'worried': 0.5, 'smug': 0.5, 'proud': 0.4, 'happy': 0.4,
+                           'embarrassed': 0.4, 'sad': 0.4, 'determined': 0.3, 'curious': 0.3, 'relieved': 0.3,
+                           'bored': 0.2, 'neutral': 0.0}
+
 EMOTIONS = ['neutral', 'happy', 'excited', 'startled', 'worried', 'sad', 'angry', 'determined', 'smug', 'scared',
             'confused', 'embarrassed', 'laughing', 'proud', 'bored', 'disgusted', 'relieved', 'curious']
 PACES = ['slow', 'normal', 'fast']

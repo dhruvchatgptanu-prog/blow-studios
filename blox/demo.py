@@ -179,7 +179,7 @@ LAST_PLATFORM = {
         'ending': 'Bloxy facepalms; Pip asks "Again?", implying it happens every time.',
         'ending_type': 'twist',
     },
-    'hook': {'text': 'Bloxy reaches the edge and the next platform is gone.',
+    'hook': {'text': 'The next platform is GONE.',
              'question': 'How will Bloxy cross the gap?', 't_end': 3.0},
     'payoff': {'text': 'Bloxy never needed to cross: the door behind them was the way out.', 't_start': 21.0},
     'setting': {

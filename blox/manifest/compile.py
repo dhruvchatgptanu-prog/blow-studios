@@ -195,12 +195,14 @@ def check_pace(pace, speech_rate):
 
 
 def pace_kwargs(prefs):
-    """compile_plan keyword arguments for the owner's production pace.
+    """compile_plan keyword arguments for the owner's production pace and the
+    production defaults a plan may leave unset (the hook text overlay).
 
     A prefs dict without pace settings (hand-built in tests or tools) compiles
     at real time, which is the behaviour before pace existed."""
     pr = (prefs or {}).get('production') or {}
-    return {'pace': pr.get('pace', 1.0), 'speech_rate': pr.get('speech_rate', 1.0)}
+    return {'pace': pr.get('pace', 1.0), 'speech_rate': pr.get('speech_rate', 1.0),
+            'hook_overlay': bool(pr.get('hook_text_overlay', True))}
 
 
 def manifest_pace(m):
@@ -376,7 +378,7 @@ def _caption_words(c):
     return out
 
 
-def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_rate=1.0):
+def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_rate=1.0, hook_overlay=True):
     """Plan dict -> compiled manifest dict. Raises ValueError on malformed input.
 
     Semantic problems are left for ``validate`` to report so the owner sees all
@@ -386,7 +388,8 @@ def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_
     second and frame count is divided by it); ``speech_rate`` is how much
     faster than normal the voices speak, used for line length estimates and
     passed to the voice engines on every line. The defaults compile at real
-    time.
+    time. ``hook_overlay`` is the default of ``hook.on_screen`` (the owner's
+    production.hook_text_overlay setting) when the plan does not say.
     """
     if not isinstance(plan, dict):
         raise ValueError('Plan must be an object')
@@ -428,6 +431,16 @@ def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_
     payoff = plan.get('payoff') or {}
     m['hook'] = {'id': 'hook', 'text': str(hook.get('text', ''))[:400], 'question': str(hook.get('question', ''))[:300],
                  'end_frame': F(hook.get('t_end'), 3.0)}
+    # hook.on_screen: the plan's choice, else the owner's default. A plan that does not say and describes the
+    # hook in more words than fit the band (older stories) keeps its text off screen rather than failing.
+    on_screen = hook.get('on_screen')
+    n_words = len(words(m['hook']['text']))
+    if on_screen is None and hook_overlay and n_words > S.HOOK_TEXT_MAX_WORDS:
+        on_screen = False
+        m['notes'].append(f'hook text has {n_words} words and is not shown on screen; write hook.text as at most '
+                          f'{S.HOOK_TEXT_MAX_WORDS} words to put it on screen')
+    m['hook']['on_screen'] = bool(hook_overlay if on_screen is None else on_screen)
+    m['hook']['overlay'] = hook_overlay_window(m['hook'], D, F, fps)
     m['payoff'] = {'resolves': 'hook', 'text': str(payoff.get('text', ''))[:400],
                    'start_frame': F(payoff.get('t_start'), duration_s * 0.8)}
     m['setting'].setdefault('preset', 'sky_obby')
@@ -653,9 +666,21 @@ def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_
     m['music_dropouts'] = _music_dropouts(m, plan, F, fps, pace)
     m['effects'] = _effects(plan, F, N)
     m['cover_frame'] = min(D - 1, max(0, F(plan.get('cover_t'), min(2.0, duration_s / 3))))
+    # Who chose the cover frame: the plan's cover_t ('plan'), the owner in the studio ('owner'), or nobody yet
+    # ('auto': assembly picks the strongest reaction frame from the render telemetry).
+    m['cover_source'] = 'plan' if plan.get('cover_t') is not None else 'auto'
 
     m['beats'] = derive_beats(m, plan.get('beats') or [])
     return m
+
+
+def hook_overlay_window(hook, D, F, fps):
+    """Frames [start, end) of the on-screen hook text: the hook's own window, at least HOOK_OVERLAY_MIN_S of
+    finished video (a shorter band cannot be read) and never past HOOK_OVERLAY_MAX_STORY_S of story time or the
+    end of the video. The band is planned whether or not it is switched on, so the editor can show it."""
+    end = min(hook['end_frame'], F(S.HOOK_OVERLAY_MAX_STORY_S))
+    end = max(end, int(round(S.HOOK_OVERLAY_MIN_S * fps)))
+    return {'start_frame': 0, 'end_frame': max(1, min(D, end))}
 
 
 def plan_style(plan):

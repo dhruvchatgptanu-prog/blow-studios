@@ -13,7 +13,8 @@ def run_all(m, solved, telemetry_paths, line_audio, assembly, prefs, video_id='l
     tech = technical.run(ck, m, final, prefs, assembly, dialog_wav=assembly['mix']['paths']['dialog'])
     tele = motion.load_telemetry(telemetry_paths)
     envs = motion.dialog_envelopes(m, line_audio)
-    motion.run(ck, m, solved, tele, prefs, assembly['joined'], envs)
+    # Pixel checks on the characters use the picture before the hook band was drawn on it.
+    motion.run(ck, m, solved, tele, prefs, assembly.get('joined_clean') or assembly['joined'], envs)
     asr = None
     if allow_paid:
         try:
