@@ -570,7 +570,11 @@ def build_set(lay):
         s = p.get('scale', 1.0)
         ob.scale = (s, s, s)
         ob['blox_set'] = p['kind']
-    bpy.context.scene.render.film_transparent = False
+    # A layout marked 'transparent' (stills composited by the host, e.g. the channel kit) keeps the sky for
+    # lighting but leaves the background alpha empty; production renders always write an opaque RGB frame.
+    transparent = bool(lay.get('transparent'))
+    bpy.context.scene.render.film_transparent = transparent
+    bpy.context.scene.render.image_settings.color_mode = 'RGBA' if transparent else 'RGB'
     return {'pieces': len(lay.get('pieces', [])), 'meshes': len(meshes)}
 
 

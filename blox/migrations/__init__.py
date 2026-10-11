@@ -16,6 +16,7 @@ VERSIONS = [
     '0004_story_backlog',
     '0005_new_cast',
     '0006_measured_voices',
+    '0008_research_notes',
 ]
 
 
