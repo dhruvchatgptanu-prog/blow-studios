@@ -21,7 +21,7 @@ from ..manifest import compile as C, director, schema as S, validate as V
 from ..research import service as research, transcripts, youtube_api as Y
 from ..timeutil import fmt, slot_times
 from ..util import Blocked, now
-from ..voice import piper as piper_mod
+from ..voice import piper as piper_mod, voicecfg
 from ..youtube import oauth
 from . import security
 from .assets import register as register_assets
@@ -48,6 +48,8 @@ def create_app():
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=proxies, x_proto=proxies, x_host=proxies)
     app.before_request(security.protect)
     app.after_request(security.headers)
+    from .voicebase import bp as voicebase_bp
+    app.register_blueprint(voicebase_bp)
 
     @app.errorhandler(Exception)
     def error(e):
@@ -116,9 +118,14 @@ def create_app():
             ok = piper.installed(p['production'].get('piper_model', piper.DEFAULT_MODEL))
             return {'ok': ok, 'label': 'Free voices (Piper) installed',
                     'detail': None if ok else 'run: python -m blox.cli install-voice'}
+        if prov == 'kokoro':
+            from ..voice import kokoro
+            ok = kokoro.installed(p['production'].get('kokoro_model', kokoro.DEFAULT_MODEL)) and kokoro.engine_available()
+            return {'ok': ok, 'label': 'Free voices (Kokoro) installed',
+                    'detail': None if ok else 'run: python -m blox.cli install-voice --engine kokoro'}
         if prov == 'local_test':
             return {'ok': False, 'label': 'Natural voices', 'detail': 'the local test voice cannot be published'}
-        key = 'OPENAI_API_KEY' if prov == 'openai' else 'ELEVENLABS_API_KEY'
+        key = {'openai': 'OPENAI_API_KEY', 'speechify': 'SPEECHIFY_API_KEY'}.get(prov, 'ELEVENLABS_API_KEY')
         return {'ok': vault.configured(key), 'label': f'Voices ({prov})'}
 
     def readiness():
@@ -738,6 +745,7 @@ def create_app():
                        'piper_speaker': _speaker(voice.get('piper_speaker')),
                        'rights_note': str(voice.get('rights_note', ''))[:300]}
         clean_voice.update(_delivery(voice))
+        clean_voice.update(voicecfg.clean(voice))  # engine override, Kokoro/Speechify voice, target profile
         if voice.get('casting_note'):
             clean_voice['casting_note'] = str(voice['casting_note'])[:400]
         # A measured speaking rate belongs to the speaker and length scale it was measured with: it is kept

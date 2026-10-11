@@ -134,6 +134,9 @@ DEFAULTS = {
         # piper: free offline voices (no account). openai / elevenlabs: paid, more expressive.
         'tts_provider': 'piper',
         'piper_model': 'en-us-libritts-high',
+        # kokoro: second free offline engine; speechify: paid, the owner's key, default OFF (never selected here).
+        'kokoro_model': 'kokoro-v1.0',
+        'speechify_model': 'simba-english',
         'tts_model': 'gpt-4o-mini-tts',
         'elevenlabs_model': 'eleven_multilingual_v2',
         'runway_model': 'gen4.5',
@@ -192,6 +195,7 @@ DEFAULTS = {
             'openai_asr_per_min': 0.006,
             'openai_vision_per_image': 0.002,
             'elevenlabs_per_kchar': 0.20,
+            'speechify_per_kchar': 0.03,
             'runway_per_second': 0.12,
             'local_render_per_min': 0.0,
         },
@@ -206,7 +210,7 @@ DEFAULTS = {
 }
 
 RENDERERS = {'blender', 'runway', 'clips'}
-TTS_PROVIDERS = {'openai', 'elevenlabs', 'piper', 'local_test'}
+TTS_PROVIDERS = {'openai', 'elevenlabs', 'piper', 'kokoro', 'speechify', 'local_test'}
 ENGINES = {'BLENDER_EEVEE', 'CYCLES', 'BLENDER_WORKBENCH'}
 
 
@@ -357,7 +361,8 @@ def validate(p):
     if pr['blender_engine'] not in ENGINES:
         raise ValueError('Unknown Blender engine')
     pr['blender_samples'] = integer(pr['blender_samples'], 1, 1024, 'samples')
-    for k in ('text_model', 'vision_model', 'asr_model', 'embedding_model', 'tts_model', 'elevenlabs_model', 'runway_model'):
+    for k in ('text_model', 'vision_model', 'asr_model', 'embedding_model', 'tts_model', 'elevenlabs_model', 'runway_model',
+              'kokoro_model', 'speechify_model'):
         if not re.fullmatch(r'[A-Za-z0-9._:\-]{1,64}', str(pr[k])):
             raise ValueError(f'Invalid model name for {k}')
     if pr.get('story_source', 'auto') not in ('auto', 'backlog', 'llm'):
