@@ -74,7 +74,7 @@ def plan_schema(cast_ids, character_ids):
         'title': STR, 'logline': STR, 'duration_s': N,
         'story': obj({'premise': STR, 'conflict': STR, 'stakes': STR, 'reveal': STR, 'ending': STR,
                       'ending_type': enum(ENDINGS)}),
-        'hook': obj({'text': STR, 'question': STR, 't_end': N}),
+        'hook': obj({'text': STR, 'question': STR, 't_end': N, 'on_screen': {'type': 'boolean'}}),
         'payoff': obj({'text': STR, 't_start': N}),
         'setting': obj({'preset': enum(S.SETTING_PRESETS), 'time_of_day': enum(S.TIME_OF_DAY),
                         'lighting': enum(S.LIGHTING), 'description': STR,
@@ -115,7 +115,7 @@ def plan_schema(cast_ids, character_ids):
         'effects': arr(obj({'type': enum(S.EFFECTS), 't': N, 'frames': NN, 'strength': NN})),
         'style': obj({'expression_snap': enum(S.EXPRESSION_SNAP), 'whoosh_on_cuts': {'type': 'boolean'},
                       'music_dropout': {'type': 'boolean'}}),
-        'cover_t': N,
+        'cover_t': NN,
         'metadata': obj({'title': STR, 'description': STR, 'tags': arr(STR)}),
     })
 
@@ -256,6 +256,12 @@ def plan_rules(prefs):
         'Head yaw/pitch/roll are degrees relative to the torso; +yaw turns toward the character\'s left, +pitch looks up.',
         'Give one beat per second (start_s = 0, 1, 2, ...) with a narrative purpose; open with a hook beat at 0 s and '
         'end with payoff/button beats in the final quarter. The payoff must resolve the hook question.',
+        f'hook.text is the on-screen hook: at most {S.HOOK_TEXT_MAX_WORDS} punchy words (a claim, a dare or a '
+        f'stake, e.g. "Two doors. One is lava."), shown big in a top band over the opening (until hook.t_end, at '
+        f'most {S.HOOK_OVERLAY_MAX_STORY_S:g} s of story) and on the cover image; the captions and the faces stay '
+        'clear of it automatically. Write it as text a viewer reads, not a description of the scene; set '
+        'hook.on_screen false only when the opening image must carry no text. cover_t is optional: leave it null '
+        'and the cover is the biggest reaction face in the hook or the payoff.',
         'Shots must cover the timeline exactly with no gaps or overlaps; shots are at least 1.2 s.',
         'Every character needs a performance key at t=0 with position and facing. Change position only with a walk, '
         'run or jump action whose "to" is the new position. Use turn with to_facing to change facing.',

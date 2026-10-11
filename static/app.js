@@ -269,7 +269,13 @@ function opts(list, cur, allowEmpty) { return (allowEmpty ? '<option value="">(u
 function renderEditor(d) {
   if (!S.plan) { $('#tab').innerHTML = empty('This video has no editable plan (it was imported or is still being written). Duplicate a demo video to experiment.'); return; }
   const V = S.vocab, P = S.plan, cast = (P.cast || []).map(c => c.id);
+  const hk = P.hook || {}, hookMax = V.HOOK_TEXT_MAX_WORDS || 6;
+  const hookMode = hk.on_screen === true ? 'on' : hk.on_screen === false ? 'off' : '';
   $('#tab').innerHTML = `<div class="grid g2"><div>
+    <h3>Hook</h3><form id="hook-form"><label>Hook text (at most ${hookMax} words; shown big in the top band over the opening and on the cover)<input name="text" maxlength="120" value="${esc(hk.text || '')}"></label>
+    <div class="row"><label>Question it raises<input name="question" value="${esc(hk.question || '')}"></label><label>Ends (s, story time)<input name="t_end" type="number" step="0.1" min="0.5" value="${hk.t_end === undefined ? 3 : hk.t_end}"></label>
+    <label>On screen<select name="on_screen"><option value="" ${hookMode === '' ? 'selected' : ''}>Studio default (Settings)</option><option value="on" ${hookMode === 'on' ? 'selected' : ''}>Shown</option><option value="off" ${hookMode === 'off' ? 'selected' : ''}>Hidden</option></select></label></div>
+    <p class="small muted" id="hook-words"></p></form>
     <h3>Pose key (performance)</h3><form id="key-form"><div class="row"><label>Character<select name="character">${opts(cast)}</select></label><label>Time (s)<input name="t" type="number" step="0.033" value="0"></label></div>
     <div class="row"><label>Expression<select name="expression">${opts(V.EXPRESSIONS, '', true)}</select></label><label>Posture<select name="posture">${opts(V.POSTURES, '', true)}</select></label></div>
     <div class="row"><label>Left arm<select name="arm_left">${opts(V.ARM_POSES, '', true)}</select></label><label>Right arm<select name="arm_right">${opts(V.ARM_POSES, '', true)}</select></label></div>
@@ -313,6 +319,11 @@ function renderEditor(d) {
     toast('Action added'); renderEditor(d);
   });
   $$('[data-line]').forEach(el => el.addEventListener('change', () => { const l = P.lines[Number(el.dataset.line)]; l[el.dataset.k] = el.dataset.k === 't' ? Number(el.value) : el.value; }));
+  const hookForm = $('#hook-form');
+  const hookWords = () => { const n = (hookForm.text.value.trim().match(/\S+/g) || []).length; const el = $('#hook-words'); el.textContent = `${n} of ${hookMax} words` + (n > hookMax ? ' — too long for the screen' : ''); el.className = 'small ' + (n > hookMax ? 'error' : 'muted'); };
+  bind('#hook-form', 'submit', e => e.preventDefault());
+  bind('#hook-form', 'input', () => { P.hook = P.hook || {}; P.hook.text = hookForm.text.value; P.hook.question = hookForm.question.value; P.hook.t_end = Number(hookForm.t_end.value); const v = hookForm.on_screen.value; if (v === '') delete P.hook.on_screen; else P.hook.on_screen = v === 'on'; hookWords(); });
+  hookWords();
   bind('#apply-json', 'click', () => { S.plan = JSON.parse($('#plan-json').value); toast('JSON applied'); renderEditor(d); });
   const showVal = r => { const v = r.validation; $('#val-out').innerHTML = `<p>${v.ok ? '<span class="good">Valid</span>' : `<span class="error">${v.errors.length} error(s)</span>`} · ${v.warnings.length} warning(s)</p>${v.errors.map(x => `<p class="small error">${esc(x.message)}${x.fix ? ' — ' + esc(x.fix) : ''}</p>`).join('')}${v.warnings.map(x => `<p class="small warn">${esc(x.message)}</p>`).join('')}`; };
   bind('#validate', 'click', async () => showVal(await api('validate-plan', 'POST', {plan: S.plan})));
@@ -529,6 +540,7 @@ async function settings() {
     <div class="row">${inp('production', 'text_model', pr.text_model)}${inp('production', 'vision_model', pr.vision_model)}${inp('production', 'tts_model', pr.tts_model)}${inp('production', 'asr_model', pr.asr_model)}${inp('production', 'runway_model', pr.runway_model)}</div>
     <div class="row">${sel('production', 'music', pr.music, [['generated', 'Generated original music'], ['asset', 'My licensed track'], ['none', 'No music']])}${inp('production', 'music_asset', pr.music_asset)}${inp('production', 'music_gain_db', pr.music_gain_db, 'number')}${inp('production', 'duck_db', pr.duck_db, 'number')}</div>
     <label class="check"><input type="checkbox" data-sec="production" data-key="captions" ${pr.captions ? 'checked' : ''}> Burn in captions</label>
+    <label class="check"><input type="checkbox" data-sec="production" data-key="hook_text_overlay" ${pr.hook_text_overlay ? 'checked' : ''}> Hook text on screen (the plan's hook text, big, in a top band over the opening and on the cover; a plan may turn it off)</label>
     <label class="check"><input type="checkbox" data-sec="production" data-key="depth_of_field" ${pr.depth_of_field ? 'checked' : ''}> Soft background behind faces (depth of field, about 25% slower renders)</label>
     ${sel('production', 'story_source', pr.story_source || 'auto', [['auto', 'Automatic: LLM API if connected, otherwise the story backlog'], ['backlog', 'Story backlog only (no AI API cost)'], ['llm', 'LLM API only (paid)']])}
     <label class="check"><input type="checkbox" data-sec="production" data-key="allow_template_stories" ${pr.allow_template_stories ? 'checked' : ''}> Allow offline template stories (dry runs)</label>

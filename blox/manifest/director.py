@@ -229,6 +229,9 @@ def script(m, character_names=None):
         f'{m["duration_frames"] / fps:.2f} s · {m["duration_frames"]} frames @ {fps} fps · {m["width"]}×{m["height"]}',
         f'Logline: {m["logline"]}',
         f'Hook (ends {tc(m["hook"]["end_frame"], fps)}): {m["hook"]["text"]}  Question: {m["hook"]["question"]}',
+        (f'On screen {tc(0, fps)}–{tc(m["hook"]["overlay"]["end_frame"], fps)}: "{m["hook"]["text"]}" in the top '
+         f'band (big caption style, pops in, fades out; also on the cover)'
+         if m['hook'].get('on_screen') and m['hook'].get('overlay') else 'On screen: no hook text (hook.on_screen off)'),
         f'Payoff (from {tc(m["payoff"]["start_frame"], fps)}): {m["payoff"]["text"]}',
         'Coordinates: ' + m['coordinate_system']['world'],
         'Facing: ' + m['coordinate_system']['facing'],

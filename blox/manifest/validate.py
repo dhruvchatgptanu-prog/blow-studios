@@ -614,9 +614,15 @@ def _captions(r, m, prefs):
     if not prefs:
         return
     pr = prefs['production']
+    from ..captions_layout import fits, hook_fits
+    hk = m['hook']
+    if hk.get('on_screen') and hk['text']:
+        ok, info = hook_fits(hk['text'], m['width'], m['height'], pr)
+        if not ok:
+            r.err('hook_text_fit', f'The on-screen hook text "{hk["text"]}" does not fit the top band ({info})',
+                  frames=(0, hk['overlay']['end_frame']), fix='Shorten hook.text or use shorter words')
     if not pr.get('captions', True):
         return
-    from ..captions_layout import fits
     for c in m['captions']:
         ok, info = fits(c['text'], m['width'], m['height'], pr)
         if not ok:
@@ -650,6 +656,12 @@ def _story(r, m):
         r.err('hook', 'No hook beat in the first three seconds', fix='Open with the hook')
     if not m['hook']['text']:
         r.err('hook', 'The hook is not described')
+    elif m['hook'].get('on_screen'):
+        n = len(words(m['hook']['text']))
+        if n > S.HOOK_TEXT_MAX_WORDS:
+            r.err('hook_text_long', f'The on-screen hook text has {n} words; at most {S.HOOK_TEXT_MAX_WORDS} read '
+                                    f'in the opening band', frames=(0, m['hook']['overlay']['end_frame']),
+                  fix=f'Shorten hook.text to {S.HOOK_TEXT_MAX_WORDS} words or fewer, or set hook.on_screen false')
     payoffs = [b for b in m['beats'] if b['purpose'] in ('payoff', 'button')]
     if not payoffs:
         r.err('payoff', 'No payoff beat; the ending must pay off the hook')

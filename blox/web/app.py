@@ -391,6 +391,7 @@ def create_app():
             if not 0 <= f < m['duration_frames']:
                 raise ValueError('Frame outside the video')
             m['cover_frame'] = f
+            m['cover_source'] = 'owner'   # the owner's choice beats the automatic reaction-frame pick
             d.execute('UPDATE manifests SET body=? WHERE id=?', (json.dumps(m), v['manifest_id']))
             if v['render_id']:
                 jobs.enqueue('video.assemble', {'manifest_id': v['manifest_id']}, video_id=vid,
@@ -852,7 +853,7 @@ def create_app():
         return jsonify(schema={k: getattr(S, k) for k in (
             'PURPOSES', 'SETTING_PRESETS', 'TIME_OF_DAY', 'LIGHTING', 'PROP_TYPES', 'MOUTH_SHAPES', 'ARM_POSES',
             'POSTURES', 'STANCES', 'WEIGHTS', 'ACTIONS', 'FRAMINGS', 'CAMERA_ANGLES', 'CAMERA_SIDES', 'CAMERA_MOVES',
-            'EASES', 'TRANSITIONS', 'EMOTIONS', 'PACES', 'VOLUMES', 'SFX_CUES', 'MUSIC_CUES')} |
+            'EASES', 'TRANSITIONS', 'EMOTIONS', 'PACES', 'VOLUMES', 'SFX_CUES', 'MUSIC_CUES', 'HOOK_TEXT_MAX_WORDS')} |
             {'EXPRESSIONS': list(S.EXPRESSIONS), 'COORDINATE_SYSTEM': S.COORDINATE_SYSTEM})
 
     register_assets(app)
