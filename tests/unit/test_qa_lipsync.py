@@ -59,3 +59,16 @@ def test_hand_on_chest_is_not_occlusion():
     assert motion._hand_over_mouth(rec, 9 / 16) is True
     rec['palm2d_l'] = [0.5, 0.4, 1.3]  # behind the head
     assert motion._hand_over_mouth(rec, 9 / 16) is False
+
+
+def test_glasses_frames_above_the_mouth_do_not_swamp_the_signal():
+    # Dark eyewear bars sit just above the mouth and bob with the head; the mouth box must exclude them.
+    env = np.clip(np.sin(np.linspace(0, 6 * np.pi, N)) ** 2, 0, 1)
+    m, recs, gray, _ = scene(env)
+    for f in range(N + 5):
+        bob = int(3 * np.sin(f / 2.0))
+        gray[f, 70 + bob:76 + bob, 30:78] = 0.08  # glasses bottom edge, 20-26 px above the mouth centre (96)
+    ck = Checks(30)
+    motion._lipsync(ck, m, 'hero', recs, gray, {'l1': env})
+    c = ck.items[0]
+    assert c['status'] == 'pass' and c['evidence']['pixel_mouth_voice_correlation'] > 0.6

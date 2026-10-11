@@ -94,6 +94,7 @@ def run(ck, m, solved, tele, prefs, joined_path, dialog_by_line):
         _lipsync(ck, m, cid, recs, gray, dialog_by_line)
     _camera(ck, m, tele)
     _sightlines(ck, m, tele, solved)
+    _face_framing(ck, m, tele)
     _props(ck, m, tele, solved)
     _identity(ck, m, tele, joined_path)
 
@@ -417,8 +418,11 @@ def _lipsync(ck, m, cid, recs, gray, dialog_by_line):
                     opening.append(np.nan)
                     continue
                 if r and on_screen(r) and r['face_dot'] > 0.2:
-                    hw = max(0.012, r['mouth_width_px'] / max(1, m['width']) * 0.75)
-                    crop = _crop(gray, f, r['mouth2d'][0], r['mouth2d'][1], hw, hw * 0.8)
+                    # A tight box around the mouth itself: the old 0.8-tall box reached up to the glasses
+                    # frames and the pupils, whose dark pixels drifted in and out with head motion and
+                    # swamped the mouth signal on darker skin.
+                    hw = max(0.012, r['mouth_width_px'] / max(1, m['width']) * 0.7)
+                    crop = _crop(gray, f, r['mouth2d'][0], r['mouth2d'][1] + hw * 0.12, hw, hw * 0.5)
                 if crop is None or crop.size < 30:
                     opening.append(np.nan)
                     continue
@@ -541,6 +545,41 @@ def _camera(ck, m, tele):
            frames=(jumps[0]['frame'] - 1, jumps[0]['frame']) if jumps else None,
            target={'kind': 'shot', 'id': jumps[0]['shot']} if jumps else None,
            repair={'action': 're_render_shot', 'shot': jumps[0]['shot'], 'params': {'camera_smooth': True}} if jumps else None)
+
+
+def _face_framing(ck, m, tele):
+    """The shot subject's face must actually be in frame and turned toward the camera for most of the shot.
+
+    Found in a real render: an extreme close-up on a character looking at someone else showed only a cheek.
+    Occlusion checks cannot see that, because nothing is in the way.
+    """
+    for s in m['shots']:
+        subj = s['camera']['subject']
+        frames = [f for f in range(s['start_frame'], s['end_frame']) if tele.get(f)]
+        if not frames or subj not in tele[frames[0]]['characters']:
+            continue
+        good, away, off = 0, 0, 0
+        for f in frames:
+            r = tele[f]['characters'].get(subj)
+            if not r:
+                off += 1
+                continue
+            fx, fy = r['face2d'][0], r['face2d'][1]
+            in_frame = r.get('in_front_of_camera', True) and 0.05 <= fx <= 0.95 and 0.05 <= fy <= 0.9
+            if not in_frame:
+                off += 1
+            elif r['face_dot'] < 0.3:
+                away += 1
+            else:
+                good += 1
+        ok = good >= 0.6 * len(frames)
+        ev = {'subject': subj, 'frames': len(frames), 'face_in_frame_and_toward_camera': good,
+              'face_turned_away': away, 'face_off_screen': off}
+        ck.add(f'face_framing:{s["id"]}', f'Shot {s["id"]}: {subj}\'s face is in frame and toward the camera', 'visual',
+               'pass' if ok else 'fail', 'major', ev, 0.9, 'telemetry',
+               frames=(s['start_frame'], s['end_frame']) if not ok else None, target={'kind': 'shot', 'id': s['id']},
+               repair={'action': 're_render_shot', 'shot': s['id'],
+                       'params': {'face_camera': subj, 'camera_wider': True}} if not ok else None)
 
 
 def _sightlines(ck, m, tele, solved):

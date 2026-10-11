@@ -1973,6 +1973,24 @@ def solve_camera(m, chars, n, repair=None, set_layout=None):
             if off:
                 for fr in frames:
                     fr['occlusion_avoided_deg'] = off
+        # A tight framing on a face that is turned toward someone else shows a cheek (found in a real
+        # render). For close-ups, swing to the side the subject looks toward when the unswung view is poor.
+        tight = {cam['framing_start'], cam['framing_end']} & {'close_up', 'extreme_close_up'}
+        if tight and subj in chars and not blocked(frames):
+            score = _facing_camera_score(frames, chars, subj, f0)
+            if score < 0.5:
+                best = (score + 0.15, None, frames)
+                for off2 in (35, -35, 55, -55, 80, -80, 110, -110, 140, -140):
+                    trial = frames_at(float(off2))
+                    if blocked(trial):
+                        continue
+                    sc2 = _facing_camera_score(trial, chars, subj, f0)
+                    if sc2 > best[0]:
+                        best = (sc2, off2, trial)
+                if best[1] is not None:
+                    frames = best[2]
+                    for fr in frames:
+                        fr['face_turned_deg'] = best[1]
         for i, fr in enumerate(frames):
             out[f0 + i] = fr
     for f in range(n):
