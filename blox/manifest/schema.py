@@ -27,6 +27,10 @@ SETTING_PRESETS = {
     'classroom': 'Block-style classroom with desks and a board',
     'night_forest': 'Blocky trees at night, moonlight and a campfire',
     'bedroom': 'Cosy block bedroom with bed, desk and window',
+    'home': 'Cosy block family home: living room with sofa and screen, open hallway with stairs and front door, '
+            'kitchen corner through an opening (family and sibling skits)',
+    'park': 'City park: paved plaza, paths, a fountain, benches, lamp posts, trees, a playground corner, houses '
+            'beyond the fence (outdoor hangouts)',
     'studio': 'Neutral gradient stage (tests and character turnarounds)',
 }
 TIME_OF_DAY = ['morning', 'noon', 'sunset', 'night']
