@@ -52,8 +52,9 @@ DEFAULTS = {
         'max_in_production': 3,
     },
     'publishing': {
-        'made_for_kids': None,
-        'synthetic_disclosure': None,
+        # Owner's decision (2026-10-12): a general audience (comments on) and altered/synthetic content disclosed.
+        'made_for_kids': False,
+        'synthetic_disclosure': True,
         'category_id': '20',
         'default_language': 'en',
         'tags': ['roblox', 'animation', 'shorts', 'obby', 'story'],

@@ -304,7 +304,11 @@ def test_bad_settings_rejected_cleanly(client):
 
 def test_approve_requires_disclosure_choices(client, db):
     from blox import videos
+    from blox import prefs as P
     vid = videos.create('t', 'manual', status='approved', d=db)
+    p = P.get(db)
+    p['publishing'].update(made_for_kids=None, synthetic_disclosure=None)  # the owner cleared the defaults
+    P.put(p, db)
     r = client.post(f'/api/videos/{vid}/approve', json={})
     assert r.status_code == 400 and 'audience' in r.get_json()['error'].lower()
     ready_to_publish(db)
