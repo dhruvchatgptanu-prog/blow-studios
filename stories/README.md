@@ -7,6 +7,7 @@ studio can produce without any AI API. Each file is a JSON list of plans in the 
 | File | Stories | Written by | Notes |
 |---|---|---|---|
 | `batch-2026-10-03-claude.json` | 12 (about one day at 12 per day) | Claude, in a chat session on 2026-10-03 | All pass the validator and the originality screen against each other and the demo story. Themes were informed only by broad patterns in research titles (twists, trades, rivalry, rescues); no specific video was used. |
+| `batch-2026-10-11-mainstream.json` | 12: 6 skits (29-30 s finished) and 6 first-person storytime pieces (46-53 s finished) | Claude, in a chat session on 2026-10-11 (two writer passes and a judge/editor pass) | The mainstream batch: conflict-sentence titles with one emoji, a spoken hook by 0.2 s, stakes by 5 s, a rival/judge/family turn, karma or warm endings with a callback or loop. Uses the full cast (Bloxy, Pip, Rook, Dot, Ms. Tally) across bedroom, classroom, town_street, night_forest, sky_obby and lava_obby. Written from the studio's own pattern research (style guide and direction brief: hook, pacing, structure and sound patterns only); no reference video's plot, lines, devices or looks were reused, no real brands, people or other games. Every plan validates with zero warnings at production pace 1.5 (voices 1.3x) and imports as ready. First story in the file is the recommended test video. |
 
 ## Import
 
