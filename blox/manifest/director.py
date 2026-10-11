@@ -18,7 +18,8 @@ MOUTH_TEXT = {
     'neutral': 'relaxes the mouth', 'smile': 'smiles', 'grin': 'breaks into a wide grin',
     'open_smile': 'smiles open-mouthed', 'frown': 'frowns', 'o': 'rounds the mouth into an "o"',
     'gasp': 'gasps', 'grimace': 'grimaces through clenched teeth', 'smirk': 'smirks to one side',
-    'pout': 'pouts', 'flat': 'sets the mouth in a flat line',
+    'pout': 'pouts', 'flat': 'sets the mouth in a flat line', 'scream': 'opens the mouth wide in a scream',
+    'wide_grin': 'grins from ear to ear', 'smirk_wide': 'smirks as wide as it goes', 'tiny': 'shrinks the mouth to a dot',
 }
 POSTURE_TEXT = {'upright': 'stands upright', 'slumped': 'slumps', 'crouch': 'drops into a crouch',
                 'ready': 'settles into a ready stance', 'proud': 'puffs up proudly'}
@@ -97,7 +98,7 @@ def describe_change(a, b, name, names):
     if b['eyes']['squint'] - a['eyes']['squint'] > 0.3:
         parts.append('squints')
     if a['mouth']['shape'] != b['mouth']['shape']:
-        m = MOUTH_TEXT[b['mouth']['shape']]
+        m = MOUTH_TEXT.get(b['mouth']['shape'], 'changes the mouth to ' + str(b['mouth']['shape']).replace('_', ' '))
         if b['mouth']['shape'] in ('o', 'gasp') and b['mouth']['open'] < 0.4:
             m = 'parts the mouth slightly'
         parts.append(m)

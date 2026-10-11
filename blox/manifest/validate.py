@@ -629,6 +629,8 @@ def _silhouettes(r, m, characters):
     seen = {}
     for c in m['cast']:
         b = characters.get(c.get('character_id')) or {}
+        if 'bible' in b and isinstance(b['bible'], dict):  # a character row from the database
+            b = b['bible']
         cos = b.get('costume') or {}
         key = (cos.get('hair') or 'bald', cos.get('hat'), cos.get('eyewear'))
         if key in seen:
