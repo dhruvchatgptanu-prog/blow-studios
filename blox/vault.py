@@ -18,6 +18,7 @@ KNOWN = {
     'OPENAI_API_KEY': 'OpenAI API key (scripts, vision review, TTS, transcription)',
     'RUNWAYML_API_SECRET': 'Runway API key (optional generative shots)',
     'ELEVENLABS_API_KEY': 'ElevenLabs API key (optional TTS with timestamps)',
+    'SPEECHIFY_API_KEY': 'Speechify API key (optional paid voices with word timing; off by default)',
     'YOUTUBE_API_KEY': 'YouTube Data API key (research of public videos)',
     'GOOGLE_CLIENT_ID': 'Google OAuth client ID',
     'GOOGLE_CLIENT_SECRET': 'Google OAuth client secret',

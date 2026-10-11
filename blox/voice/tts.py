@@ -9,6 +9,12 @@ Providers:
                timings, converted to word timings (``measured_provider``).
 * local_test - FFmpeg's built-in flite voices. Robotic. For pipeline tests
                only; QA blocks publishing a video that uses it.
+* piper      - free offline voices (blox.voice.piper); timing ``estimated``.
+* kokoro     - free offline voices (blox.voice.kokoro); the package returns no
+               timestamps, so timing is ``estimated``.
+* speechify  - paid, the owner's key; word speech marks -> ``measured_provider``.
+
+A character may override the studio's provider with ``voice.engine``.
 
 Voices are synthetic voices from the provider's catalogue or voices the owner
 has rights to; this module never clones a person's voice.
@@ -74,6 +80,9 @@ def estimate_cost(text, provider, prices, pace='normal'):
         return max(0.0005, minutes * prices['openai_tts_per_min'])
     if provider == 'elevenlabs':
         return max(0.0005, len(text) / 1000.0 * prices['elevenlabs_per_kchar'])
+    if provider == 'speechify':
+        from .speechify import estimate_cost as speechify_cost
+        return speechify_cost(text, prices)
     return 0.0
 
 
@@ -139,7 +148,7 @@ def post_filter(provider, voice, line):
     from .piper import voice_settings
     vs = voice_settings(voice)
     semitones, presence = vs.get('pitch_semitones', 0.0), 0.0
-    if provider == 'piper':
+    if provider in ('piper', 'kokoro'):
         extra, presence = PIPER_VOLUME_FX.get(line.get('volume'), (0.0, 0.0))
         semitones += extra
     parts = []
@@ -218,15 +227,12 @@ def estimated_words(text, samples):
 
 
 # ------------------------------------------------------------------ main entry
-def synthesize_line(line, character, prefs, work_dir, video_id, attempt=0, use_asr=None):
-    """Generate, clean and align one line. Returns a result dict.
-
-    character: {'name', 'voice': {...}} or None for the narrator.
-    """
-    pr = prefs['production']
-    provider = pr['tts_provider']
+def line_spec(line, character, pr, attempt=0):
+    """Everything that determines a line's raw audio: provider (the character's engine override or the studio's),
+    spoken text, voice settings and direction. Returns the spec, its hash and the raw file name."""
+    from .voicecfg import engine_for
     voice = (character or {}).get('voice') or {}
-    name = (character or {}).get('name', 'Narrator')
+    provider = engine_for(voice, pr['tts_provider'])
     say = spoken_text(line['text'], pr['pronunciations'])
     spec = {'p': provider, 'text': say, 'voice': voice, 'emotion': line['emotion'], 'pace': line['pace'],
             'volume': line['volume'], 'delivery': line.get('delivery', ''), 'model': pr['tts_model'],
@@ -235,20 +241,53 @@ def synthesize_line(line, character, prefs, work_dir, video_id, attempt=0, use_a
         spec['rate'] = line_rate(line)
     if line.get('kind') == 'narration':
         spec['kind'] = 'narration'
-    voice_meta = None
     if provider == 'piper':
         from . import piper
         spec['piper'] = [pr.get('piper_model', piper.DEFAULT_MODEL),
                          piper.speaker_for((character or {}).get('id'), voice)]
+    elif provider == 'kokoro':
+        from . import kokoro
+        spec['kokoro'] = [pr.get('kokoro_model', kokoro.DEFAULT_MODEL),
+                          kokoro.voice_for((character or {}).get('id'), voice), kokoro.speed_for(line, voice)]
+    elif provider == 'speechify':
+        from . import speechify
+        spec['speechify'] = [pr.get('speechify_model', speechify.DEFAULT_MODEL), voice.get('speechify_voice_id', '')]
     h = stable_hash(spec)
+    return {'provider': provider, 'say': say, 'voice': voice, 'spec': spec, 'hash': h,
+            'raw': f'{line["id"]}_{h}_raw' + ('.mp3' if provider == 'elevenlabs' else '.wav')}
+
+
+def synthesize_line(line, character, prefs, work_dir, video_id, attempt=0, use_asr=None):
+    """Generate, clean and align one line. Returns a result dict.
+
+    character: {'name', 'voice': {...}} or None for the narrator.
+    """
+    pr = prefs['production']
+    ls = line_spec(line, character, pr, attempt)
+    provider, say, voice, spec, h = ls['provider'], ls['say'], ls['voice'], ls['spec'], ls['hash']
+    name = (character or {}).get('name', 'Narrator')
+    voice_meta = None
     os.makedirs(work_dir, exist_ok=True)
-    raw = os.path.join(work_dir, f'{line["id"]}_{h}_raw' + ('.mp3' if provider == 'elevenlabs' else '.wav'))
-    char_al = None
+    raw = os.path.join(work_dir, ls['raw'])
+    char_al, prov_words = None, None
     if provider == 'local_test':
         _local_tts(say, voice.get('local_test_voice', 'kal16'), raw)
     elif provider == 'piper':
+        from . import piper
         voice_meta = piper.synthesize(say, raw, spec['piper'][1], line, model=spec['piper'][0], voice=voice)
+    elif provider == 'kokoro':
+        from . import kokoro
+        if os.path.exists(raw) and os.path.getsize(raw) > 2000:
+            # Written atomically by the runner for this exact spec (bake-off batches render ahead).
+            voice_meta = kokoro.plan(say, raw, spec['kokoro'][1], line, model=spec['kokoro'][0], voice=voice)[1]
+        else:
+            voice_meta = kokoro.synthesize(say, raw, spec['kokoro'][1], line, model=spec['kokoro'][0], voice=voice)
+        prov_words = voice_meta.get('words')
     else:
+        if provider == 'speechify' and not vault.configured('SPEECHIFY_API_KEY'):
+            # Checked before the ledger: without the owner's key nothing is reserved, recorded or sent.
+            raise Blocked('Connect Speechify (API key on Connections) or choose another voice engine',
+                          state='needs_credentials')
         est = estimate_cost(say, provider, prefs['budget']['prices'], line['pace'])
         key = f'tts:{video_id}:{line["id"]}:{h}'
 
@@ -259,12 +298,16 @@ def synthesize_line(line, character, prefs, work_dir, video_id, attempt=0, use_a
                     raise Blocked(f'Unknown OpenAI voice {v!r} for {name}', state='needs_review')
                 return _openai_tts(say, v, instructions(line, name, voice), pr['tts_model'], raw,
                                    speed=line_rate(line))
+            if provider == 'speechify':
+                from . import speechify
+                return speechify.synthesize(say, voice.get('speechify_voice_id'), line, raw, spec['speechify'][0])
             return _elevenlabs_tts(say, voice.get('elevenlabs_voice_id'), line, pr['elevenlabs_model'], raw)
 
         res = paid.run(key, provider=provider, operation='tts', category='tts', estimate=est, fn=call,
                        video_id=video_id, summary={'line': line['id'], 'chars': len(say)},
                        recover=lambda: ({'path': raw} if os.path.exists(raw) and os.path.getsize(raw) > 1000 else None))
         char_al = (res or {}).get('char_alignment')
+        prov_words = (res or {}).get('words')
     fx = post_filter(provider, voice, line)
     src = raw
     if fx:
@@ -289,6 +332,12 @@ def synthesize_line(line, character, prefs, work_dir, video_id, attempt=0, use_a
     if char_al:
         words = [dict(w, start=max(0.0, w['start'] - lead), end=max(0.0, w['end'] - lead))
                  for w in words_from_chars(say, char_al)]
+        kind = 'measured_provider'
+    elif prov_words:
+        # Provider word timestamps (Speechify speech marks), shifted by the trimmed lead-in and kept within the
+        # cleaned line, so the active caption word follows the real timing.
+        words = [{'word': w['word'], 'start': round(min(duration, max(0.0, float(w['start']) - lead)), 3),
+                  'end': round(min(duration, max(0.0, float(w['end']) - lead)), 3)} for w in prov_words]
         kind = 'measured_provider'
     want_asr = use_asr if use_asr is not None else (provider == 'openai')
     if words is None and want_asr and vault.configured('OPENAI_API_KEY') and provider != 'local_test':

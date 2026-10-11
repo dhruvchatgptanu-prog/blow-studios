@@ -410,6 +410,7 @@ async function characters() {
     <label>Voice direction<input name="openai_instructions" value="${esc(c.voice.openai_instructions || '')}"></label>
     <label>Voice rights note<input name="rights_note" value="${esc(c.voice.rights_note || '')}" placeholder="e.g. provider catalogue voice"></label>
     <div class="actions"><button class="primary">Save</button><button type="button" data-preview="${esc(id)}">Render preview</button></div><div id="pv-${esc(id)}"></div></form></div>`).join('')}</div>`);
+  if (window.VoiceBase) VoiceBase.mount(r);  // engine choice, reference profiles, bake-off (static/voicebase.js)
   const DELIVERY = ['pitch_semitones', 'piper_length_scale', 'piper_noise_scale', 'piper_noise_w', 'narration_length_scale'];
   const delivery = f => { const v = {pitch_formants: f.pitch_formants.value}; DELIVERY.forEach(k => { if (f[k].value !== '') v[k] = Number(f[k].value); }); return v; };
   bind('form[data-char]', 'submit', async e => {
@@ -423,7 +424,8 @@ async function characters() {
         visual_rules: f.rules.value.split('\n').filter(Boolean)},
       voice: Object.assign({piper_speaker: f.piper_speaker.value === '' ? null : Number(f.piper_speaker.value),
         openai_voice: f.openai_voice.value, elevenlabs_voice_id: f.elevenlabs_voice_id.value, local_test_voice: f.local_test_voice.value,
-        openai_instructions: f.openai_instructions.value, rights_note: f.rights_note.value, casting_note: c.voice.casting_note}, delivery(f))});
+        openai_instructions: f.openai_instructions.value, rights_note: f.rights_note.value, casting_note: c.voice.casting_note}, delivery(f),
+        window.VoiceBase ? VoiceBase.fields(f) : {})});
     toast('Character saved');
   });
   bind('[data-hear]', 'click', async e => {

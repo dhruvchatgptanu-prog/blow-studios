@@ -218,7 +218,12 @@ def cmd_hash_password(a):
 def cmd_install_voice(a):
     """Download and verify a free Piper voice model (checksum-pinned, from the Piper releases on GitHub)."""
     config.ensure_dirs()
-    from .voice import piper
+    from .voice import kokoro, piper
+    if getattr(a, 'engine', 'piper') == 'kokoro':
+        path = kokoro.install(a.model if a.model in kokoro.MODELS else kokoro.DEFAULT_MODEL)
+        print(json.dumps({'engine': 'kokoro', 'installed': str(path), 'license': kokoro.MODELS[kokoro.DEFAULT_MODEL]['license'],
+                          'package_available': kokoro.engine_available(), 'presets': kokoro.PRESETS}))
+        return
     path = piper.install(a.model)
     spec = piper.VOICES[a.model]
     print(json.dumps({'installed': str(path), 'license': spec['license'], 'dataset': spec['dataset'],
@@ -284,6 +289,7 @@ def main(argv=None):
     sub.add_parser('hash-password').set_defaults(fn=cmd_hash_password)
     s = sub.add_parser('install-voice')
     s.add_argument('--model', default='en-us-libritts-high')
+    s.add_argument('--engine', default='piper', choices=['piper', 'kokoro'])
     s.set_defaults(fn=cmd_install_voice)
     s = sub.add_parser('import-stories')
     s.add_argument('file')
