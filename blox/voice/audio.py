@@ -1,6 +1,7 @@
 """PCM helpers built on FFmpeg + numpy (decode, measure, trim, normalise, pitch-shift, write)."""
 import functools
 import json
+import math
 import re
 import wave
 
@@ -99,11 +100,22 @@ def loudnorm(src, dst, target=-16.0, tp=-1.5, lra=11.0, sr=SR, channels=1):
                         f'loudnorm=I={target}:TP={tp}:LRA={lra}:print_format=json', '-f', 'null', '-'], timeout=300)
     text = err.decode(errors='replace')
     j = json.loads(text[text.rfind('{'):text.rfind('}') + 1])
+    measured = {k: float(j[k]) for k in ('input_i', 'input_tp', 'input_lra', 'input_thresh', 'target_offset')}
+    if not all(math.isfinite(v) for v in measured.values()):
+        # Shorter than one 400 ms gating block (an interjection like "Heh."), or silent: R128 has no integrated
+        # loudness to work with, so apply a plain RMS gain toward the target and keep the peak under the ceiling.
+        a = decode(src)
+        rms = float(np.sqrt(np.mean(a ** 2) + 1e-12)) if len(a) else 0.0
+        gain_db = min(30.0, max(-30.0, target - db(rms))) if rms > 1e-5 else 0.0
+        media.run([config.FFMPEG_BIN, '-y', '-v', 'error', '-i', str(src), '-af',
+                   f'volume={gain_db:.2f}dB,alimiter=limit={10 ** (tp / 20):.4f}:level=false', '-ar', str(sr), '-ac',
+                   str(channels), str(dst)], timeout=300)
+        return {'input_i': db(rms) if rms > 1e-5 else -120.0, 'input_tp': peak_dbfs(a), 'short_clip': True}
     flt = (f'loudnorm=I={target}:TP={tp}:LRA={lra}:measured_I={j["input_i"]}:measured_TP={j["input_tp"]}:'
            f'measured_LRA={j["input_lra"]}:measured_thresh={j["input_thresh"]}:offset={j["target_offset"]}:linear=true')
     media.run([config.FFMPEG_BIN, '-y', '-v', 'error', '-i', str(src), '-af', flt, '-ar', str(sr), '-ac',
                str(channels), str(dst)], timeout=300)
-    return {'input_i': float(j['input_i']), 'input_tp': float(j['input_tp'])}
+    return {'input_i': measured['input_i'], 'input_tp': measured['input_tp']}
 
 
 def peak_dbfs(a):
