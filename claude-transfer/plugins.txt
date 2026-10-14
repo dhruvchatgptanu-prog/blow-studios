@@ -1,0 +1,26 @@
+# Plugins enabled in your claude.ai cloud sessions.
+# Format: plugin-name|where it came from on claude.ai
+abracadabrax-youtube-thumbnail-maker|anthropic-plugin-directory
+advisorppc|anthropic-plugin-directory
+ai-youtube-os|anthropic-plugin-directory
+aitopia|anthropic-plugin-directory
+arcmira|anthropic-plugin-directory
+aws-core|anthropic-plugin-directory
+clover|anthropic-plugin-directory
+helvabase|anthropic-plugin-directory
+lovable|anthropic-plugin-directory
+lovableseo-agent-plugin|anthropic-plugin-directory
+proofable-mcp|anthropic-plugin-directory
+tubealfred-youtube|anthropic-plugin-directory
+valet|anthropic-plugin-directory
+youtube-transcriber|anthropic-plugin-directory
+airtable|knowledge-work-plugins
+brightdata-plugin|knowledge-work-plugins
+carta-cap-table|knowledge-work-plugins
+carta-investors|knowledge-work-plugins
+cowork-plugin-management|knowledge-work-plugins
+datadog|knowledge-work-plugins
+product-tracking-skills|knowledge-work-plugins
+# Anthropic's public skill packs: docx, pdf, pptx, xlsx, skill-creator and more
+document-skills|anthropics/skills
+example-skills|anthropics/skills
