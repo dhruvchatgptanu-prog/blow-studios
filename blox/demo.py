@@ -1,0 +1,486 @@
+"""Built-in original cast and a hand-authored demo story.
+
+The demo plan below was written by hand for this repository to exercise the
+full pipeline without paid services. It is labelled ``source: hand_authored_demo``
+everywhere it appears and is not presented as AI output or as research-driven.
+"""
+import copy
+
+# How the free Piper voices were cast (2026-10). Nobody could listen, so LibriTTS speakers were auditioned by
+# measurement: every 6th of the 904 speakers read one test line, then 55 candidates read three more (narration,
+# a shout, a verdict) and the finalists ten more at production speed. Measured: median pitch (YIN), pitch spread
+# in semitones (liveliness), spectral centroid (brightness) and natural words/second. Picks are spaced on a pitch
+# ladder after the pitch shift (Pip ~98, Ms. Tally ~124, Bloxy ~143, Rook ~180, Dot ~276 Hz) and differ in spread,
+# brightness and pace, so each recurring character is recognisable by ear. Qualities only: no voice was chosen to
+# resemble any person or creator.
+CASTING = {
+    'ch_bloxy': 'Piper LibriTTS speaker 744: mid pitch (~143 Hz median at production speed), the liveliest '
+                'candidate in range (2.9 st spread), bright, crisp 3.7 w/s natural rate; confident storytime '
+                'narrator. About 5 w/s at speech rate 1.3, so narration is not sped up further (set '
+                'narration_length_scale below 1 to do so).',
+    'ch_pip': 'Piper LibriTTS speaker 288: the low end of the cast (~98 Hz), dark and dry; slightly slower (x1.04) '
+              'with less variation (0.6/0.7), the half-beat-late sidekick.',
+    'ch_rook': 'Piper LibriTTS speaker 456 +2 st (~160 -> ~180 Hz): higher and brighter than Bloxy, nasal-bright '
+               'timbre (centroid ~3.9 kHz), naturally slow 3.2 w/s drawl for brags; livelier variation (0.75/0.92).',
+    'ch_dot': 'Piper LibriTTS speaker 408 +4 st with shifted formants (~219 -> ~276 Hz): light and lively '
+              '(2.9 st spread); the shifted formants read as a smaller, younger speaker. Livelier variation '
+              '(0.75/0.9).',
+    'ch_tally': 'Piper LibriTTS speaker 504 -2 st (~139 -> ~124 Hz), formants preserved: the steadiest candidate '
+                'measured (1.1 st spread), between Pip and Bloxy on the pitch ladder; slower (x1.1) with subdued '
+                'variation (0.5/0.6) for deadpan verdicts.',
+}
+# Measured speaking rates (voice 'measured_wps', 'line_overhead_s' at 'measured_rate'): 16 varied lines (1-23
+# words, mixed punctuation and emotions) per character were synthesised through the full line chain
+# (tts.synthesize_line: Piper at speech rate 1.3, pitch shift, trim, gap squeeze, loudness) and a line's length
+# fitted as overhead + words / wps on the pace-normal lines (2026-10-11). Real rates ran 4.3-5.3 words/s
+# against the 2.7 w/s planning default; the fit's per-line spread (words vary in length) is covered by the
+# estimate's margin (schema.MEASURED_MARGIN) and the line-fitting tempo allowance. Measured for these speakers
+# and length scales: migration m0006 fills them only into rows that still use them.
+
+CHARACTERS = [
+    {
+        'id': 'ch_bloxy',
+        'name': 'Bloxy',
+        'bible': {
+            'summary': 'Over-confident but kind-hearted obby runner who always takes the hard way first.',
+            'personality': 'Brave, impulsive, quick to panic, quicker to laugh at themself.',
+            'scale': 1.0,
+            'palette': {'skin': '#F2C14E', 'top': '#18A999', 'top_trim': '#F4F1DE', 'pants': '#23325C',
+                        'shoes': '#E2504C', 'hair': '#5B3A21', 'eyes': '#16161D', 'brows': '#3B2615',
+                        'mouth': '#5B1A1A', 'badge': '#FFD23F'},
+            'costume': {'top': 'hoodie', 'hair': 'messy_block', 'hat': None, 'badge': 'star'},
+            'visual_rules': ['Teal hoodie with cream drawstring trim is always worn',
+                             'Yellow star badge on the left chest', 'Messy brown block hair, no hat',
+                             'Navy trousers and red trainers'],
+        },
+        'voice': {'openai_voice': 'verse',
+                  'openai_instructions': 'Young, bright, energetic adventurer. Expressive, natural, not cartoonish.',
+                  'elevenlabs_voice_id': '', 'local_test_voice': 'kal16', 'pitch_semitones': 0,
+                  'piper_speaker': 744, 'piper_noise_scale': 0.72, 'piper_noise_w': 0.88,
+                  'measured_wps': 5.02, 'line_overhead_s': 0.07, 'measured_rate': 1.3,
+                  'casting_note': CASTING['ch_bloxy'],
+                  'rights_note': 'Piper LibriTTS model (CC BY 4.0) / provider catalogue voices'},
+    },
+    {
+        'id': 'ch_pip',
+        'name': 'Pip',
+        'bible': {
+            'summary': 'Calm, slightly smug best friend who always knows the shortcut.',
+            'personality': 'Dry humour, loyal, enjoys Bloxy\'s chaos a little too much.',
+            'scale': 0.9,
+            'palette': {'skin': '#E9B48A', 'top': '#7B5CD6', 'top_trim': '#2E2A47', 'pants': '#3B7D4F',
+                        'shoes': '#F4F1DE', 'hair': '#1F1A17', 'eyes': '#16161D', 'brows': '#1F1A17',
+                        'mouth': '#5B1A1A', 'badge': '#FF8C42', 'hat': '#FF8C42'},
+            'costume': {'top': 'tee', 'hair': 'short_block', 'hat': 'cap', 'badge': None},
+            'visual_rules': ['Orange cap, brim forward', 'Purple T-shirt', 'Green trousers', 'Cream trainers'],
+        },
+        'voice': {'openai_voice': 'sage',
+                  'openai_instructions': 'Calm, dry, gently teasing friend. Natural conversational timing.',
+                  'elevenlabs_voice_id': '', 'local_test_voice': 'slt', 'pitch_semitones': 0,
+                  'piper_speaker': 288, 'piper_length_scale': 1.04, 'piper_noise_scale': 0.6, 'piper_noise_w': 0.7,
+                  'measured_wps': 5.49, 'line_overhead_s': 0.10, 'measured_rate': 1.3,
+                  'casting_note': CASTING['ch_pip'],
+                  'rights_note': 'Piper LibriTTS model (CC BY 4.0) / provider catalogue voices'},
+    },
+    {
+        'id': 'ch_rook',
+        'name': 'Rook',
+        'bible': {
+            'summary': 'Show-off rival from the next obby over who has to win everything, loudly. Vain and '
+                       'competitive but never cruel; secretly worried nobody would notice him if he stopped winning.',
+            'personality': 'Brags with a slow drawl, poses for cameras that are not there, sulks for a second when '
+                           'he loses, then turns out decent when it counts. Teases skills and plans, never looks. '
+                           'Redeemable: he helps in the end more often than he admits.',
+            'scale': 1.05,
+            'palette': {'skin': '#C68B59', 'top': '#E3B23C', 'top2': '#1B1B2F', 'top_trim': '#FFFFFF',
+                        'pants': '#1B1B2F', 'shoes': '#F4F1DE', 'hair': '#2B1D14', 'eyes': '#16161D',
+                        'brows': '#2B1D14', 'mouth': '#5B1A1A', 'badge': '#5BC0EB', 'accessory': '#E3B23C',
+                        'hat': '#1B1B2F'},
+            'costume': {'hair': 'spiky', 'hat': 'cap_backwards', 'eyewear': 'sunglasses', 'top': 'jacket',
+                        'tie': False, 'badge': 'diamond'},
+            # Brag moments swap the backwards cap for a gold crown (accessory colour).
+            'costume_variants': {'brag': {'hat': 'crown'}},
+            'visual_rules': ['Navy jacket open over a gold tee, white trim', 'Light-blue diamond badge on the jacket',
+                             'Spiky dark hair, black sunglasses always on',
+                             'Navy cap worn backwards; a gold crown replaces it only in brag moments',
+                             'Navy trousers and cream trainers', 'Slightly taller than Bloxy'],
+        },
+        'voice': {'openai_voice': 'ash',
+                  'openai_instructions': 'Cocky, bright show-off with a slight drawl on brags; whiny but harmless when '
+                                         'he loses. Playful, never mean.',
+                  'elevenlabs_voice_id': '', 'local_test_voice': 'rms', 'pitch_semitones': 2,
+                  'piper_speaker': 456, 'piper_noise_scale': 0.75, 'piper_noise_w': 0.92,
+                  'measured_wps': 4.58, 'line_overhead_s': 0.20, 'measured_rate': 1.3,
+                  'casting_note': CASTING['ch_rook'],
+                  'rights_note': 'Piper LibriTTS model (CC BY 4.0) / provider catalogue voices'},
+    },
+    {
+        'id': 'ch_dot',
+        'name': 'Dot',
+        'bible': {
+            'summary': "Pip's little sister: tiny, earnest and blunt, a genius builder who fixes in five minutes what "
+                       'the others broke in fifty.',
+            'personality': 'Says exactly what she thinks in one to six words, takes every plan literally, builds '
+                           'gadgets out of spare blocks and usually gets the last word. Proud of her brother, would '
+                           'never say so.',
+            'scale': 0.72,
+            'palette': {'skin': '#E9B48A', 'top': '#FF6F91', 'top_trim': '#FFD23F', 'pants': '#18A999',
+                        'shoes': '#F4F1DE', 'hair': '#1F1A17', 'eyes': '#16161D', 'brows': '#1F1A17',
+                        'mouth': '#5B1A1A', 'badge': '#FFD23F', 'accessory': '#FF6F91'},
+            'costume': {'hair': 'pigtails', 'hat': 'bow', 'eyewear': None, 'top': 'hoodie', 'tie': False,
+                        'badge': 'star'},
+            'visual_rules': ['Coral hoodie with yellow trim', 'Coral bow on top of black pigtails',
+                             'Yellow star badge', 'Teal trousers and cream trainers',
+                             'Smallest of the cast (about knee-to-shoulder of Bloxy)'],
+        },
+        'voice': {'openai_voice': 'coral',
+                  'openai_instructions': 'Small, earnest kid sister. Short, blunt, matter-of-fact lines; mischievous '
+                                         'when she lands the last word.',
+                  'elevenlabs_voice_id': '', 'local_test_voice': 'slt', 'pitch_semitones': 4,
+                  'pitch_formants': 'shift', 'piper_speaker': 408, 'piper_noise_scale': 0.75, 'piper_noise_w': 0.9,
+                  'measured_wps': 5.04, 'line_overhead_s': 0.14, 'measured_rate': 1.3,
+                  'casting_note': CASTING['ch_dot'],
+                  'rights_note': 'Piper LibriTTS model (CC BY 4.0) / provider catalogue voices'},
+    },
+    {
+        'id': 'ch_tally',
+        'name': 'Ms. Tally',
+        'bible': {
+            'summary': 'The obby teacher and referee: fair, deadpan and impossible to rattle. Secretly a retired obby '
+                       'champion who can still clear any course without spilling her cup.',
+            'personality': 'Speaks in short verdicts, keeps score, sides with whoever played fair and never raises '
+                           'her voice. One raised eyebrow does more than a lecture.',
+            'scale': 1.12,
+            'palette': {'skin': '#A0674B', 'top': '#2E4057', 'top2': '#E1A140', 'top_trim': '#E1A140',
+                        'pants': '#6D2E46', 'shoes': '#5B3A21', 'hair': '#9AA0A6', 'eyes': '#16161D',
+                        'brows': '#6B7076', 'mouth': '#5B1A1A', 'badge': '#E2504C', 'accessory': '#3B3B44'},
+            'costume': {'hair': 'bun', 'hat': None, 'eyewear': 'glasses', 'top': 'cardigan', 'tie': False,
+                        'badge': 'star'},
+            'visual_rules': ['Mustard cardigan over a slate-blue top', 'Grey hair in a neat bun',
+                             'Dark rectangular glasses', 'Red star badge (referee)',
+                             'Plum trousers and brown shoes', 'Tallest of the cast'],
+        },
+        'voice': {'openai_voice': 'shimmer',
+                  'openai_instructions': 'Low, flat, deadpan teacher and referee. Measured verdicts, never loud.',
+                  'elevenlabs_voice_id': '', 'local_test_voice': 'awb', 'pitch_semitones': -2,
+                  'piper_speaker': 504, 'piper_length_scale': 1.1, 'piper_noise_scale': 0.5, 'piper_noise_w': 0.6,
+                  'measured_wps': 4.88, 'line_overhead_s': 0.10, 'measured_rate': 1.3,
+                  'casting_note': CASTING['ch_tally'],
+                  'rights_note': 'Piper LibriTTS model (CC BY 4.0) / provider catalogue voices'},
+    },
+]
+# Ids added after the first release (seeded by migration 0005 on existing installs).
+NEW_CAST_IDS = ('ch_rook', 'ch_dot', 'ch_tally')
+
+
+def _k(t, **pose):
+    pose['t'] = t
+    return pose
+
+
+LAST_PLATFORM = {
+    'source': 'hand_authored_demo',
+    'title': 'The Missing Platform',
+    'logline': 'Bloxy makes a heroic leap across the clouds, only to learn the exit was behind them all along.',
+    'duration_s': 30.0,
+    'story': {
+        'premise': 'An obby runner finds the next platform missing.',
+        'conflict': 'The gap looks far too wide to jump.',
+        'stakes': 'Falling means restarting the whole obby.',
+        'reveal': 'The exit door was right behind them the entire time.',
+        'ending': 'Bloxy facepalms; Pip asks "Again?", implying it happens every time.',
+        'ending_type': 'twist',
+    },
+    'hook': {'text': 'The next platform is GONE.',
+             'question': 'How will Bloxy cross the gap?', 't_end': 3.0},
+    'payoff': {'text': 'Bloxy never needed to cross: the door behind them was the way out.', 't_start': 21.0},
+    'setting': {
+        'preset': 'sky_obby', 'time_of_day': 'sunset', 'lighting': 'warm_key_cool_fill',
+        'description': 'Three studded platforms floating over a sea of clouds at sunset.',
+        'props': [
+            {'id': 'platform_a', 'type': 'platform', 'position': [0.0, 0.3, 0.0], 'size': [2.4, 2.4], 'color': '#4CAF50'},
+            {'id': 'platform_b', 'type': 'platform', 'position': [3.0, 0.4, 0.0], 'size': [1.6, 1.6], 'color': '#2196F3'},
+            {'id': 'platform_c', 'type': 'platform', 'position': [5.8, 1.0, 0.0], 'size': [2.0, 2.0], 'color': '#FF9800'},
+            {'id': 'exit_door', 'type': 'door', 'position': [-0.7, 1.15, 0.0], 'rotation': 90, 'color': '#8E5A2B'},
+            {'id': 'flag', 'type': 'checkpoint_flag', 'position': [6.4, 1.7, 0.0], 'color': '#E2504C'},
+        ],
+    },
+    'cast': [{'id': 'hero', 'character_id': 'ch_bloxy'}, {'id': 'pip', 'character_id': 'ch_pip'}],
+    'shots': [
+        {'id': 's1', 'start_s': 0.0, 'end_s': 3.5, 'camera': {'subject': 'hero', 'framing_start': 'medium',
+                                                             'framing_end': 'close_up', 'move': 'push_in', 'side': 'front'}},
+        {'id': 's2', 'start_s': 3.5, 'end_s': 7.0, 'camera': {'subject': 'pip', 'framing_start': 'medium_wide',
+                                                             'framing_end': 'medium_wide', 'move': 'static', 'side': 'front'}},
+        {'id': 's3', 'start_s': 7.0, 'end_s': 12.0, 'camera': {'subject': 'hero', 'framing_start': 'medium_close',
+                                                              'framing_end': 'medium', 'move': 'pull_out', 'side': 'front'}},
+        {'id': 's4', 'start_s': 12.0, 'end_s': 17.0, 'camera': {'subject': 'hero', 'framing_start': 'full',
+                                                               'framing_end': 'full', 'move': 'follow', 'side': 'profile_right'}},
+        {'id': 's5', 'start_s': 17.0, 'end_s': 21.0, 'camera': {'subject': 'pip', 'framing_start': 'medium_close',
+                                                               'framing_end': 'medium_close', 'move': 'static',
+                                                               'side': 'three_quarter_left'}},
+        {'id': 's6', 'start_s': 21.0, 'end_s': 22.6, 'camera': {'subject': 'hero', 'framing_start': 'medium',
+                                                               'framing_end': 'medium', 'move': 'static', 'side': 'front'}},
+        {'id': 's6b', 'start_s': 22.6, 'end_s': 24.0, 'camera': {'subject': 'prop:exit_door', 'framing_start': 'full',
+                                                                'framing_end': 'medium_wide', 'move': 'push_in',
+                                                                'side': 'profile_left'}},
+        {'id': 's6c', 'start_s': 24.0, 'end_s': 25.0, 'camera': {'subject': 'hero', 'framing_start': 'medium',
+                                                                'framing_end': 'medium', 'move': 'static', 'side': 'front'}},
+        {'id': 's7', 'start_s': 25.0, 'end_s': 30.0, 'camera': {'subject': 'hero', 'framing_start': 'medium_close',
+                                                               'framing_end': 'close_up', 'move': 'push_in', 'side': 'front'}},
+    ],
+    'beats': [
+        {'start_s': 0, 'purpose': 'hook', 'description': 'Bloxy jogs up to the edge, confident, then looks down.'},
+        {'start_s': 1, 'purpose': 'hook', 'description': 'The next platform is missing. Startled reaction.',
+         'continuity': ['Bloxy stands at the right edge of the green platform']},
+        {'start_s': 2, 'purpose': 'hook', 'description': 'Hold the startled face; camera pushes in.'},
+        {'start_s': 3, 'purpose': 'setup'},
+        {'start_s': 4, 'purpose': 'setup', 'description': 'Pip waves from the far orange platform.'},
+        {'start_s': 5, 'purpose': 'setup'},
+        {'start_s': 6, 'purpose': 'setup'},
+        {'start_s': 7, 'purpose': 'escalation', 'description': 'Bloxy peers down into the clouds, worried.'},
+        {'start_s': 8, 'purpose': 'escalation'},
+        {'start_s': 9, 'purpose': 'escalation'},
+        {'start_s': 10, 'purpose': 'escalation', 'description': 'Bloxy steels themself. Determined.'},
+        {'start_s': 11, 'purpose': 'escalation'},
+        {'start_s': 12, 'purpose': 'climax', 'description': 'Crouch, leap across the gap to the blue platform.'},
+        {'start_s': 13, 'purpose': 'climax', 'description': 'Hard landing, knees bend.'},
+        {'start_s': 14, 'purpose': 'climax', 'description': 'Wobble on the edge, windmilling arms, recover.'},
+        {'start_s': 15, 'purpose': 'reaction', 'description': 'Relief, then a proud fist pump at the camera.'},
+        {'start_s': 16, 'purpose': 'reaction'},
+        {'start_s': 17, 'purpose': 'reveal', 'description': 'Pip, unimpressed, points back past Bloxy.'},
+        {'start_s': 18, 'purpose': 'reveal'},
+        {'start_s': 19, 'purpose': 'reveal'},
+        {'start_s': 20, 'purpose': 'reveal'},
+        {'start_s': 21, 'purpose': 'reveal', 'description': 'Bloxy turns around slowly.'},
+        {'start_s': 22, 'purpose': 'reveal', 'description': 'Cut to the exit door, right behind where Bloxy started.',
+         'continuity': ['Exit door stands on the green platform behind Bloxy\'s start position']},
+        {'start_s': 23, 'purpose': 'reaction', 'description': 'Bloxy turns back to camera.'},
+        {'start_s': 24, 'purpose': 'reaction'},
+        {'start_s': 25, 'purpose': 'payoff', 'description': 'Facepalm.'},
+        {'start_s': 26, 'purpose': 'payoff'},
+        {'start_s': 27, 'purpose': 'payoff'},
+        {'start_s': 28, 'purpose': 'button', 'description': 'Off-screen Pip: "Again?" Bloxy deadpans to camera.'},
+        {'start_s': 29, 'purpose': 'button'},
+    ],
+    'performance': {
+        'hero': [
+            _k(0.0, position=[0.6, 0.0], facing=90, expression='curious',
+               eye_target={'kind': 'point', 'point': [2.2, 0.2, 0.6]}, head={'pitch': -4}),
+            _k(1.0, expression='startled', feet={'weight': 'right'}, shoulders={'raise': -0.3},
+               arms={'left': 'chest'}, eye_target={'kind': 'point', 'point': [1.9, 0.1, -1.2]},
+               note='Weight onto right foot, shoulders drop, inner brows up, eyes wide at the gap, '
+                    'mouth parts; left hand to chest. Hold the reaction.'),
+            _k(7.0, expression='worried', head={'pitch': -22}, torso={'lean_forward': 10}, shoulders={'raise': 0.4},
+               arms={'left': 'rest'}, feet={'weight': 'center'}, eye_target={'kind': 'point', 'point': [1.8, 0.2, -2.6]}),
+            _k(9.8, expression='determined', head={'pitch': 0}, torso={'lean_forward': 0}, shoulders={'raise': 0.0},
+               feet={'stance': 'wide'}, eye_target={'kind': 'point', 'point': [3.0, 0.4, 0.3]}),
+            _k(14.9, expression='relieved', head={'yaw': -55}, eye_target={'kind': 'camera'},
+               feet={'stance': 'neutral'}),
+            _k(15.7, expression='proud', arms={'right': 'fist_pump'}),
+            _k(16.6, arms={'right': 'rest'}),
+            _k(21.0, expression='curious', head={'yaw': 0}, eye_target={'kind': 'character', 'id': 'pip'}),
+            _k(22.2, eye_target={'kind': 'prop', 'id': 'exit_door'}),
+            _k(24.1, expression='embarrassed', eye_target={'kind': 'camera'}),
+            _k(28.8, expression='bored', eye_target={'kind': 'camera'}),
+        ],
+        'pip': [
+            _k(0.0, position=[5.6, 1.0], facing=-90, expression='happy', eye_target={'kind': 'character', 'id': 'hero'}),
+            _k(4.0, expression='excited'),
+            _k(6.4, expression='happy'),
+            _k(12.0, expression='curious'),
+            _k(17.2, expression='confused', head={'roll': 8}),
+            _k(18.6, eye_target={'kind': 'prop', 'id': 'exit_door'}),
+            _k(20.6, expression='smug', head={'roll': 0}, eye_target={'kind': 'character', 'id': 'hero'}),
+            _k(28.6, expression='laughing'),
+        ],
+    },
+    'actions': [
+        {'character': 'pip', 'type': 'wave', 't': 3.7, 'anticipation_frames': 4, 'main_frames': 30,
+         'follow_through_frames': 6, 'params': {'hand': 'left'}},
+        {'character': 'hero', 'type': 'talk', 't': 7.6, 'anticipation_frames': 2, 'main_frames': 50,
+         'follow_through_frames': 4, 'params': {'hand': 'right'}},
+        {'character': 'hero', 'type': 'jump', 't': 12.4, 'anticipation_frames': 8, 'main_frames': 16,
+         'follow_through_frames': 8, 'hold_frames': 4, 'params': {'to': [3.0, 0.4]}},
+        {'character': 'hero', 'type': 'stumble', 't': 13.9, 'anticipation_frames': 2, 'main_frames': 14,
+         'follow_through_frames': 8},
+        {'character': 'pip', 'type': 'point', 't': 18.6, 'anticipation_frames': 4, 'main_frames': 10,
+         'follow_through_frames': 4, 'hold_frames': 16, 'params': {'hand': 'right'}},
+        {'character': 'hero', 'type': 'turn', 't': 21.3, 'anticipation_frames': 4, 'main_frames': 14,
+         'follow_through_frames': 6, 'params': {'to_facing': -90}},
+        {'character': 'hero', 'type': 'turn', 't': 23.4, 'anticipation_frames': 3, 'main_frames': 12,
+         'follow_through_frames': 5, 'params': {'to_facing': 90}},
+        {'character': 'hero', 'type': 'facepalm', 't': 25.3, 'anticipation_frames': 4, 'main_frames': 10,
+         'follow_through_frames': 6, 'hold_frames': 40, 'params': {'hand': 'right'}},
+    ],
+    'lines': [
+        {'id': 'l1', 'speaker': 'hero', 'text': "Wait... where's the next platform?!", 't': 0.4,
+         'emotion': 'startled', 'pace': 'fast', 'volume': 'loud'},
+        {'id': 'l2', 'speaker': 'pip', 'text': 'Over here! Just jump!', 't': 4.0, 'emotion': 'excited',
+         'pace': 'normal', 'volume': 'loud'},
+        {'id': 'l3', 'speaker': 'hero', 'text': "That's way too far!", 't': 7.6, 'emotion': 'worried',
+         'pace': 'normal', 'volume': 'normal'},
+        {'id': 'l4', 'speaker': 'hero', 'text': 'Okay. You got this.', 't': 10.2, 'emotion': 'determined',
+         'pace': 'slow', 'volume': 'soft', 'delivery': 'quietly psyching themself up'},
+        {'id': 'l5', 'speaker': 'pip', 'text': "Uh... there's a door right behind you.", 't': 17.4,
+         'emotion': 'confused', 'pace': 'normal', 'volume': 'normal', 'delivery': 'deadpan'},
+        {'id': 'l6', 'speaker': 'hero', 'text': 'I jumped... for nothing.', 't': 26.0, 'emotion': 'embarrassed',
+         'pace': 'slow', 'volume': 'soft'},
+        {'id': 'l7', 'speaker': 'pip', 'text': 'Again?', 't': 28.7, 'emotion': 'laughing', 'pace': 'fast',
+         'volume': 'normal'},
+    ],
+    'sfx': [
+        {'cue': 'gasp_sting', 't': 1.0}, {'cue': 'whoosh', 't': 12.65}, {'cue': 'thud', 't': 13.2},
+        {'cue': 'ding', 't': 22.65}, {'cue': 'fail_horn', 't': 26.9},
+    ],
+    'music': [{'t': 0, 'cue': 'playful'}, {'t': 7.0, 'cue': 'tension'}, {'t': 13.2, 'cue': 'triumph'},
+              {'t': 21.0, 'cue': 'mystery'}, {'t': 25.0, 'cue': 'playful'}],
+    'cover_t': 1.4,
+    'metadata': {'title': 'The Missing Platform', 'description': 'Bloxy takes the long way. Again.',
+                 'tags': ['obby', 'animation', 'funny']},
+    'inspiration': {'note': 'Hand-authored demo story; no reference video was used.', 'sources': []},
+}
+
+
+# A short family skit at home: three characters, static blocking, every shot type the set must clear (two-shot,
+# three-quarter, close-ups). Used by the set tests and the turnaround renders as the 'home' fixture story.
+LAST_COOKIE = {
+    'source': 'hand_authored_demo',
+    'title': 'The Last Cookie',
+    'logline': 'Bloxy opens an investigation into the missing last cookie; the youngest suspect confesses by accident.',
+    'duration_s': 30.0,
+    'story': {
+        'premise': 'The last cookie in the house is gone and everyone denies it.',
+        'conflict': 'Bloxy interrogates the siblings in the living room.',
+        'stakes': 'Whoever took it does the dishes for a week.',
+        'reveal': 'Dot was "checking the cookies were safe" in the kitchen.',
+        'ending': 'Pip deadpans that they were not safe.',
+        'ending_type': 'twist',
+    },
+    'hook': {'text': 'Bloxy demands to know who ate the last cookie.', 'question': 'Who took it?', 't_end': 3.0},
+    'payoff': {'text': 'Dot confesses without meaning to; Pip delivers the verdict.', 't_start': 21.75},
+    'setting': {
+        'preset': 'home', 'time_of_day': 'sunset', 'lighting': 'natural',
+        'description': 'The living room at home, late afternoon light through the windows, the kitchen through the '
+                       'opening.',
+        'props': [],
+    },
+    'cast': [{'id': 'bloxy', 'character_id': 'ch_bloxy'}, {'id': 'pip', 'character_id': 'ch_pip'},
+             {'id': 'dot', 'character_id': 'ch_dot'}],
+    'shots': [
+        {'id': 's1', 'start_s': 0.0, 'end_s': 6.0, 'camera': {'subject': 'two_shot', 'framing_start': 'medium_wide',
+                                                             'framing_end': 'medium_wide', 'move': 'static',
+                                                             'side': 'front'}},
+        {'id': 's2', 'start_s': 6.0, 'end_s': 12.0, 'camera': {'subject': 'pip', 'framing_start': 'medium',
+                                                             'framing_end': 'medium', 'move': 'static',
+                                                             'side': 'three_quarter_left'}},
+        {'id': 's3', 'start_s': 12.0, 'end_s': 17.25, 'camera': {'subject': 'dot', 'framing_start': 'medium_close',
+                                                             'framing_end': 'medium_close', 'move': 'static',
+                                                             'side': 'front'}},
+        {'id': 's4', 'start_s': 17.25, 'end_s': 21.75, 'camera': {'subject': 'bloxy', 'framing_start': 'medium',
+                                                              'framing_end': 'medium_close', 'move': 'push_in',
+                                                              'side': 'front'}},
+        {'id': 's5', 'start_s': 21.75, 'end_s': 26.25, 'camera': {'subject': 'dot', 'framing_start': 'close_up',
+                                                               'framing_end': 'close_up', 'move': 'static',
+                                                               'side': 'front'}},
+        {'id': 's6', 'start_s': 26.25, 'end_s': 30.0, 'camera': {'subject': 'pip', 'framing_start': 'medium_close',
+                                                               'framing_end': 'medium_close', 'move': 'static',
+                                                               'side': 'front'}},
+    ],
+    'beats': [
+        {'start_s': 0.0, 'purpose': 'hook', 'description': 'Bloxy faces the two suspects in the living room.'},
+        {'start_s': 1.5, 'purpose': 'hook'}, {'start_s': 3.0, 'purpose': 'hook'}, {'start_s': 4.5, 'purpose': 'hook'},
+        {'start_s': 6.0, 'purpose': 'setup', 'description': 'Pip denies everything, a little too fast.'},
+        {'start_s': 7.5, 'purpose': 'setup'}, {'start_s': 9.0, 'purpose': 'setup'}, {'start_s': 10.5, 'purpose': 'setup'},
+        {'start_s': 12.0, 'purpose': 'escalation', 'description': 'Dot, innocent, was only in the kitchen.'},
+        {'start_s': 13.5, 'purpose': 'escalation'}, {'start_s': 15.0, 'purpose': 'escalation'},
+        {'start_s': 16.5, 'purpose': 'escalation', 'description': 'Bloxy narrows the eyes: doing what?'},
+        {'start_s': 18.0, 'purpose': 'escalation'}, {'start_s': 19.5, 'purpose': 'escalation'},
+        {'start_s': 21.0, 'purpose': 'reveal', 'description': 'Dot admits to checking the cookies were safe.'},
+        {'start_s': 22.5, 'purpose': 'reveal'}, {'start_s': 24.0, 'purpose': 'reveal'},
+        {'start_s': 25.5, 'purpose': 'payoff', 'description': 'Pip: they were not.'},
+        {'start_s': 27.0, 'purpose': 'payoff'}, {'start_s': 28.5, 'purpose': 'button'},
+    ],
+    'performance': {
+        'bloxy': [
+            _k(0.0, position=[-1.0, 0.2], facing=45, expression='determined',
+               eye_target={'kind': 'character', 'id': 'pip'}, head={'pitch': -3}),
+            _k(6.0, expression='curious'),
+            _k(17.25, expression='determined', eye_target={'kind': 'character', 'id': 'dot'}),
+            _k(21.75, expression='startled'),
+            _k(26.7, expression='bored', eye_target={'kind': 'character', 'id': 'pip'}),
+        ],
+        'pip': [
+            _k(0.0, position=[1.0, 0.2], facing=-45, expression='neutral',
+               eye_target={'kind': 'character', 'id': 'bloxy'}),
+            _k(6.0, expression='worried', shoulders={'raise': 0.4}),
+            _k(12.0, expression='neutral', shoulders={'raise': 0.0}, eye_target={'kind': 'character', 'id': 'dot'}),
+            _k(26.25, expression='smug', eye_target={'kind': 'camera'}),
+        ],
+        'dot': [
+            _k(0.0, position=[0.0, 1.4], facing=0, expression='happy',
+               eye_target={'kind': 'character', 'id': 'bloxy'}),
+            _k(12.0, expression='curious'),
+            _k(17.25, expression='worried'),
+            _k(21.75, expression='embarrassed', head={'pitch': -10},
+               eye_target={'kind': 'point', 'point': [0.4, 0.4, 0.3]}),
+            _k(26.25, expression='embarrassed', eye_target={'kind': 'character', 'id': 'pip'}),
+        ],
+    },
+    'actions': [
+        {'character': 'bloxy', 'type': 'point', 't': 1.2, 'anticipation_frames': 4, 'main_frames': 10,
+         'follow_through_frames': 4, 'hold_frames': 30, 'params': {'hand': 'right'}},
+        {'character': 'pip', 'type': 'talk', 't': 6.3, 'anticipation_frames': 2, 'main_frames': 50,
+         'follow_through_frames': 4, 'params': {'hand': 'left'}},
+        {'character': 'pip', 'type': 'head_shake', 't': 6.15, 'anticipation_frames': 2, 'main_frames': 16,
+         'follow_through_frames': 4},
+        {'character': 'dot', 'type': 'talk', 't': 12.45, 'anticipation_frames': 2, 'main_frames': 36,
+         'follow_through_frames': 4, 'params': {'hand': 'right'}},
+        {'character': 'bloxy', 'type': 'talk', 't': 17.55, 'anticipation_frames': 2, 'main_frames': 30,
+         'follow_through_frames': 4, 'params': {'hand': 'left'}},
+        {'character': 'dot', 'type': 'shrug', 't': 22.35, 'anticipation_frames': 4, 'main_frames': 12,
+         'follow_through_frames': 6, 'hold_frames': 20},
+        {'character': 'bloxy', 'type': 'facepalm', 't': 27.0, 'anticipation_frames': 4, 'main_frames': 10,
+         'follow_through_frames': 6, 'hold_frames': 20, 'params': {'hand': 'right'}},
+    ],
+    'lines': [
+        {'id': 'l1', 'speaker': 'bloxy', 'text': 'Okay. Who ate the last cookie?', 't': 0.6,
+         'emotion': 'determined', 'pace': 'normal', 'volume': 'normal'},
+        {'id': 'l2', 'speaker': 'pip', 'text': 'Not me! I was upstairs the whole time.', 't': 6.3,
+         'emotion': 'worried', 'pace': 'fast', 'volume': 'loud'},
+        {'id': 'l3', 'speaker': 'dot', 'text': 'I was in the kitchen.', 't': 12.45, 'emotion': 'happy',
+         'pace': 'normal', 'volume': 'normal'},
+        {'id': 'l4', 'speaker': 'bloxy', 'text': 'Doing what?', 't': 17.55, 'emotion': 'determined',
+         'pace': 'slow', 'volume': 'normal'},
+        {'id': 'l5', 'speaker': 'dot', 'text': 'Checking the cookies were safe.', 't': 22.2,
+         'emotion': 'embarrassed', 'pace': 'slow', 'volume': 'soft'},
+        {'id': 'l6', 'speaker': 'pip', 'text': 'They were not.', 't': 26.7, 'emotion': 'smug', 'pace': 'normal',
+         'volume': 'normal', 'delivery': 'deadpan'},
+    ],
+    'sfx': [{'cue': 'gasp_sting', 't': 22.05}, {'cue': 'fail_horn', 't': 27.3}],
+    'music': [{'t': 0.0, 'cue': 'playful'}, {'t': 17.25, 'cue': 'tension'}, {'t': 26.25, 'cue': 'playful'}],
+    'cover_t': 1.8,
+    'metadata': {'title': 'The Last Cookie', 'description': 'Someone ate the last cookie. Nobody did it.',
+                 'tags': ['family', 'animation', 'funny']},
+    'inspiration': {'note': 'Hand-authored fixture story; no reference video was used.', 'sources': []},
+}
+
+
+def plan():
+    return copy.deepcopy(LAST_PLATFORM)
+
+
+def home_plan():
+    """The family skit fixture at the 'home' set."""
+    return copy.deepcopy(LAST_COOKIE)
+
+
+def park_plan():
+    """The same skit taken outdoors: the fixture story for the 'park' set."""
+    p = copy.deepcopy(LAST_COOKIE)
+    p['title'] = 'The Last Cookie at the Park'
+    p['metadata']['title'] = p['title']
+    p['setting'].update(preset='park', time_of_day='noon',
+                        description='The plaza of a city park at noon, benches and trees around, a fountain nearby.')
+    p['lines'][2]['text'] = 'I was by the fountain.'
+    p['story']['reveal'] = 'Dot was "checking the cookies were safe" by the fountain.'
+    return p
