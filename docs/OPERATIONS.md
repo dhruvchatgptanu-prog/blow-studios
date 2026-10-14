@@ -31,7 +31,9 @@ are left and how many days they last at your cadence.
 
 * **Add stories:** paste a JSON list of plans (format: the Director's editor *Plan JSON*) and press
   *Validate and add*, or run `python -m blox.cli import-stories file.json --source claude`. Invalid
-  plans are rejected with the validator's reasons; exact duplicates are skipped.
+  plans are rejected with the validator's reasons; exact duplicates are skipped. The repository ships
+  two batches: `stories/batch-2026-10-03-claude.json` and the mainstream
+  `stories/batch-2026-10-11-mainstream.json` (storytime and skits written to `docs/research/`).
 * **Get more without API costs:** ask Claude in a normal chat with the prompt in `stories/README.md`.
 * **Reject** a story you do not want; **Restore** brings it back. A story whose video is cancelled
   before upload returns to the backlog automatically.
@@ -44,10 +46,49 @@ are left and how many days they last at your cadence.
 
 The default voice engine is Piper (free, offline). The Docker image includes the LibriTTS model; on
 other installs run `python -m blox.cli install-voice` (downloads from the Piper releases on GitHub
-and verifies the checksum). Choose each character's speaker number on **Characters** and listen with
-*Hear free voice*. Every video that uses it credits the voice model's licence (CC BY 4.0) in its
-description. To use OpenAI or ElevenLabs voices instead, connect the key and change Settings →
-Production → voice provider.
+and verifies the checksum). Choose each character's speaker number, pitch and rate on **Characters**
+and listen with *Hear free voice*. Every video that uses it credits the voice model's licence
+(CC BY 4.0) in its description. To use OpenAI or ElevenLabs voices instead, connect the key and change
+Settings → Production → voice provider.
+
+* **Kokoro** is a second free offline engine (Kokoro-82M, Apache-2.0 weights, through `kokoro-onnx`):
+  `python -m blox.cli install-voice --engine kokoro` downloads the pinned release files and verifies
+  their checksums; a mismatch installs nothing. Choose it per character on Characters (engine choice).
+* **Speechify** voices are optional and paid: enter the key on Connections; every request goes through
+  the paid-call ledger and budgets. It is never selected unless you choose it.
+* **Voice base** (Characters): upload reference clips you have the right to use (audio files or a zip;
+  an `index.csv` with `file`, `line` and optional `voice` columns adds words per second and splits
+  profiles). Only the measurements (pitch, range, pace, pauses, dynamics) and your provenance note are
+  kept; the audio is deleted after measuring and never sent to any engine. Set a profile as a
+  character's target and run **Voice bake-off**: every candidate voice reads the same test script, is
+  scored against the target (0–100) and can be chosen with one click. Blox scores its own catalogue
+  voices; it does not clone anyone's voice.
+* Each cast voice carries its measured words per second and line overhead (fields on the Characters
+  form, filled in for the shipped cast), which decide how much dialogue fits a plan. If you change a
+  character's voice, pitch or rate, update them, or turn on Settings → Production → *measure lines on
+  validate* so every line is voiced for real at validation time.
+
+## Production style settings
+
+Settings → Production holds the pace (default 1.5: a 30-second story becomes a 20-second video), the
+speech rate (1.3, spoken natively faster), the finished video length (minimum, target and maximum
+seconds), the hook text overlay (on by default; a plan can turn it off with `hook.on_screen`), the render
+size and the voice provider. The director's editor has the hook text field.
+
+## Research notes
+
+**Trend research → Notes** imports your own research: pasted text or `.md`, `.txt`, `.csv`, `.json`,
+`.jsonl` files, or a zip of them. Extraction is local (titles, video ids and URLs, numbers such as views,
+words per second, durations, beat spacing and hook times, and rule-like lines), capped in size and screened
+as untrusted data. Notes appear read-only in the research brief and reach story generation only as
+pattern hints inside the untrusted block. Keep transcripts paraphrased; never paste full copied scripts.
+
+## Channel kit
+
+**Connections → Channel kit** generates name and handle suggestions, a profile picture (800×800), a banner
+(2560×1440 with the safe area respected), a description with the AI-assist disclosure and cadence, and
+the default upload settings, saved under `data/channel_kit/`. Blox cannot sign in to Google: create the
+channel yourself with the kit, then connect it on Connections and confirm it.
 
 ## Autopilot controls
 

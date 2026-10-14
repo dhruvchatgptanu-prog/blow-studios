@@ -15,7 +15,7 @@ brief (top sources, metadata-only flagged)                     ┐
   → originality screen vs references and own recent videos     │
   → director's script + publish metadata                       ┘
 storyboard: cost estimate + budget check                       ┐
-voices (Piper offline / OpenAI / ElevenLabs) → alignment → fit │
+voices (Piper or Kokoro offline / OpenAI / ElevenLabs / Speechify) → alignment → fit │
 motion solve (rig, IK, feet, face, visemes, camera)            │  render worker
 Blender shots (or Runway / footage) with telemetry             │
 assembly: concat, captions, mix + ducking, loudness, cover     ┘
@@ -56,6 +56,14 @@ authoritative **frame-indexed** manifest:
 * `beats`: one per second (split at cuts) with each visible character's resolved start and end pose,
   camera state, dialogue, captions, sound, continuity notes and the QA checks expected there.
 
+Plans are written in story time and compiled at the production **pace** (`production.pace`, default 1.5:
+every action, camera move, pause and line plays 1.5× faster) with voices spoken natively at
+`production.speech_rate` (1.3). Line lengths are estimated from each cast voice's measured words per
+second and line overhead (migration m0006; `estimate_line_frames` gets the cast rows), optionally voiced
+for real at validation time (`measure_lines_on_validate`). The plan's `hook.text` is drawn on screen
+over the opening (`hook.on_screen`, default from `production.hook_text_overlay`) and composited on the
+cover frame.
+
 `validate.py` rejects structural problems (unknown vocabulary is reported as *unsupported*), timeline
 gaps/overlaps, overlapping use of a body part, impossible action sequences, dialogue that does not
 fit, teleports, implausible speeds and jumps, unsupported ground, unreachable props, expressions that
@@ -72,8 +80,18 @@ Coordinate system: metres, Z up, characters face −Y at facing 0°; facing is d
   footstep planning with planted feet, analytic two-bone IK for legs and arms plus iterative palm IK
   for contacts (face, props), spring-based follow-through, look-at with a lagged head, blinks,
   expression blending, viseme timing from word alignment plus an amplitude-driven jaw, and a camera
-  solver (lens by framing, headroom, follow with springs, moves). Deterministic: the same manifest
-  produces the same motion.
+  solver (lens by framing, headroom measured from the costume's visual top, follow with springs, moves,
+  swings that keep other characters and scenery out of the line of sight, close-ups that swing toward
+  the face). Deterministic: the same manifest produces the same motion. Solved motion is cached per
+  manifest timing, alignment, repair parameters and `code_version()` (a fingerprint of solver.py,
+  sets.py and life.py), so a code change re-solves instead of reusing stale motion.
+* `life.py`: the life layers under the directed poses: idle weight shifts and breathing, glances and
+  saccades, gestures on stressed words, listening reactions, a heel-toe gait and overlapping action.
+* `sets.py`: 360-degree set layouts for every preset (sky obby, lava obby, town street, classroom, night
+  forest, bedroom, home, park) built around a clearance box the cast walks in: walkable ground flush with
+  planted feet, camera zones, piece boxes used by the camera solver and QA, time-of-day window lights.
+* `rig.py` also exposes each costume's visual top (hair, hat, bow) so framings, headroom and the
+  sight-line checks use the real silhouette.
 * `blender_scene.py` runs inside headless Blender: builds the set, props and cast, applies the solved
   transforms per frame, renders, and exports **telemetry from the evaluated scene** (feet, palms, face
   and mouth projected to the image, visibility, camera) used by QA.
@@ -83,8 +101,10 @@ Coordinate system: metres, Z up, characters face −Y at facing 0°; facing is d
 ## QA (`blox/qa`)
 
 Checks run on the actual output and telemetry: technical (FFmpeg filters and probes), motion (feet,
-actions, expressions, lip sync, camera, props, identity), story (hook, payoff, dialogue vs ASR,
-captions, claim screening) and an optional vision review of frame strips. Each record has status,
+actions, expressions, lip sync measured in a tight mouth box on the rendered pixels, sight lines against
+characters and scenery, head in frame, face framing per shot, camera, props, identity), story (hook, hook
+text on screen, payoff, dialogue vs ASR, captions, claim screening) and an optional vision review of
+frame strips. Each record has status,
 severity, frames, evidence, confidence, method and an optional repair action. The verdict:
 critical failure without a repair → *blocked*; repairable failures → *repair* (bounded per target and
 per video); uncertain critical/major → *hold*; otherwise *approved*.
@@ -115,5 +135,6 @@ output, and public error responses without internal details.
 `slots`, `uploads`, `tasks`, `workers`, `locks`, `paid_calls`, `budget_ledger`, `breakers`,
 `quota_ledger`, `api_cache`, `research_runs`, `ref_channels`, `ref_videos`, `ref_snapshots`,
 `transcripts`, `ref_analyses`, `patterns`, `concepts`, `characters`, `analytics_snapshots`,
-`learning_findings`, `story_backlog`, `audit_log`, `settings` (preferences and encrypted secrets), plus the original
+`learning_findings`, `story_backlog`, `voice_profiles` (measured reference voices), `research_notes`
+(owner notes, untrusted), `audit_log`, `settings` (preferences and encrypted secrets), plus the original
 release's `projects`, `jobs`, `assets`, `reservations` (kept).

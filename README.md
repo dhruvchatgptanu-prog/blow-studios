@@ -73,10 +73,17 @@ Blox can run with **no paid API at all**:
 * **Voices:** the default voice engine is **Piper**, which is free and runs offline. It uses a
   LibriTTS voice model (CC BY 4.0, credited automatically in each video description) and is bundled
   in the Docker image; elsewhere run `python -m blox.cli install-voice`. Pick each character's voice
-  (0–903) and listen on **Characters → Hear free voice**.
+  (0–903), pitch and rate and listen on **Characters → Hear free voice**. A second free offline
+  engine, **Kokoro-82M** (Apache-2.0 weights through `kokoro-onnx`; install with
+  `python -m blox.cli install-voice --engine kokoro`, checksum-pinned), can be chosen per character.
+  **Speechify** voices are optional, paid with your own key and off by default. The **voice base** on
+  Characters measures reference clips you have the right to use (pitch, pace, pauses, energy; the
+  audio is deleted right after measuring and never sent to any engine), scores the catalogue voices
+  against them and runs a **bake-off** of every candidate voice on one test script. No voice is cloned.
 * **Stories:** with no LLM API key, autopilot takes stories from the **Story backlog**. The
-  repository includes 12 original, validated stories (`stories/`). You can write your own in the
-  editor, or ask Claude in a normal chat for a new batch using the prompt in `stories/README.md`
+  repository includes 24 original, validated stories (`stories/`: a first batch and a mainstream
+  batch of storytime and skits written to the style guide in `docs/research/`). You can write your
+  own in the editor, or ask Claude in a normal chat for a new batch using the prompt in `stories/README.md`
   (covered by your existing Claude plan). Note that a ChatGPT or Claude *subscription* does not
   include API access, so the studio cannot call those services automatically.
 * **Research and publishing:** the YouTube Data API and uploads are free within Google's daily
@@ -84,7 +91,7 @@ Blox can run with **no paid API at all**:
 
 What you need then is: a YouTube Data API key, a Google OAuth client, your channel connected and
 confirmed, and the audience and disclosure choices. At 12 videos a day, a backlog of 12 stories lasts
-one day; the dashboard shows how many days are left. If it runs out, Blox stops starting new videos
+one day (the two included batches last two days); the dashboard shows how many days are left. If it runs out, Blox stops starting new videos
 and tells you, rather than publishing anything unfinished.
 
 | Credential | Used for | Required for autopilot | How to get it |
@@ -105,7 +112,14 @@ YouTube drops the scheduled time or refuses an upload and pauses publishing with
 retrying blindly.
 
 Also choose on **Settings → Publishing**: *made for kids* (yes/no) and *altered/synthetic content*
-disclosure. Autopilot refuses to start until both are chosen.
+disclosure. New installs default to a general audience (comments on) with the synthetic-content
+disclosure set, as the owner decided; both stay editable, and clearing either blocks approval.
+
+Your own research can go in too: **Trend research → Notes** takes pasted text or `.md`, `.txt`,
+`.csv`, `.json`, `.jsonl` files (or a zip of them). Titles, video ids, numbers (views, words per
+second, durations, beat spacing, hook times) and rule-like lines are extracted locally, kept as
+untrusted data, shown read-only in the research brief and passed to story generation as pattern
+hints, never as instructions.
 
 ## 3. Make a first video
 
@@ -116,11 +130,44 @@ disclosure. Autopilot refuses to start until both are chosen.
    jump the player there.
 4. If the verdict is *approved*, **Approve for publishing** (review mode) assigns it to the next
    slot; nothing is uploaded unless YouTube is connected and confirmed.
-5. **Story backlog** → paste `stories/batch-2026-10-03-claude.json` → *Validate and add*. Autopilot
-   (or **New researched video**) then produces those stories in order when no LLM key is connected.
+5. **Story backlog** → paste `stories/batch-2026-10-03-claude.json` or
+   `stories/batch-2026-10-11-mainstream.json` → *Validate and add* (or
+   `python -m blox.cli import-stories <file>`). Autopilot (or **New researched video**) then produces
+   those stories in order when no LLM key is connected.
 
 **New researched video** does the full autonomous path (research brief → patterns → original concepts
 → originality screen → manifest with validation → production).
+
+### What a finished video looks like (production style)
+
+* **Pace.** Stories are written in story time and played **1.5× faster** (Settings → Production →
+  pace), with voices spoken natively faster (speech rate 1.3) rather than sped up. A 30-second story
+  becomes a 20-second video. Each voice's measured words per second (not a planning constant) decides
+  how much dialogue fits, so finished speech runs at roughly 4.4–5.4 words per second.
+* **Hook on screen.** The plan's hook text (at most six words) is drawn big in a top band over the
+  opening, in the caption style, placed off the faces the renderer reports; QA confirms it is visible.
+  The cover is the biggest reaction face in the hook or the payoff with the hook text on it.
+* **Look.** Costumes (hats, hair, glasses, outfits) on the block characters, big reaction faces, comedy
+  edit effects (zoom punch, impact shake, freeze), Shorts-style captions with a heavy outline and a
+  yellow active word, a sound bed with cues, whooshes and drop-outs.
+* **Sets.** Eight 360-degree sets (sky obby, lava obby, town street, classroom, night forest,
+  bedroom, home, park) with walkable ground flush with the feet; the camera never sits inside or looks
+  through scenery.
+* **Motion.** Idle life (weight shifts, breathing, glances), gestures on stressed words, listening
+  reactions, a heel-toe gait and overlapping action under the directed poses.
+* **Camera.** Framings measure each character by its visual top (bun, spikes, bow, hat) so tall costumes
+  keep their headroom; close-ups swing toward the side the face turns to and avoid other characters.
+* **Voices.** Each cast member has a voice, pitch and rate (Piper or Kokoro by default); storytime
+  narration is a voice-over kind of its own, never lip-synced.
+
+### Channel kit
+
+**Connections → Channel kit** builds what a new channel needs before the first upload: name and handle
+suggestions (original; no "roblox" in the name), an 800×800 profile picture (Bloxy's face rendered by
+Blender on a transparent studio background), a 2560×1440 banner with the cast line-up and the name inside
+the 1546×423 safe area, a description with the AI-assist disclosure and cadence, the default upload
+settings, and the steps to create the channel and connect it. Blox cannot sign in to Google for you, so
+the channel itself is created by you with the kit.
 
 ## 4. Autopilot: enable, pause, stop
 
@@ -192,28 +239,31 @@ Verified here means exercised end to end in this environment with real tools, no
 | Database, migrations, legacy upgrade | SQLite and PostgreSQL, forward-only migrations, non-destructive import of old projects | Unit tests on both engines (PostgreSQL 16); legacy upgrade test |
 | Durable queue | leases, heartbeats, idempotency, retries, dead letters, concurrency keys, leader lock | Concurrency and crash-recovery tests on both engines |
 | Paid-call safety and budgets | exactly-once ledger, ambiguous-call holds with owner reconciliation, reservations, breakers, global auto-pause | Unit tests with simulated provider failures |
-| Research | YouTube Data API v3 client, quota ledger (Pacific-midnight reset), caching, Shorts signals, explainable ranking, emerging topics, watchlist, references | Fake-API tests seeded with a real, dated sample of 12 Roblox story Shorts ([docs/RESEARCH_SNAPSHOT.md](docs/RESEARCH_SNAPSHOT.md)). **Not run against your API key.** |
+| Research | YouTube Data API v3 client, quota ledger (Pacific-midnight reset), caching, Shorts signals, explainable ranking, emerging topics, watchlist, references; owner research notes import (local extraction, untrusted) | Fake-API tests seeded with a real, dated sample of 12 Roblox story Shorts ([docs/RESEARCH_SNAPSHOT.md](docs/RESEARCH_SNAPSHOT.md)); notes import unit tests with zip and csv fixtures. **Not run against your API key.** |
 | Transcripts and analysis | upload with rights confirmation, authorised provider contract, ASR of your own media, metadata-only labelling | Unit tests; no provider configured |
 | Stories and originality | story backlog (import, validation, de-duplication, oldest-first claiming); LLM path: pattern extraction, concepts, manifest generation with validation and repair; originality screening against references and recent own videos | Backlog: a backlog story produced end to end through the queued pipeline here with Piper voices (render, QA, three automatic repair rounds). 12 original stories written in this session, all valid and mutually distinct. LLM path tested with mocked OpenAI; **no live generation was run** |
 | Manifest and director's script | authoring plan → frame-indexed manifest, 1-second beats with full start/end poses, validator, script | Unit tests on the demo story and invalid variants |
-| Deterministic animation | joint-hierarchy rig, analytic + iterative IK, footstep planning, springs, expressions, visemes, amplitude-driven jaw, camera solver, Blender scene build with telemetry | Real Blender renders; solver tests (planted feet, facepalm contact, jump landing, determinism); full demo rendered through the queued pipeline |
-| Voices | free offline Piper voices (default), OpenAI TTS with direction, ElevenLabs with timestamps, local test voice, alignment, pronunciation overrides, gentle fitting | Piper run for real (checksum-verified install, CLI, inside the Docker image, in the pipeline); OpenAI/ElevenLabs request code **not run live** |
-| Assembly | captions in the safe area (face-aware placement), ducking, loudness normalisation, transitions, cover and thumbnails | Real FFmpeg tests; full demo assembly |
-| QA and repairs | technical, motion, sight lines, lip-sync (scene and rendered-pixel evidence, hand occlusion), caption, story, optional vision checks; verdicts; bounded repair loop whose repairs must change the shot | Real QA on two complete rendered videos, findings checked frame by frame. Those reviews found defects QA had missed or misjudged (camera inside a character, no-op repairs, a miscalibrated gesture check); all fixed with regression tests ([docs/AUDIT.md](docs/AUDIT.md#defects-in-this-rebuild-found-by-its-own-end-to-end-runs)) |
+| Deterministic animation | joint-hierarchy rig with costumes, analytic + iterative IK, footstep planning, springs, idle life and speech gestures, expressions, visemes, amplitude-driven jaw, eight 360-degree sets, camera solver with headroom from the visual top and occlusion-avoiding swings, Blender scene build with telemetry | Real Blender renders; solver tests (planted feet, contacts, jump landing, determinism, cameras never inside or blocked, feet planted at the production pace); four complete videos rendered through the queued pipeline, reviewed frame by frame |
+| Voices | free offline Piper voices (default) and Kokoro-82M, OpenAI TTS with direction, ElevenLabs with timestamps, optional Speechify (owner key, paid ledger), per-character pitch and rate, measured words per second per voice, reference voice profiles and bake-off, local test voice, alignment, pronunciation overrides, gentle fitting | Piper run for real (checksum-verified install, CLI, inside the Docker image, in four pipeline videos); Kokoro runner tested with the pinned checksums; OpenAI/ElevenLabs/Speechify request code **not run live** |
+| Assembly | captions in the safe area (face-aware placement, heavy outline, yellow active word), hook text band over the opening, ducking, loudness normalisation (short-line fallback), transitions and comedy effects, reaction-face cover and thumbnails | Real FFmpeg tests; four full assemblies |
+| QA and repairs | technical, motion (feet, actions, expressions, lip-sync with scene and rendered-pixel evidence, hand occlusion, sight lines against characters and scenery, head in frame, face framing per shot, camera, props, identity), caption, hook-text, story, optional vision checks; verdicts; bounded repair loop whose repairs must change the shot | Real QA on four complete rendered videos, findings checked frame by frame. Those reviews found defects QA had missed or misjudged (camera inside a character, no-op repairs, a miscalibrated gesture check, cropped heads, cheek-only close-ups); all fixed with regression tests ([docs/AUDIT.md](docs/AUDIT.md#defects-in-this-rebuild-found-by-its-own-end-to-end-runs)) |
 | Scheduling and autopilot | slots, DST, rolling cap, buffer, skips, pause, emergency stop | Unit tests including Adelaide DST dates |
 | YouTube publishing | OAuth (PKCE, state, encrypted tokens), resumable upload with resume and reconciliation, scheduled private uploads, processing/scheduled/published verification, restriction detection | Tests against a simulated YouTube; **no upload to a real channel was performed** |
 | Analytics learning | YouTube Analytics reports, retention, findings with bootstrap intervals labelled finding vs hypothesis | Unit-level only; needs your channel |
-| Studio UI | dashboard, research, director's editor with beat inspector and pose editing, QC, calendar, characters, library, queue, budget & learning, connections, settings | Every view driven in headless Chromium against a running server, no console errors, phone width checked |
+| Studio UI | dashboard, research (with notes), director's editor with beat inspector, pose editing and hook field, QC, calendar, characters with voice base and bake-off, library, queue, budget & learning, connections with channel kit, settings | Every view driven in headless Chromium against a running server, no console errors, phone width checked |
 | Deployment | Dockerfile (non-root, health checks), compose with PostgreSQL and role workers, backups | Image built here (Ubuntu 24.04, Python 3.12, Blender 4.0.2); the test suite passes inside it; the full compose stack (PostgreSQL + migrate + web + 5 workers) came up healthy and created slots |
 
 **Not done / incomplete**
 
 * No live call to any paid provider or to your YouTube channel was made (no credentials or spending
   authorisation were provided). The first live run should be the opt-in live tests in `tests/live`.
-* **No video has reached QA approval in this environment yet.** The free-voice test video ended with 66
-  of 68 checks passing and was blocked after three repair rounds on one borderline lip-sync check (a
-  line spoken while the character looks down, so the mouth is small on screen). Expect some videos
-  to be held or blocked; that costs a slot, not a defective upload.
+* **No video has reached QA approval in this environment yet.** Four complete videos have been produced
+  through the queued pipeline here with free voices. The latest two, on the current code, were held by
+  QA rather than published: "Whoever Laughs Loses" (classroom) because heads were cropped at the top and
+  two close-ups showed a cheek, which led to the headroom and face-framing checks; "My Little Sister
+  Hopped Every Time She Lied" (bedroom, hook text on screen) because three close-ups were aimed at the
+  back of a head or half off the face. That camera-aim defect is being fixed with regression tests on the
+  real plans. Expect some videos to be held or blocked; that costs a slot, not a defective upload.
 * Piper voices are clear but calmer and less expressive than instruction-following cloud voices;
   emotion is approximated through pace and variation.
 * The story backlog needs refilling: about one batch of 12 stories per day at the default cadence.
@@ -251,8 +301,17 @@ Verified here means exercised end to end in this environment with real tools, no
 * **Occlusion**: cameras are kept out of other characters and QA checks the sight line to each shot's
   subject, with bodies approximated as cylinders. To get a clear view the camera swings toward the side
   the subject is looking at, which can cross the line between two characters (screen direction flips
-  for that shot). Set pieces (houses, trees, walls) are not checked
-  for occlusion; that relies on the optional vision review or your own review.
+  for that shot). Set pieces (walls, furniture, trees) are checked too: the camera never sits inside or
+  looks through scenery, and QA checks the sight line to the subject against the set. Small props and
+  set details are not modelled for occlusion; that relies on the optional vision review or your own
+  review.
+* **Framing**: characters are framed by their visual top (hair, hat, bow) so tall costumes keep their
+  headroom. QA fails a cropped head in whole-head framings and a close-up whose subject's face is off
+  screen or turned away for most of the shot, and asks for a wider or re-aimed camera. Faces that cannot
+  turn toward the camera (a character directed to look behind themselves) are a known limit: the camera
+  can only show what the pose allows.
+* **Hook text** is drawn by the assembler, not by the renderer, so it is checked as a caption-style
+  overlay; it never covers a face the renderer reported.
 * **Generative shots** (Runway) do not follow second-by-second directions exactly; identity and costume
   continuity are reviewed, and uncertain results are held rather than published. Upscaled generative
   output is labelled as upscaled.
@@ -272,7 +331,9 @@ BLOX_TEST_DATABASE_URL=postgresql://user@host/db pytest   # also run the databas
 LIVE_TESTS=1 pytest tests/live            # real provider calls with your credentials; see tests/live/README.md
 ```
 
-The unit suite blocks all outbound network access; any unexpected request fails the test.
+The unit suite blocks all outbound network access; any unexpected request fails the test. On
+2026-10-11 the unit and integration suites gave 785 passed and 6 skipped locally (the skips are
+PostgreSQL-only and optional-engine tests) and the CI run on the same commit was green.
 
 ## 10. Layout and further docs
 
@@ -280,8 +341,10 @@ The unit suite blocks all outbound network access; any unexpected request fails 
 blox/            application package
   web/           Flask app, security, uploads          migrations/  forward-only schema migrations
   research/      Data API client, ranking, transcripts  story/       patterns, concepts, originality
-  manifest/      schema, compiler, validator, script    animation/   rig, solver, Blender scene, Runway
-  voice/         TTS, audio, synthesised SFX/music      qa/          technical, motion, story, vision
+  manifest/      schema, compiler, validator, script    animation/   rig, solver, life, sets, Blender scene, Runway
+  voice/         Piper/Kokoro/Speechify TTS, profiles,  qa/          technical, motion, story, vision
+                 bake-off, audio, synthesised SFX/music
+  research/notes.py  owner research notes (import)     channel_kit.py  name, profile picture, banner, description
   youtube/       OAuth, publisher, analytics            pipeline.py  production steps
   orchestrator.py  slots, buffer, autopilot             worker.py    queue worker
 templates/, static/   studio UI (no external scripts)
@@ -293,3 +356,5 @@ tests/unit, tests/integration, tests/live
 * [docs/OPERATIONS.md](docs/OPERATIONS.md): daily operation, backups, incidents, capacity
 * [docs/AUDIT.md](docs/AUDIT.md): defects found in the supplied version and how they were fixed
 * [docs/RESEARCH_SNAPSHOT.md](docs/RESEARCH_SNAPSHOT.md): the real research sample used in tests
+* [docs/research/](docs/research/README.md): creator and trend research, the mainstream style guide
+  and the ranked improvement plan behind the current production style
