@@ -100,8 +100,9 @@ def story_description(logline, cta, topic_tags):
 
 
 def story_format(v, d=None):
-    """(format, logline) of a video's story: from its manifest, else the plan saved with it, else the copy stored at
-    development. Unknown formats give None."""
+    """(format, teaser) of a video's story: from its manifest, else the plan saved with it, else the copy stored at
+    development. The teaser is the plan's metadata.teaser (a spoiler-free line written for the description) or, when
+    there is none, its logline. Unknown formats give None."""
     from ..learning import FORMATS, enum_value
     meta = v.get('metadata') or {}
     body = {}
@@ -122,6 +123,10 @@ def story_format(v, d=None):
         fmt = enum_value(src.get('format'), FORMATS)
         if fmt:
             break
+    for src in (body, plan, stored):
+        md = src.get('metadata') if isinstance(src.get('metadata'), dict) else {}
+        if isinstance(md.get('teaser'), str) and md['teaser'].strip():
+            return fmt, md['teaser']
     logline = ''
     for src in (body, plan, stored):
         if isinstance(src.get('logline'), str) and src['logline'].strip():

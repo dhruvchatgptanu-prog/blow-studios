@@ -73,3 +73,42 @@ def test_story_format_setting_is_validated(value, ok):
 def test_defaults_never_time_stretch_and_let_the_llm_choose_the_format():
     assert P.DEFAULTS['production']['time_stretch_speech'] is False
     assert P.DEFAULTS['production']['story_format'] == ''
+
+
+def test_first_person_description_uses_the_teaser_and_the_owners_question(db):
+    import json as _json
+    from blox.youtube import publisher as PUB
+    plan = {'format': 'first_person_story', 'logline': 'Bloxy finds out why she always wins: he narrates out loud.',
+            'metadata': {'title': 'I Hid From the Best Seeker on Earth 😳', 'description': '',
+                         'teaser': 'She has never lost, and I have lost 400 in a row.',
+                         'tags': ['hide and seek', 'funny', 'animation']}}
+    v = {'title': plan['metadata']['title'], 'manifest_id': None,
+         'metadata': {'plan': plan, 'publish_metadata': plan['metadata'], 'voice_credits': []}}
+    p = _json.loads(_json.dumps(P.DEFAULTS))
+    p['publishing']['story_cta'] = 'Would you have kept hiding? 😳'
+    snippet = PUB.build_metadata(v, 1_900_000_000, p, d=db)['snippet']
+    desc = snippet['description']
+    assert desc.startswith('She has never lost, and I have lost 400 in a row.\n\nWould you have kept hiding? 😳\n\n#shorts')
+    assert 'narrates out loud' not in desc          # the logline (which spoils the twist) is not used
+    assert desc.lower().count('#shorts') == 1
+    assert '#hideandseek' in desc
+    assert {'funny animation', 'storytime', 'animated story'} <= set(snippet['tags'])
+
+
+def test_the_llm_plan_schema_asks_for_a_teaser_only_in_the_format():
+    from blox.story import generate as G
+    fp = G.plan_schema(['hero'], ['ch_hero'], 'first_person_story')['properties']['metadata']
+    assert 'teaser' in fp['properties'] and 'teaser' in fp['required']
+    other = G.plan_schema(['hero'], ['ch_hero'])['properties']['metadata']
+    assert 'teaser' not in other['properties']
+
+
+def test_the_batch_has_teasers_and_empty_descriptions():
+    import json as _json
+    import os
+    root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    batch = _json.load(open(os.path.join(root, 'stories', 'batch-2026-10-22-first-person.json'), encoding='utf-8'))
+    for p in batch:
+        md = p['metadata']
+        assert md['description'] == '' and 0 < len(md['teaser']) <= 140, p['title']
+        assert 'shorts' not in [t.lower() for t in md['tags']]

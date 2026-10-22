@@ -118,6 +118,11 @@ def plan_schema(cast_ids, character_ids, story_format=None):
         story = sch['properties']['story']
         story['properties'].update(f)
         story['required'] += list(f)
+        # The description is built from the owner's template (teaser, question, hashtags) when the plan leaves
+        # it empty; the teaser is the one line the model writes for it.
+        md = sch['properties']['metadata']
+        md['properties']['teaser'] = STR
+        md['required'].append('teaser')
     return sch
 
 
@@ -374,6 +379,9 @@ def first_person_rules(prefs, cal=None, avoid_twists=()):
         'sped up: the pace comes only from how much is written.',
         f'Shots: a cut or a strong camera move every 1.5-3 s of finished video ({st(1.5)}-{st(3)} s of story '
         f'time); no shot longer than {st(cal["max_shot_s"])} s of story time.',
+        'Packaging: metadata.teaser is one spoiler-free sentence for the description (at most 140 characters, never '
+        'the twist); leave metadata.description empty so Blox builds it from the owner\'s template; metadata.tags '
+        'start with 2-3 topic words of this story.',
     ]
     if avoid_twists:
         rules.append('Do not use these twist types (used by the last videos): ' + ', '.join(avoid_twists) + '.')

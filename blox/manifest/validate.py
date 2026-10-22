@@ -709,7 +709,8 @@ def _ip_watch(r, m):
     md = _metadata(m)
     tags = md.get('tags') if isinstance(md.get('tags'), list) else []
     fields = [('title', m.get('title')), ('metadata title', md.get('title')), ('logline', m.get('logline')),
-              ('description', md.get('description')), ('tags', ' '.join(str(t) for t in tags[:50])),
+              ('description', md.get('description')), ('teaser', md.get('teaser')),
+              ('tags', ' '.join(str(t) for t in tags[:50])),
               ('hook', (m.get('hook') or {}).get('text'))]
     fields += [(f'line {ln["id"]}', ln['text']) for ln in m['lines']]
     found = {}
