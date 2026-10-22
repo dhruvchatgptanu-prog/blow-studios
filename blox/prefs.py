@@ -64,6 +64,8 @@ DEFAULTS = {
         'upload_thumbnail': False,
         'notify_subscribers': True,
         'publish_verify_grace_minutes': 45,
+        # First-person story format: the question that closes a built description (teaser, question, hashtags).
+        'story_cta': 'What would you have done? 😳',
     },
     'channel': {
         'niche': 'Funny, emotional Roblox-style obby adventure stories with recurring characters',
@@ -315,6 +317,10 @@ def validate(p):
     _bool(pub['upload_thumbnail'], 'upload thumbnail')
     _bool(pub['notify_subscribers'], 'notify subscribers')
     pub['publish_verify_grace_minutes'] = integer(pub['publish_verify_grace_minutes'], 5, 600, 'verify grace')
+    cta = text(pub['story_cta'], 200, 'story question').strip()
+    if '\n' in cta or '\r' in cta:
+        raise ValueError('story question must be one line')
+    pub['story_cta'] = cta
 
     c = p['channel']
     text(c['niche'], 500, 'niche', allow_empty=False)

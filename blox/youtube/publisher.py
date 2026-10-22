@@ -21,7 +21,7 @@ import os
 import re
 import urllib.parse
 
-from .. import config, db as dbmod, jobs, prefs as prefsmod, store, vault, videos
+from .. import config, db as dbmod, jobs, prefs as prefsmod, store, untrusted, vault, videos
 from ..http import ProviderError
 from ..research import youtube_api as Y
 from ..tasks import handler
@@ -51,16 +51,105 @@ def _set(d, uid, **f):
     d.execute('UPDATE uploads SET ' + ', '.join(f'{k}=?' for k in f) + ' WHERE id=?', (*f.values(), uid))
 
 
-def build_metadata(v, slot_at, p):
+# ---------------------------------------------------------------- packaging for the first-person story format
+FIRST_PERSON = 'first_person_story'
+DEFAULT_STORY_CTA = 'What would you have done? 😳'
+FORMAT_TAGS = ('funny animation', 'storytime', 'animated story')
+TEASER_MAX = 140
+HASHTAGS_MIN, HASHTAGS_MAX = 3, 5
+_SHORTS_TAG = re.compile(r'(?<![\w#])#shorts\b', re.I)
+
+
+def teaser(logline, limit=TEASER_MAX):
+    """The first sentence of the logline, at most ``limit`` characters (cut at a word with "…" when longer)."""
+    s = ' '.join(untrusted.clean(logline, 1000).split())
+    if not s:
+        return ''
+    m = re.match(r'(.+?[.!?])(?:\s|$)', s)
+    if m:
+        s = m.group(1)
+    if len(s) <= limit:
+        return s
+    cut = s[:limit - 1].rsplit(' ', 1)[0].rstrip(' ,;:-–—')
+    return (cut or s[:limit - 1]) + '…'
+
+
+def _hashtag(tag):
+    word = ''.join(re.findall(r'[^\W_]+', untrusted.clean(tag, 80))).lower()
+    return '#' + word if word and not word.isdigit() and len(word) <= 30 else ''
+
+
+def hashtags(topic_tags):
+    """3-5 hashtags: #shorts first, then the plan's topic tags (deduplicated), topped up with the format's own."""
+    out = ['#shorts']
+    for t in topic_tags or []:
+        h = _hashtag(t) if isinstance(t, str) else ''
+        if h and h not in out and len(out) < HASHTAGS_MAX:
+            out.append(h)
+    for t in FORMAT_TAGS:
+        h = _hashtag(t)
+        if h not in out and len(out) < HASHTAGS_MIN:
+            out.append(h)
+    return out
+
+
+def story_description(logline, cta, topic_tags):
+    """Teaser sentence, blank line, the ending question, blank line, hashtags (each part only when present)."""
+    parts = [teaser(logline), ' '.join(untrusted.clean(cta, 200).split()), ' '.join(hashtags(topic_tags))]
+    return '\n\n'.join(x for x in parts if x)
+
+
+def story_format(v, d=None):
+    """(format, logline) of a video's story: from its manifest, else the plan saved with it, else the copy stored at
+    development. Unknown formats give None."""
+    from ..learning import FORMATS, enum_value
+    meta = v.get('metadata') or {}
+    body = {}
+    if v.get('manifest_id'):
+        d = d or dbmod.get()
+        row = d.one('SELECT body FROM manifests WHERE id=?', (v['manifest_id'],))
+        if row:
+            try:
+                body = json.loads(row['body']) or {}
+            except ValueError:
+                body = {}
+    if not isinstance(body, dict):
+        body = {}
+    plan = meta.get('plan') if isinstance(meta.get('plan'), dict) else {}
+    stored = meta.get('format_story') if isinstance(meta.get('format_story'), dict) else {}
+    fmt = None
+    for src in (body, plan, stored):
+        fmt = enum_value(src.get('format'), FORMATS)
+        if fmt:
+            break
+    logline = ''
+    for src in (body, plan, stored):
+        if isinstance(src.get('logline'), str) and src['logline'].strip():
+            logline = src['logline']
+            break
+    return fmt, logline
+
+
+def build_metadata(v, slot_at, p, d=None):
     pub = p['publishing']
     md = v['metadata'].get('publish_metadata') or {}
     title = (md.get('title') or v['title'])[:100]
     desc = (md.get('description') or '').strip()
+    fmt, logline = story_format(v, d)
+    first_person = fmt == FIRST_PERSON
+    raw_tags = md.get('tags')
+    topic_tags = [t for t in raw_tags if isinstance(t, str)] if isinstance(raw_tags, list) else []
+    if first_person and not desc:
+        desc = story_description(logline, pub.get('story_cta', DEFAULT_STORY_CTA), topic_tags)
     footer = pub['description_footer'].strip()
     # Licence attributions for the voices actually used in this video (for example CC BY voice models).
     credits = '\n'.join(v['metadata'].get('voice_credits') or [])
-    description = '\n\n'.join(x for x in (desc, footer, credits, '#Shorts') if x).strip()[:4900]
-    tags = list(dict.fromkeys([t for t in (md.get('tags') or []) + pub['tags'] if t]))
+    shorts = '' if _SHORTS_TAG.search(desc) else '#Shorts'
+    description = '\n\n'.join(x for x in (desc, footer, credits, shorts) if x).strip()[:4900]
+    tags = list(dict.fromkeys([t for t in topic_tags + pub['tags'] if t]))
+    if first_person:
+        have = {t.lower() for t in tags}
+        tags += [t for t in FORMAT_TAGS if t not in have]
     while sum(len(t) + 2 for t in tags) > 450:
         tags.pop()
     status = {'privacyStatus': 'private', 'publishAt': iso_utc(slot_at),
@@ -110,7 +199,7 @@ def upload(ctx):
     path = os.path.join(config.DATA_DIR, d.one('SELECT file FROM renders WHERE id=?', (v['render_id'],))['file'])
     total = os.path.getsize(path)
     if not up:
-        md = build_metadata(v, slot['slot_at'], p)
+        md = build_metadata(v, slot['slot_at'], p, d)
         marker = _marker()
         md['snippet']['tags'] = md['snippet']['tags'] + [marker]
         d.execute('''INSERT INTO uploads(id, video_id, slot_id, status, marker, bytes_total, requested, created_at,

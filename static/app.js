@@ -258,6 +258,7 @@ const TAB_RENDER = {
   originality(d) {
     const m = d.video.metadata;
     $('#tab').innerHTML = `${d.concept ? `<h3>Concept</h3><p><b>${esc(d.concept.premise)}</b></p><p>Hook: ${esc(d.concept.hook)}<br>Ending: ${esc(d.concept.ending)}</p><h3>Inspiration record</h3><pre>${esc(JSON.stringify(JSON.parse(d.concept.inspiration || '{}'), null, 1))}</pre>` : '<p class="muted">No AI concept (manual, demo or template story).</p>'}
+      ${m.title_check ? `<h3>Title closeness · ${chip(m.title_check.blocked ? 'fail' : m.title_check.note ? 'uncertain' : 'pass', m.title_check.blocked ? 'held' : m.title_check.note ? 'note' : 'pass')}</h3><p class="small">Similarity ${esc(m.title_check.score)} (limit ${esc(m.title_check.threshold)})${m.title_check.closest ? ` to “${esc(m.title_check.closest.title)}” · ${esc(m.title_check.closest.channel)}${m.title_check.closest.own ? ' (your channel)' : ''}` : ''}</p>${m.title_check.note ? `<p class="small ${m.title_check.blocked ? 'error' : 'warn'}">${esc(m.title_check.note)}</p>` : ''}` : ''}
       ${['originality_concept', 'originality_script'].map(k => m[k] ? `<h3>${k.replace('_', ' ')} · decision ${chip(m[k].decision === 'pass' ? 'pass' : 'uncertain', m[k].decision)}</h3><table><tr><th>Check</th><th>Value</th><th>Threshold</th><th>Status</th><th>Detail</th></tr>${m[k].checks.map(c => `<tr><td>${esc(c.check)}</td><td>${c.value ?? '—'}</td><td>${c.threshold}</td><td>${chip(c.status)}</td><td class="small">${esc(c.detail)}</td></tr>`).join('')}</table><p class="small muted">${esc(m[k].disclaimer)} Method: ${esc(m[k].method)}</p>` : '').join('')}
       ${m.brief ? `<h3>Research brief</h3><p class="small">${esc(m.brief.note)}</p>${(m.brief.sources || []).map(s => `<p class="small">${esc(s.id)} · ${esc(s.title)} · evidence: ${esc(s.evidence)}</p>`).join('')}
       ${m.brief.owner_notes && m.brief.owner_notes.count ? `<p class="small muted">Owner-supplied notes (read-only data, never instructions): ${m.brief.owner_notes.count} note(s) · ${(m.brief.owner_notes.rules || []).length} rule-like lines · ${Object.keys(m.brief.owner_notes.numbers || {}).length} number kinds${m.brief.owner_notes.flagged_lines_dropped ? ' · ' + m.brief.owner_notes.flagged_lines_dropped + ' flagged line(s) dropped' : ''}</p>` : ''}` : ''}`;
@@ -333,6 +334,31 @@ function renderEditor(d) {
   const showVal = r => { const v = r.validation; $('#val-out').innerHTML = `<p>${v.ok ? '<span class="good">Valid</span>' : `<span class="error">${v.errors.length} error(s)</span>`} · ${v.warnings.length} warning(s)</p>${v.errors.map(x => `<p class="small error">${esc(x.message)}${x.fix ? ' — ' + esc(x.fix) : ''}</p>`).join('')}${v.warnings.map(x => `<p class="small warn">${esc(x.message)}</p>`).join('')}`; };
   bind('#validate', 'click', async () => showVal(await api('validate-plan', 'POST', {plan: S.plan})));
   bind('#save-plan', 'click', async () => { const r = await api(`videos/${S.videoId}/plan`, 'PUT', {plan: S.plan}); showVal(r); toast(r.validation.ok ? 'Saved; ready to produce' : 'Saved with errors (held for review)'); });
+  titleField(P);
+}
+
+/* Editor title field with a one-line hint: how close the title is to the reference titles imported in Research notes. */
+function titleField(P) {
+  const hook = $('#hook-form'); if (!hook || !hook.previousElementSibling) return;
+  const md = P.metadata || {};
+  hook.previousElementSibling.insertAdjacentHTML('beforebegin', `<h3>Title</h3><form id="title-form"><label>Video title<input name="title" maxlength="100" value="${esc(md.title || P.title || '')}"></label><p class="small muted" id="title-hint"></p></form>`);
+  const f = $('#title-form'), hint = $('#title-hint');
+  const check = async () => {
+    const t = f.title.value.trim(); if (!t) { hint.textContent = ''; return; }
+    try {
+      const r = await api('title-check?title=' + encodeURIComponent(t));
+      hint.className = 'small ' + (r.blocked ? 'error' : r.note ? 'warn' : 'muted');
+      hint.textContent = r.blocked || r.note ? (r.reason || r.note) : (r.references ? `Not close to any of ${r.references} reference titles (closest similarity ${r.score}).` : 'No reference titles imported yet (Research notes: reference.jsonl).');
+    } catch (x) { hint.className = 'small muted'; hint.textContent = x.message; }
+  };
+  f.addEventListener('submit', e => e.preventDefault());
+  f.addEventListener('input', () => {
+    P.title = f.title.value; if (P.metadata && P.metadata.title !== undefined) P.metadata.title = f.title.value;
+    // Keep the Plan JSON box in step, so "Apply JSON" afterwards does not bring the old title back.
+    const box = $('#plan-json'); if (box) box.value = JSON.stringify(P, null, 1);
+    clearTimeout(titleField.h); titleField.h = setTimeout(check, 400);
+  });
+  check();
 }
 
 /* ------------------------------------------------------------------ story backlog */
@@ -355,7 +381,7 @@ async function stories() {
     try { data = JSON.parse(e.target.json.value); } catch (x) { throw Error('That is not valid JSON'); }
     const plans = Array.isArray(data) ? data : (data.plans || [data]);
     const r = await api('backlog', 'POST', {plans, source: 'owner'});
-    $('#import-out').innerHTML = r.results.map(x => `<p class="small">${chip(x.status === 'ready' ? 'pass' : x.status === 'duplicate' ? 'uncertain' : 'fail', x.status)} ${esc(x.title)} ${x.reason ? '<span class="muted">' + esc(x.reason) + '</span>' : ''}</p>`).join('');
+    $('#import-out').innerHTML = r.results.map(x => `<p class="small">${chip(x.status === 'ready' ? 'pass' : x.status === 'duplicate' ? 'uncertain' : 'fail', x.status)} ${esc(x.title)} ${x.reason ? '<span class="muted">' + esc(x.reason) + '</span>' : ''}${[x.note, ...(x.warnings || [])].filter(Boolean).map(w => '<br><span class="warn">' + esc(w) + '</span>').join('')}</p>`).join('');
     toast(r.results.filter(x => x.status === 'ready').length + ' stories added');
     setTimeout(stories, 2500);
   });
@@ -487,7 +513,7 @@ async function budget() {
     <div class="panel"><h2>How estimates are made</h2><p>${esc(b.estimate_method)}</p><p class="small">Current price table: ${Object.entries(b.prices).map(([k, v]) => esc(k) + ' ' + v).join(' · ')}</p></div>
     <div class="grid g2"><div class="panel tablewrap"><h2>Ledger</h2>${b.ledger.length ? `<table><tr><th>When</th><th>Category</th><th>Provider</th><th>Status</th><th>Estimate</th><th>Actual</th></tr>${b.ledger.map(x => `<tr><td class="small">${when(x.created_at)}</td><td>${esc(x.category)}</td><td>${esc(x.provider)}</td><td>${chip(x.status)}</td><td>${money(x.estimate)}</td><td>${x.actual == null ? '—' : money(x.actual) + ' ' + esc(x.actual_kind)}</td></tr>`).join('')}</table>` : empty('No paid activity yet.')}</div>
     <div class="panel"><h2>Learning from your videos</h2><p class="small">${esc((a.status || {}).note || 'No analytics collected yet.')}</p>
-      ${a.findings.length ? a.findings.map(f => `<div class="panel"><p>${chip(f.kind === 'finding' ? 'pass' : 'uncertain', f.kind)} <b>${esc(f.feature)}</b>: ${esc(f.body.better)} ${f.body.mean_better}% vs ${esc(f.body.worse)} ${f.body.mean_worse}% average viewed (n=${f.body.n_better} vs ${f.body.n_worse})</p><p class="small muted">${esc(f.body.caveat)} CI95 ${esc(JSON.stringify(f.body.ci95))}</p></div>`).join('') : empty('No comparisons yet. They need published videos with analytics older than the minimum age.')}</div></div>`);
+      ${a.findings.length ? a.findings.map(f => `<div class="panel"><p>${chip(f.kind === 'finding' ? 'pass' : 'uncertain', f.kind)} <b>${esc(f.feature)}</b>: ${f.body.metric === 'views' ? `median views by mechanism: ${Object.entries(f.body.groups || {}).map(([k, g]) => esc(k) + ' ' + Number(g.median_views).toLocaleString() + ' (n=' + g.n + ')').join(' · ')}` : `${esc(f.body.better)} ${f.body.mean_better}% vs ${esc(f.body.worse)} ${f.body.mean_worse}% average viewed (n=${f.body.n_better} vs ${f.body.n_worse})`}</p><p class="small muted">${esc(f.body.caveat)} CI95 ${esc(JSON.stringify(f.body.ci95))}</p></div>`).join('') : empty('No comparisons yet. They need published videos with analytics older than the minimum age.')}</div></div>`);
 }
 
 /* ------------------------------------------------------------------ connections */
@@ -534,7 +560,7 @@ async function notesPanel() {
       ${h.rules.length ? `<ul class="small">${h.rules.slice(0, 12).map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p class="muted small">No rule-like lines found yet.</p>'}` : empty('No notes yet.')}</div></div>
   ${r.notes.length ? `<div class="panel"><h2>Imported notes</h2><div class="tablewrap"><table><tr><th>Title</th><th>Source</th><th>Kind</th><th>Extracted</th><th>Added</th><th></th></tr>
     ${r.notes.map(n => { const x = n.extracted || {}; return `<tr><td>${esc(n.title)}</td><td class="small muted">${esc(n.source)}</td><td class="small">${esc(n.kind)}</td>
-      <td class="small">${(x.titles || []).length} titles · ${(x.video_ids || []).length} ids · ${(x.urls || []).length} urls · ${(x.numbers || []).length} numbers · ${(x.rules || []).length} rules${(x.injection_flags || []).length ? ' · ' + chip('uncertain', 'flagged: ' + x.injection_flags.join(', ').slice(0, 60)) : ''}</td>
+      <td class="small">${(x.titles || []).length} titles · ${(x.video_ids || []).length} ids · ${(x.urls || []).length} urls · ${(x.numbers || []).length} numbers · ${(x.rules || []).length} rules${x.reference_titles_count ? ' · ' + x.reference_titles_count + ' reference titles' : ''}${(x.injection_flags || []).length ? ' · ' + chip('uncertain', 'flagged: ' + x.injection_flags.join(', ').slice(0, 60)) : ''}</td>
       <td class="small">${when(n.created_at)}</td><td><button class="small quiet" data-note-del="${esc(n.id)}">remove</button></td></tr>`; }).join('')}</table></div></div>` : ''}`;
   bind('#note-paste', 'submit', async e => { const f = e.target; await api('research/notes', 'POST', {text: f.text.value, title: f.title.value, kind: f.kind.value}); toast('Note added'); notesPanel(); });
   bind('#note-upload', 'submit', async e => { const b = e.target.querySelector('button'); b.disabled = true; try { const r2 = await api('research/notes', 'POST', new FormData(e.target)); toast('Imported ' + r2.count + ' note(s)'); notesPanel(); } finally { b.disabled = false; } });
@@ -587,6 +613,7 @@ async function settings() {
     <div class="row">${inp('publishing', 'category_id', pub.category_id)}${inp('publishing', 'default_language', pub.default_language)}${inp('publishing', 'publish_verify_grace_minutes', pub.publish_verify_grace_minutes, 'number')}</div>
     <label>Tags (comma separated)<input data-sec="publishing" data-key="tags" data-list="1" value="${esc(pub.tags.join(', '))}"></label>
     <label>Description footer<textarea data-sec="publishing" data-key="description_footer">${esc(pub.description_footer)}</textarea></label>
+    <label>Story question (first-person stories: ends the description built from the logline, before the hashtags)<input data-sec="publishing" data-key="story_cta" maxlength="200" value="${esc(pub.story_cta || '')}"></label>
     <label class="check"><input type="checkbox" data-sec="publishing" data-key="notify_subscribers" ${pub.notify_subscribers ? 'checked' : ''}> Notify subscribers</label>
     <label class="check"><input type="checkbox" data-sec="publishing" data-key="upload_thumbnail" ${pub.upload_thumbnail ? 'checked' : ''}> Upload generated thumbnail (Shorts may not display it)</label></div></div>
   <div class="grid g2"><div class="panel"><h2>Channel & niche</h2><label>Niche<textarea data-sec="channel" data-key="niche">${esc(p.channel.niche)}</textarea></label>

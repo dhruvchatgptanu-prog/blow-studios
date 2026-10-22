@@ -26,19 +26,40 @@ overview lists *Paid requests awaiting reconciliation*. Check the provider's das
 ## Story backlog
 
 With no LLM API key (or with Settings → Production → story source set to *backlog*), every new video
-takes the oldest *ready* story from **Story backlog**. The page and the dashboard show how many stories
-are left and how many days they last at your cadence.
+takes a *ready* story from **Story backlog**: the oldest one whose twist type (`story.twist_type`) was not
+used by your last five videos, or simply the oldest one when every ready story repeats a recent twist.
+Stories without a twist type always qualify, so older batches keep their order. The page and the
+dashboard show how many stories are left and how many days they last at your cadence.
 
 * **Add stories:** paste a JSON list of plans (format: the Director's editor *Plan JSON*) and press
   *Validate and add*, or run `python -m blox.cli import-stories file.json --source claude`. Invalid
   plans are rejected with the validator's reasons; exact duplicates are skipped. The repository ships
   two batches: `stories/batch-2026-10-03-claude.json` and the mainstream
   `stories/batch-2026-10-11-mainstream.json` (storytime and skits written to `docs/research/`).
+* **Titles:** a story whose title is too close to another creator's title in your imported reference
+  titles (see Research notes) is rejected, with the closest title in the reason. A title close to one
+  of your own videos is accepted with a note ("a variation of your own video"). Closeness is a
+  similarity score from 0 to 1 over the whole title. Emoji and punctuation are ignored; every word
+  counts, small words such as *I*, *the* and *my* included. For titles in Latin letters it is never
+  lower than your capture tool's `--check-title` score, so a title your tool calls too close is blocked
+  here too. 0.6 or more blocks.
+  Titles in this format share a lot of grammar, so two different stories can reach 0.6 on shared words
+  alone ("I Ate The World's Biggest Burger" and "I Built The World's Biggest Lego Tower" score 0.77).
+* **Twist types and mechanisms in a batch:** a batch that uses the same twist type, or the same
+  mechanism (`story.mechanism`), twice within five stories in a row is still added, with a warning on
+  those stories. Reorder the batch if you want them further apart.
 * **Get more without API costs:** ask Claude in a normal chat with the prompt in `stories/README.md`.
 * **Reject** a story you do not want; **Restore** brings it back. A story whose video is cancelled
   before upload returns to the backlog automatically.
 * At production time each story is screened for originality against research references and your
-  recent videos; a near-duplicate is held for review instead of produced.
+  recent videos; a near-duplicate is held for review instead of produced. The title is checked again
+  against the reference titles imported since; a close title holds the video with the reason (the
+  video's *Originality* tab shows the score).
+* First-person stories (`"format": "first_person_story"`) with no description of their own get one
+  built at upload: a teaser sentence from the logline, the story question (Settings → Publishing →
+  *Story question*, default "What would you have done? 😳"), then three to five hashtags (#shorts plus
+  the plan's tags). The tags *funny animation*, *storytime* and *animated story* are added. Titles stay
+  as written.
 * When the backlog is empty, autopilot starts no new videos and the dashboard says why. Slots without a
   ready video are skipped with the reason.
 
@@ -123,6 +144,23 @@ size and the voice provider. The director's editor has the hook text field.
 words per second, durations, beat spacing and hook times, and rule-like lines), capped in size and screened
 as untrusted data. Notes appear read-only in the research brief and reach story generation only as
 pattern hints inside the untrusted block. Keep transcripts paraphrased; never paste full copied scripts.
+
+* **Reference titles:** upload the `reference.jsonl` from your capture tool (one row per studied video
+  with `id`, `title`, `channel` and `views`; `views` may be null when YouTube hides the count). Up to
+  2,000 rows per file are kept as reference titles with the channel, handle, whether it is your own
+  channel (`own_channel`), views, mechanism, duration, speech words per second, first-word time and
+  longest shot. The capture tool's mechanism names are mapped to the format's names (for example
+  `crime_then_reversal` becomes `crime_reversal`); `role_swap_or_debt`, `crime_or_rulebreak` and `other`
+  have no match and are left empty. Rows with a bad id, an empty title or channel, or views that are not
+  a number are skipped and counted. A title that trips the safety screen (for example one with the word
+  "password") is kept for the title check and marked as flagged. The notes table shows how many were kept.
+* **Never stored:** transcripts (any `transcript`, `captions`, `subtitles`, `segments` field that holds
+  words), and the hook and ending excerpts of other creators' videos. Excerpts of your own videos are
+  kept, cut to 12 words. This applies to the stored note text too, including lines that are not valid
+  JSON. Numbers and timing-only data under those names (a subscriber count, segment start and end
+  times) are kept.
+* The reference titles feed the title check: the Director's editor shows a one-line hint under its
+  title field, the backlog rejects titles too close to another creator's, and development holds them.
 
 ## Channel kit
 
