@@ -142,9 +142,25 @@ def test_spec_hash_changes_with_settings_section_speed_and_context():
     assert tts.line_spec(dict(l4, fit_speed=1.1), ME, pr, manifest=m)['hash'] != base
     assert h(dict(IMPORTED, voice_import={'imported_at': '2026-10-22T00:00:00Z'})) == base, \
         'importing the same voice again does not re-voice (and re-bill) its lines'
-    # A plain ElevenLabs voice voiced without a manifest keeps the cache key it always had.
-    legacy = tts.line_spec(l4, {'id': 'ch_x', 'voice': {'engine': 'elevenlabs', 'elevenlabs_voice_id': VOICE_ID}}, pr)
+    # A plain ElevenLabs voice keeps the cache key (and request) it always had, with or without a manifest: only a
+    # voice from voice.json gets its neighbouring lines, so older projects are not voiced and billed again.
+    plain = {'id': 'ch_x', 'voice': {'engine': 'elevenlabs', 'elevenlabs_voice_id': VOICE_ID}}
+    legacy = tts.line_spec(l4, plain, pr)
     assert 'elevenlabs' not in legacy['spec']
+    with_m = tts.line_spec(l4, plain, pr, manifest=m)
+    assert with_m['hash'] == legacy['hash'] and with_m['elevenlabs']['previous_text'] == ''
+    # A lean voice.json import (no settings) still counts as the owner's voice: it gets the context.
+    lean = dict(plain['voice'], voice_import={'engine': 'elevenlabs', 'voice_id': VOICE_ID})
+    assert tts.line_spec(l4, dict(plain, voice=lean), pr, manifest=m)['elevenlabs']['previous_text']
+
+
+def test_a_plain_elevenlabs_voice_sends_no_neighbouring_lines(eleven, db, tmp_path):
+    p = copy.deepcopy(prefs.get(db))
+    m = manifest()
+    plain = {'id': 'ch_x', 'name': 'X', 'voice': {'engine': 'elevenlabs', 'elevenlabs_voice_id': VOICE_ID}}
+    tts.synthesize_line(m['lines'][3], plain, p, str(tmp_path / 'v'), 'vid1', manifest=m)
+    body = eleven.sent[-1]['json']
+    assert 'previous_text' not in body and 'next_text' not in body
 
 
 def test_voice_lines_passes_the_manifest_and_other_engines_ignore_it(eleven, db, tmp_path, monkeypatch):
@@ -219,6 +235,147 @@ def test_no_key_means_no_request(db, fake_http):
     with pytest.raises(Blocked) as e:
         production.credit_guard(manifest(), CAST, copy.deepcopy(prefs.get(db)))
     assert e.value.state == 'needs_credentials' and fake_http.calls == []
+
+
+def test_a_key_without_account_read_access_is_explained(db, fake_http):
+    vault.put('ELEVENLABS_API_KEY', 'xi-test', db)
+    fake_http.on('GET', SUB, status=401, json_body={'detail': {
+        'status': 'missing_permissions',
+        'message': 'The API key you used is missing the permission user_read to execute this operation.'}})
+    with pytest.raises(Blocked) as e:
+        tts.check_elevenlabs_credits(10)
+    msg = str(e.value)
+    assert e.value.state == 'needs_credentials' and 'not allowed to read your account' in msg and '"User"' in msg
+    assert 'did not accept' not in msg and 'xi-test' not in msg
+    assert fake_http.count('POST', TTS) == 0
+
+
+# ----------------------------------------------------------------------------- re-voices inside the quarter
+def long_lines():
+    """Four lines of the imported voice, each slightly longer than its slot (the fake take lasts 0.8 s, a slot
+    0.733 s), at production pace 1.5 so line fitting may speed them up natively."""
+    texts = ['I sued the moon.', 'It sued me back.', 'The judge was a tide.', 'I lost the ocean.']
+    lines = [dict(line(i + 1, 'me', 22 * i, t), pause_after_ms=0) for i, t in enumerate(texts)]
+    return {'fps': 30, 'duration_frames': 88, 'pace': {'timeline': 1.5, 'speech_rate': 1.3},
+            'beats': [{'start_frame': 0, 'end_frame': 88, 'purpose': 'escalation'}], 'lines': lines}
+
+
+def sent_chars(eleven):
+    return sum(len(c['json']['text']) for c in eleven.sent)
+
+
+@pytest.mark.skipif(not have('ffmpeg'), reason='needs FFmpeg')
+@pytest.mark.parametrize('quarters', [4, 6, 40])
+def test_re_voices_never_take_a_video_past_a_quarter_of_what_was_left(eleven, db, tmp_path, quarters):
+    """The reviewer's case: first takes at exactly 25% of what is left, then lines slightly over their slot. The
+    re-voices to fit count against the same quarter: nothing goes over it, whatever the headroom."""
+    p = copy.deepcopy(prefs.get(db))
+    m = long_lines()
+    cast = {'me': ME}
+    need = production.elevenlabs_characters(m, cast, p)
+    left = need * quarters
+    eleven.on('GET', SUB, json_body={'character_count': 100000 - left, 'character_limit': 100000})
+    budget = production.CreditBudget()
+    wd = str(tmp_path / 'v')
+    results = production.voice_lines(m, cast, p, wd, 'vid1', budget=budget)
+    _, _, report = production.retime(m, results, p, max_shift_s=0.0,
+                                     revoice=production.revoicer(m, cast, p, wd, 'vid1', budget=budget))
+    assert sent_chars(eleven) <= 0.25 * left, (sent_chars(eleven), left, report)
+    assert tts.elevenlabs_sent('vid1', db) == sent_chars(eleven), 'the ledger counts the same characters'
+    tried = [r for r in report if r['action'] in ('native_speed', 'native_speed_skipped')]
+    assert len(tried) == 4, report
+    skipped = [r for r in report if r['action'] == 'native_speed_skipped']
+    if quarters == 4:
+        assert eleven.count('POST', TTS) == 4 and len(skipped) == 4, 'no room left: no re-voice is sent'
+        assert all(r['reason'] == 'credits' for r in skipped)
+    elif quarters == 6:
+        assert 0 < len(skipped) < 4, 'some re-voices fit in the quarter, the rest are skipped'
+    else:
+        assert not skipped and eleven.count('POST', TTS) == 8, 'plenty left: every line is re-voiced'
+    assert eleven.count('GET', SUB) == 1, 'one credit check covers the first takes and the re-voices'
+
+
+@pytest.mark.skipif(not have('ffmpeg'), reason='needs FFmpeg')
+def test_a_re_voice_checks_the_credits_when_the_run_had_none_to_check(eleven, db, tmp_path):
+    p = copy.deepcopy(prefs.get(db))
+    m = long_lines()
+    eleven.on('GET', SUB, json_body={'character_count': 99990, 'character_limit': 100000})  # 10 left
+    rv = production.revoicer(m, {'me': ME}, p, str(tmp_path / 'v'), 'vid1')
+    assert rv(m['lines'][0], 1.08) == {'skipped': 'credits'}
+    assert eleven.count('GET', SUB) == 1 and eleven.count('POST', TTS) == 0
+
+
+@pytest.mark.skipif(not have('ffmpeg'), reason='needs FFmpeg')
+def test_takes_already_paid_for_are_not_counted_again(eleven, db, tmp_path):
+    p = copy.deepcopy(prefs.get(db))
+    m = manifest()
+    production.voice_lines(m, CAST, p, str(tmp_path / 'v'), 'vid1')
+    assert production.elevenlabs_characters(m, CAST, p, video_id='vid1') == 0, 'reused from the ledger, not billed'
+    assert production.elevenlabs_characters(m, CAST, p, video_id='vid2') > 0
+    assert production.elevenlabs_characters(m, CAST, p, video_id='vid1', attempts={'l1': 1}) == \
+        len(m['lines'][0]['text']), 'a repair take is a new request'
+    n = eleven.count('GET', SUB)
+    production.voice_lines(m, CAST, p, str(tmp_path / 'v'), 'vid1')
+    assert eleven.count('GET', SUB) == n, 'nothing to bill, so nothing to check'
+
+
+# ----------------------------------------------------------------------------- the pipeline, and the owner's OK
+@pytest.mark.skipif(not have('ffmpeg'), reason='needs FFmpeg')
+def test_the_voice_task_stops_then_goes_on_once_with_the_owners_ok(eleven, db, client, tmp_path):
+    import json
+
+    from blox import pipeline, repo, store, videos
+    from blox.demo import plan
+    from blox.manifest import compile as C
+    m = C.compile_plan(plan(), fps=30, width=540, height=960, pace=1.5, speech_rate=1.3)
+    m['lines'] = m['lines'][:3]
+    for cid in ('ch_bloxy', 'ch_pip'):
+        ch = repo.characters(active_only=False, d=db)[cid]
+        repo.save_character(cid, ch['name'], ch['bible'], dict(ch['voice'], **IMPORTED), True, db)
+    vid = videos.create('Credit stop', 'autopilot', status='storyboarded', d=db)
+    mid = repo.save_manifest(vid, m, 'test', '', {}, db)
+    db.execute('UPDATE videos SET manifest_id=? WHERE id=?', (mid, vid))
+    p = prefs.get(db)
+    need = production.elevenlabs_characters(m, pipeline._cast(m, db), p)
+    left = need * 3  # the video would use a third of what is left
+    eleven.on('GET', SUB, json_body={'character_count': 100000 - left, 'character_limit': 100000})
+
+    class Ctx:
+        payload = {'manifest_id': mid}
+        video_id = vid
+
+        def beat(self, force=False):
+            pass
+    with pytest.raises(tts.CreditStop) as e:
+        pipeline.voice(Ctx())
+    assert e.value.state == 'needs_review' and tts.CREDIT_APPROVE_BUTTON in str(e.value)
+    assert eleven.count('POST', TTS) == 0
+    stop = videos.get(vid, db)['metadata']['credit_stop']
+    assert stop['chars'] == need and stop['left'] == left
+    videos.hold(vid, 'needs_review', str(e.value))  # what the worker does with a stop
+    # The owner's button: only for a video the credit check stopped.
+    other = videos.create('No stop', 'autopilot', status='needs_review', d=db)
+    assert client.post(f'/api/videos/{other}/approve_credits', json={}).status_code == 400
+    r = client.post(f'/api/videos/{vid}/approve_credits', json={})
+    assert r.status_code == 200, r.get_json()
+    v = videos.get(vid, db)
+    assert v['status'] == 'storyboarded' and v['metadata']['credit_approval']['chars'] == need
+    assert db.query("SELECT kind FROM tasks WHERE video_id=? AND kind='video.voice'", (vid,))
+    audit = [a for a in store.recent_audit(20, db) if a['action'] == 'elevenlabs_credits_approved']
+    assert audit and audit[0]['detail'] == {'video': vid, 'chars': need, 'left': left}
+    out = pipeline.voice(Ctx())
+    assert eleven.count('POST', TTS) >= 3 and out
+    meta = videos.get(vid, db)['metadata']
+    assert meta.get('credit_approval') is None and meta.get('credit_stop') is None, 'the OK is used up'
+    # Once only: voicing a line again later (the owner's "re-voice line") is checked against what the video has
+    # already used, so the video as a whole stays inside the quarter.
+    assert client.post(f'/api/videos/{vid}/revoice_line', json={'line': m['lines'][0]['id']}).status_code == 200
+    before = eleven.count('POST', TTS)
+    with pytest.raises(tts.CreditStop) as e:
+        pipeline.voice(Ctx())
+    assert e.value.already == sent_chars(eleven) and 'has used about' in str(e.value)
+    assert eleven.count('POST', TTS) == before
+    assert json.loads(json.dumps(videos.get(vid, db)['metadata']['credit_stop']))['already'] == e.value.already
 
 
 @pytest.mark.skipif(not have('ffmpeg'), reason='needs FFmpeg')

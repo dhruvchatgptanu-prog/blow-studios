@@ -12,13 +12,15 @@ elevenlabs_section_speed  {hook, body, end: 0.7-1.2}: speed multiplier by story 
                   The ElevenLabs speed is settings.speed x the section's speed (x a line-fitting speed-up),
                   clamped to 0.7-1.2.
 voice_import      the consent and approval record of an imported voice.json. Only the import writes it; a save
-                  on the Characters page keeps it while the voice it describes is still the character's.
+                  on the Characters page (or a bake-off pick) keeps it while the voice it describes is still the
+                  character's voice: same engine, same voice id (see after_edit).
 
 voice.json is the owner's description of a voice (made on his Mac): engine, voice_name, voice_id, route
 ('library' or 'clone'), model, settings, section_speed, pace, consent {route, who, statement, date},
 approved_by_dhruv and applies_to. ``parse_voice_json`` validates one as untrusted input. It never carries
 secrets (a field named like a key, token or secret is refused) and Blox never clones a voice: it only uses the
-voice id the owner supplies.
+voice id the owner supplies. Text that only describes (applies_to, consent.statement) is shortened, with a note
+in the preview, instead of refusing the file; everything Blox acts on is checked strictly.
 """
 import datetime
 import json
@@ -46,6 +48,10 @@ SECRET_WORDS = ('key', 'token', 'secret')
 VOICE_JSON_FIELDS = ('engine', 'voice_name', 'voice_id', 'route', 'model', 'settings', 'section_speed', 'pace',
                      'consent', 'approved_by_dhruv', 'applies_to')
 VOICE_JSON_MAX_BYTES = 64 * 1024
+# Descriptive text kept with the record: longer text is shortened (with a note in the preview), not refused.
+STATEMENT_MAX = 1000
+APPLIES_TO_MAX = 300
+APPLIES_TO_ITEMS = 10
 PIPER_SPEAKERS = 904
 SECRET_REFUSED = ('This voice.json has a field named like a key, token or secret. Remove it and import again: '
                   'Blox never takes secrets from a voice file (save API keys on Connections).')
@@ -167,14 +173,40 @@ def elevenlabs_model(voice, default):
 
 
 def kept_import(prev, new):
-    """The voice.json record survives a save on the Characters page while the voice it describes is still the
-    character's ({'voice_import': record}); it is dropped once that voice id is changed."""
+    """The voice.json record survives an edit while the voice it describes is still the character's voice
+    ({'voice_import': record}): the same engine and the same voice id. It is dropped once either changes."""
     rec = (prev or {}).get('voice_import')
     if not isinstance(rec, dict):
         return {}
+    new = new or {}
     field = {'elevenlabs': 'elevenlabs_voice_id', 'piper': 'piper_speaker', 'kokoro': 'kokoro_voice'}.get(rec.get('engine'))
-    cur = (new or {}).get(field) if field else None
-    return {'voice_import': rec} if cur not in (None, '') and str(cur) == str(rec.get('voice_id')) else {}
+    cur = new.get(field) if field else None
+    if new.get('engine') != rec.get('engine') or cur in (None, '') or str(cur) != str(rec.get('voice_id')):
+        return {}
+    return {'voice_import': rec}
+
+
+def after_edit(prev, new):
+    """A character's voice config after an edit that is not a voice.json import (a save on the Characters page, a
+    bake-off pick). The import record stays only while it still describes the voice in use (kept_import). The
+    ElevenLabs model, settings and speed by section were tuned for one ElevenLabs voice id: they are dropped when
+    that id changes, so another voice never runs with them (import a voice.json for the new voice instead)."""
+    prev = prev or {}
+    out = {k: v for k, v in (new or {}).items() if k != 'voice_import'}
+    out.update(kept_import(prev, out))
+    if str(prev.get('elevenlabs_voice_id') or '') != str(out.get('elevenlabs_voice_id') or ''):
+        for k in ELEVENLABS_KEYS:
+            out.pop(k, None)
+    return out
+
+
+def sends_context(voice):
+    """True for an ElevenLabs voice described by a voice.json (its record, or its imported settings): only such a
+    voice gets the neighbouring lines as previous_text / next_text. Other ElevenLabs voices keep the request, and so
+    the cache key, they always had, so older projects are not voiced (and billed) again."""
+    voice = voice or {}
+    rec = voice.get('voice_import')
+    return (isinstance(rec, dict) and rec.get('engine') == 'elevenlabs') or imported_elevenlabs(voice)[0] is not None
 
 
 # ------------------------------------------------------------------ voice.json
@@ -206,14 +238,55 @@ def _no_secrets(node, depth=0, count=None):
             _no_secrets(v, depth + 1, count)
 
 
-def _plain(x, limit, name):
-    """Short plain text: control characters become spaces; longer than ``limit`` is refused."""
+def _clean_text(x):
+    return re.sub(r'\s+', ' ', re.sub(r'[\x00-\x1f\x7f]', ' ', x)).strip()
+
+
+def _plain(x, limit, name, notes=None):
+    """Short plain text: control characters become spaces. Longer than ``limit`` is refused or, when ``notes`` is
+    given (text that only describes), shortened with a note for the preview."""
     if not isinstance(x, str):
         raise ValueError(f'{name} must be text')
-    x = re.sub(r'[\x00-\x1f\x7f]', ' ', x).strip()
+    x = _clean_text(x)
     if len(x) > limit:
-        raise ValueError(f'{name} must be at most {limit} characters')
+        if notes is None:
+            raise ValueError(f'{name} must be at most {limit} characters')
+        notes.append(f'{name} is longer than {limit} characters. Blox keeps the first {limit} with the record; '
+                     f'your voice.json is not changed.')
+        x = x[:limit - 1].rstrip() + '…'
     return x
+
+
+def _applies_to(at, notes):
+    """applies_to only says where the owner uses the voice (a name, a sentence or a list of them). It is kept as a
+    list of text, shortened to APPLIES_TO_MAX characters in all; any other value is ignored with a note."""
+    items = [at] if isinstance(at, str) else at
+    if not isinstance(items, list):
+        notes.append('applies_to is not text or a list of text, so Blox ignored it.')
+        return None
+    items = items[:APPLIES_TO_ITEMS * 10]
+    texts = [x for x in items if isinstance(x, str)]
+    if len(texts) < len(items):
+        notes.append('Some entries of applies_to are not text, so Blox ignored them.')
+    if len(texts) > APPLIES_TO_ITEMS:
+        notes.append(f'applies_to lists more than {APPLIES_TO_ITEMS} entries. Blox keeps the first {APPLIES_TO_ITEMS}.')
+        texts = texts[:APPLIES_TO_ITEMS]
+    out, room, cut = [], APPLIES_TO_MAX, False
+    for x in texts:
+        x = _clean_text(x)
+        if not x:
+            continue
+        if room < 2:
+            cut = True
+            break
+        if len(x) > room:
+            x, cut = x[:room - 1].rstrip() + '…', True
+        out.append(x)
+        room -= len(x)
+    if cut:
+        notes.append(f'applies_to is longer than {APPLIES_TO_MAX} characters. Blox keeps the start of it with the '
+                     f'record; your voice.json is not changed.')
+    return out or None
 
 
 def _date(x, name):
@@ -286,6 +359,7 @@ def parse_voice_json(doc):
         raise ValueError("Free engines have no cloned voices: route must be 'library'")
     voice_id = _voice_id(engine, doc.get('voice_id'))
     record = {'source': 'voice.json', 'engine': engine, 'voice_id': str(voice_id), 'route': route}
+    notes = []
     if doc.get('voice_name') is not None:
         record['voice_name'] = _plain(doc['voice_name'], 80, 'voice_name')
     model = doc.get('model')
@@ -310,7 +384,7 @@ def parse_voice_json(doc):
         if consent.get('who') is not None:
             c['who'] = _plain(consent['who'], 80, 'consent.who')
         if consent.get('statement') is not None:
-            c['statement'] = _plain(consent['statement'], 300, 'consent.statement')
+            c['statement'] = _plain(consent['statement'], STATEMENT_MAX, 'consent.statement', notes)
         if consent.get('date') is not None:
             c['date'] = _date(consent['date'], 'consent.date')
     if route == 'clone' and not (c.get('who') and c.get('date')):
@@ -320,13 +394,10 @@ def parse_voice_json(doc):
         record['consent'] = c
     if doc.get('approved_by_dhruv') is not None:
         record['approved_by_dhruv'] = _date(doc['approved_by_dhruv'], 'approved_by_dhruv')
-    at = doc.get('applies_to')
-    if at is not None:
-        at = [at] if isinstance(at, str) else at
-        if not isinstance(at, list) or len(at) > 10:
-            raise ValueError('applies_to must be a name or a list of up to 10 names')
-        record['applies_to'] = [_plain(x, 40, 'applies_to') for x in at]
-    notes = []
+    if doc.get('applies_to') is not None:
+        at = _applies_to(doc['applies_to'], notes)
+        if at:
+            record['applies_to'] = at
     if engine == 'elevenlabs':
         voice = {'engine': 'elevenlabs', 'elevenlabs_voice_id': voice_id}
         for k, v in (('elevenlabs_model', model), ('elevenlabs_settings', settings),

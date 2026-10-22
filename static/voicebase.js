@@ -62,7 +62,7 @@ window.VoiceBase = (() => {
       <label>Kokoro speed<input name="kokoro_speed" type="number" step="0.05" min="${e.engines.kokoro.speed_range[0]}" max="${e.engines.kokoro.speed_range[1]}" value="${v.kokoro_speed ?? ''}" placeholder="1.0"></label>
       <label>Speechify voice id<input name="speechify_voice_id" value="${esc(v.speechify_voice_id || '')}" placeholder="from your Speechify account"></label>
       <label>Target voice profile<select name="target_profile">${opts(profiles, v.target_profile, plabels)}</select></label></div>
-      ${v.elevenlabs_settings || v.elevenlabs_section_speed || v.elevenlabs_model ? `<p class="small muted">ElevenLabs: ${v.elevenlabs_model ? 'model ' + esc(v.elevenlabs_model) + ' · ' : ''}settings ${esc(show(v.elevenlabs_settings))} · speed by section ${esc(show(v.elevenlabs_section_speed))}</p>` : ''}
+      ${v.elevenlabs_settings || v.elevenlabs_section_speed || v.elevenlabs_model ? `<p class="small muted">ElevenLabs: ${v.elevenlabs_model ? 'model ' + esc(v.elevenlabs_model) + ' · ' : ''}settings ${esc(show(v.elevenlabs_settings))} · speed by section ${esc(show(v.elevenlabs_section_speed))}. These belong to voice id ${esc(v.elevenlabs_voice_id || '–')}: if you type another ElevenLabs voice id and save, they are removed (import a voice.json for the new voice).</p>` : ''}
       ${v.voice_import ? `<div class="small muted">${recordHtml(v.voice_import)}</div>` : ''}
       <div class="actions"><button type="button" data-bakeoff="${esc(id)}">Voice bake-off</button></div><div id="bo-${esc(id)}"></div>`;
   }
@@ -155,11 +155,13 @@ window.VoiceBase = (() => {
   }
 
   function fields(f) {
-    // Imported ElevenLabs settings have no form fields: they are sent back unchanged so a save keeps them (the
-    // voice.json record itself is kept by the server and cannot be edited here).
+    // Imported ElevenLabs settings have no form fields: they are sent back unchanged so a save keeps them, but only
+    // while the ElevenLabs voice id is the one they were imported for (the server drops them too when it changes;
+    // the voice.json record itself is kept by the server and cannot be edited here).
     const v = ((R && R.characters[f.dataset.char]) || {}).voice || {};
     const kept = {};
-    EL_KEYS.forEach(k => { if (v[k]) kept[k] = v[k]; });
+    const sameVoice = !f.elevenlabs_voice_id || f.elevenlabs_voice_id.value === (v.elevenlabs_voice_id || '');
+    if (sameVoice) EL_KEYS.forEach(k => { if (v[k]) kept[k] = v[k]; });
     if (!f.engine) return kept;
     return Object.assign(kept, {engine: f.engine.value, kokoro_voice: f.kokoro_voice.value, speechify_voice_id: f.speechify_voice_id.value,
       kokoro_speed: f.kokoro_speed.value === '' ? null : Number(f.kokoro_speed.value), target_profile: f.target_profile.value});

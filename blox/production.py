@@ -101,31 +101,66 @@ def speaker_of(ln, cast, prefs):
     return cast.get(ln['speaker'])
 
 
-def elevenlabs_characters(m, cast, prefs, only=None):
-    """Characters of text the video's ElevenLabs lines send (only the lines in ``only`` when given)."""
+def elevenlabs_characters(m, cast, prefs, only=None, video_id=None, attempts=None):
+    """Characters the video's ElevenLabs lines will bill (only the lines in ``only`` when given). With
+    ``video_id``, a take already paid for (complete in the ledger, so it is reused) does not count."""
     pr = prefs['production']
     total = 0
     for ln in m['lines']:
         if only is not None and ln['id'] not in only:
             continue
-        who = speaker_of(ln, cast, prefs) or {}
-        if voicecfg.engine_for(who.get('voice'), pr['tts_provider']) == 'elevenlabs':
-            total += len(tts.spoken_text(ln['text'], pr['pronunciations']))
+        total += tts.billed_characters(ln, speaker_of(ln, cast, prefs), pr, video_id,
+                                       (attempts or {}).get(ln['id'], 0), m)
     return total
 
 
-def credit_guard(m, cast, prefs, only=None):
+class CreditBudget:
+    """The ElevenLabs characters one video may use: a quarter of what was left on the owner's plan when it started
+    (tts.credit_allowance), or everything left once the owner approved going on after a stop.
+
+    ``already`` is what the video used before this run (tts.elevenlabs_sent). The first takes are checked as a
+    whole before any is voiced (``start``); every re-voice to fit a slot is counted too (``take``) and is skipped
+    when it would go over the allowance, so the line moves or is rewritten instead. Characters are counted from
+    the text of each request; a take already paid for is not counted again."""
+
+    def __init__(self, already=0, approved=False):
+        self.already = max(0, int(already or 0))
+        self.approved = bool(approved)
+        self.spent = 0          # characters counted in this run
+        self.allowed = None     # what the video may use in all; known after the first credit check
+
+    def start(self, need):
+        """Check the credits left before voicing ``need`` characters of first takes (tts.CreditStop when that is
+        more than the video may use) and count them."""
+        credits = tts.check_elevenlabs_credits(need, already=self.already + self.spent, approved=self.approved)
+        self.allowed = credits['allowed']
+        self.spent += need
+        return credits
+
+    def take(self, n):
+        """Count a re-voice of ``n`` characters. False, with nothing counted, when it would take the video past
+        what it may use. The credits are read first when this run has not checked them yet."""
+        if self.allowed is None:
+            self.allowed = tts.credit_allowance(tts.elevenlabs_credits()['remaining'], self.already, self.approved)
+        if self.already + self.spent + n > self.allowed:
+            return False
+        self.spent += n
+        return True
+
+
+def credit_guard(m, cast, prefs, only=None, budget=None, video_id=None, attempts=None):
     """Before the first paid ElevenLabs line of a video: check the characters left on the owner's plan and stop
-    for the owner (Blocked, needs_review) when this video would use more than a quarter of them. Free and
-    other engines need no check. Returns the characters the video needs (0 when it uses no ElevenLabs voice)."""
-    need = elevenlabs_characters(m, cast, prefs, only)
+    for the owner (tts.CreditStop, needs_review) when this video would use more than a quarter of what was left
+    (``budget``: a CreditBudget, which then also covers this run's re-voices). Free and other engines need no
+    check. Returns the characters the video's first takes bill (0 when it uses no ElevenLabs voice)."""
+    need = elevenlabs_characters(m, cast, prefs, only, video_id, attempts)
     if need:
-        tts.check_elevenlabs_credits(need)
+        (budget if budget is not None else CreditBudget()).start(need)
     return need
 
 
-def voice_lines(m, cast, prefs, work_dir, video_id, only=None, attempts=None, on_line=None):
-    credit_guard(m, cast, prefs, only=only)
+def voice_lines(m, cast, prefs, work_dir, video_id, only=None, attempts=None, on_line=None, budget=None):
+    credit_guard(m, cast, prefs, only=only, budget=budget, video_id=video_id, attempts=attempts)
     results = {}
     for ln in m['lines']:
         if only and ln['id'] not in only:
@@ -143,18 +178,26 @@ def voice_lines(m, cast, prefs, work_dir, video_id, only=None, attempts=None, on
 NATIVE_FIT_MARGIN = 1.03
 
 
-def revoicer(m, cast, prefs, work_dir, video_id, attempts=None):
+def revoicer(m, cast, prefs, work_dir, video_id, attempts=None, budget=None):
     """The re-voice step retime uses when time stretching is off: ``revoice(line, factor)`` voices the line again
     with its engine's own speed raised ``factor`` times (the line's ``fit_speed``), or returns None when the
-    engine has no native speed control or is already at the end of its range."""
+    engine has no native speed control or is already at the end of its range.
+
+    A paid ElevenLabs re-voice is counted against the video's credit ``budget`` (a CreditBudget; the one the
+    first takes were checked with, so the quarter covers both). When it would go over, nothing is sent and
+    {'skipped': 'credits'} is returned: the line then moves or is rewritten like any line that does not fit."""
     pr = prefs['production']
+    budget = budget if budget is not None else CreditBudget()
 
     def revoice(ln, factor):
         who = speaker_of(ln, cast, prefs)
         if not tts.can_speed_up(ln, who, pr, factor, manifest=m):
             return None
-        res = tts.synthesize_line(dict(ln, fit_speed=factor), who, prefs, work_dir, video_id,
-                                  attempt=(attempts or {}).get(ln['id'], 0), manifest=m)
+        fast, attempt = dict(ln, fit_speed=factor), (attempts or {}).get(ln['id'], 0)
+        n = tts.billed_characters(fast, who, pr, video_id, attempt, m)
+        if n and not budget.take(n):
+            return {'skipped': 'credits'}
+        res = tts.synthesize_line(fast, who, prefs, work_dir, video_id, attempt=attempt, manifest=m)
         return dict(res, native_speed=factor)
     return revoice
 
@@ -165,6 +208,11 @@ def _native_fit(ln, r, window, cap, revoice, report):
     caller moves the next line or asks for a rewrite."""
     factor = round(min(cap, max(1.0, r['duration_s'] / max(0.05, window)) * NATIVE_FIT_MARGIN), 4)
     new = revoice(ln, factor) if revoice and factor > 1.0 else None
+    if new and new.get('skipped'):
+        # Not re-voiced: it would take the video past the ElevenLabs characters it may use.
+        report.append({'line': ln['id'], 'action': 'native_speed_skipped', 'speed': factor,
+                       'reason': new['skipped']})
+        return r, 'too_long'
     if not new:
         return r, 'too_long'
     fits = new['duration_s'] <= window
@@ -311,9 +359,11 @@ def produce_local(plan, characters, prefs, work_dir, video_id='local', quality='
     cast = cast_characters(m, characters)
     os.makedirs(work_dir, exist_ok=True)
     log('voicing lines')
-    results = voice_lines(m, cast, prefs, os.path.join(work_dir, 'voice'), video_id)
+    credits = CreditBudget()  # one ElevenLabs allowance for the first takes and the re-voices to fit
+    results = voice_lines(m, cast, prefs, os.path.join(work_dir, 'voice'), video_id, budget=credits)
     m, results, retime_report = retime(m, results, prefs,
-                                       revoice=revoicer(m, cast, prefs, os.path.join(work_dir, 'voice'), video_id))
+                                       revoice=revoicer(m, cast, prefs, os.path.join(work_dir, 'voice'), video_id,
+                                                        budget=credits))
     rep2 = V.validate(m, prefs, measured=True)
     log('solving motion')
     solved = solve(m, cast, results)

@@ -19,6 +19,27 @@ GOOD = {
     'approved_by_dhruv': '2026-10-19', 'applies_to': ['narrator'], 'calibrated_on': 'mac',
 }
 
+# The voice.json template of the owner's own voice skill, filled in the way it is written there: applies_to is one
+# long sentence, consent.statement is his own words, and 'reference' is a path Blox does not use.
+OWNER_TEMPLATE = {
+    'engine': 'elevenlabs',
+    'voice_name': 'Hadel Narrator',
+    'voice_id': 'Ab12Cd34Ef56Gh78',
+    'route': 'library',
+    'model': 'eleven_multilingual_v2',
+    'settings': {'stability': 0.5, 'similarity_boost': 0.85, 'style': 0.15, 'use_speaker_boost': True, 'speed': 1.0},
+    'section_speed': {'hook': 1.06, 'body': 1.0, 'end': 0.93},
+    'pace': {'hook': [4.35, 4.75], 'body': [4.0, 4.4], 'end': [3.7, 4.05], 'max_pause_s': 0.6},
+    'reference': 'hadel/source/ref_metrics.json',
+    'consent': {'route': 'library', 'who': 'Dhruv',
+                'statement': 'I picked this ElevenLabs library voice myself for the narrator of my channels. It is '
+                             'not a clone of anyone. Use it for every ongoing Short until I name another voice, and '
+                             'ask me before changing its settings.',
+                'date': '2026-10-19'},
+    'approved_by_dhruv': '2026-10-20',
+    'applies_to': 'all ongoing Shorts (kpbrainrot, Hadel Films, template channel) unless Dhruv names another voice',
+}
+
 
 def parse(**over):
     doc = copy.deepcopy(GOOD)
@@ -83,7 +104,8 @@ def test_any_key_token_or_secret_field_is_refused(doc):
     ({'section_speed': {'hook': 1.5}}, 'hook'),
     ({'section_speed': {'end': -1}}, 'end'),
     ({'section_speed': [1.0]}, 'section_speed'),
-    ({'consent': dict(GOOD['consent'], statement='x' * 301)}, 'statement'),
+    ({'consent': dict(GOOD['consent'], statement=42)}, 'statement'),
+    ({'consent': dict(GOOD['consent'], who='w' * 81)}, 'who'),
     ({'consent': dict(GOOD['consent'], date='2026-02-30')}, 'date'),
     ({'consent': dict(GOOD['consent'], date='19/10/2026')}, 'date'),
     ({'approved_by_dhruv': 'yesterday'}, 'approved_by_dhruv'),
@@ -97,12 +119,56 @@ def test_any_key_token_or_secret_field_is_refused(doc):
     ({'voice_name': 'n' * 81}, 'voice_name'),
     ({'pace': {'wps': 500}}, 'pace'),
     ({'pace': {'Bad Name': 1}}, 'pace'),
-    ({'applies_to': ['a'] * 11}, 'applies_to'),
 ])
 def test_out_of_range_or_malformed_values_are_refused(over, needle):
     with pytest.raises(ValueError) as e:
         parse(**over)
     assert needle in str(e.value)
+
+
+def test_the_owners_own_voice_json_template_imports_cleanly():
+    out = voicecfg.parse_voice_json(copy.deepcopy(OWNER_TEMPLATE))
+    assert out['voice'] == {'engine': 'elevenlabs', 'elevenlabs_voice_id': 'Ab12Cd34Ef56Gh78',
+                            'elevenlabs_model': 'eleven_multilingual_v2', 'elevenlabs_settings': OWNER_TEMPLATE['settings'],
+                            'elevenlabs_section_speed': OWNER_TEMPLATE['section_speed']}
+    rec = out['record']
+    assert rec['applies_to'] == [OWNER_TEMPLATE['applies_to']], 'the long sentence is kept whole (under 300)'
+    assert rec['consent'] == OWNER_TEMPLATE['consent'] and rec['approved_by_dhruv'] == '2026-10-20'
+    assert rec['pace']['max_pause_s'] == 0.6 and rec['voice_name'] == 'Hadel Narrator'
+    assert out['ignored'] == ['reference'] and out['notes'] == []
+    # The same file with a cloned voice of his own (the skill's route 2) imports too.
+    clone = copy.deepcopy(OWNER_TEMPLATE)
+    clone['route'] = 'clone'
+    clone['consent'].update(route='clone', who='Dhruv (my own voice)')
+    assert voicecfg.parse_voice_json(clone)['record']['route'] == 'clone'
+
+
+@pytest.mark.parametrize('over,kept,note', [
+    ({'applies_to': 'all ongoing Shorts, ' * 40}, lambda r: len(''.join(r['applies_to'])) <= voicecfg.APPLIES_TO_MAX
+     and r['applies_to'][0].endswith('…'), 'applies_to is longer'),
+    ({'applies_to': [f'channel {i}' for i in range(15)]}, lambda r: len(r['applies_to']) == 10, 'more than 10'),
+    ({'applies_to': 42}, lambda r: 'applies_to' not in r, 'not text'),
+    ({'applies_to': {'nested': 'x'}}, lambda r: 'applies_to' not in r, 'not text'),
+    ({'applies_to': ['kpbrainrot', 3, None]}, lambda r: r['applies_to'] == ['kpbrainrot'], 'not text'),
+    ({'consent': dict(GOOD['consent'], statement='My own words. ' * 120)},
+     lambda r: len(r['consent']['statement']) == voicecfg.STATEMENT_MAX and r['consent']['statement'].endswith('…'),
+     'consent.statement is longer'),
+])
+def test_long_or_odd_descriptive_text_is_shortened_with_a_note_not_refused(over, kept, note):
+    out = parse(**over)
+    assert kept(out['record']), out['record']
+    assert any(note in n for n in out['notes']), out['notes']
+    assert out['voice']['elevenlabs_voice_id'] == GOOD['voice_id'], 'the voice itself is unaffected'
+
+
+def test_the_owners_template_applies_through_the_endpoint_with_its_notes(client, db):
+    r = upload(client, '/api/voice-json/apply', OWNER_TEMPLATE)
+    assert r.status_code == 200, r.get_json()
+    v = voice(db)
+    assert v['voice_import']['applies_to'] == [OWNER_TEMPLATE['applies_to']]
+    long = dict(OWNER_TEMPLATE, applies_to='every Short ' * 60)
+    j = upload(client, '/api/voice-json/preview', long).get_json()
+    assert any('applies_to' in n for n in j['notes']) and len(j['record']['applies_to'][0]) <= 300
 
 
 def test_file_level_limits():
@@ -212,6 +278,11 @@ def test_the_endpoint_needs_login_and_csrf(client, db):
     no_csrf.environ_base['HTTP_X_CSRF'] = 'wrong'
     assert upload(no_csrf, '/api/voice-json/apply', GOOD).status_code == 403
     assert 'voice_import' not in voice(db)
+    # The same paths answer a signed-in owner with the CSRF header (so the refusals above come from the guard,
+    # not from a missing route).
+    for path in ('/api/voice-json/preview', '/api/voice-json/apply'):
+        assert upload(client, path, GOOD).status_code == 200
+    assert 'voice_import' in voice(db)
 
 
 def test_a_characters_page_save_keeps_the_record_while_the_voice_is_the_same(client, db):
@@ -227,6 +298,75 @@ def test_a_characters_page_save_keeps_the_record_while_the_voice_is_the_same(cli
     saved = voice(db)
     assert saved['voice_import'] == v['voice_import'], 'the record is import-only: a save cannot rewrite it'
     assert saved['elevenlabs_settings'] == GOOD['settings']
+    # Choosing another engine on the page: the record no longer describes the voice in use.
+    other_engine = copy.deepcopy(body)
+    other_engine['voice']['engine'] = 'piper'
+    assert client.put('/api/characters/ch_bloxy', json=other_engine).status_code == 200
+    assert 'voice_import' not in voice(db)
+    assert voice(db)['elevenlabs_settings'] == GOOD['settings'], 'still the same ElevenLabs voice id'
+    assert upload(client, '/api/voice-json/apply', GOOD).status_code == 200
+    # Typing another ElevenLabs voice id: neither the record nor the old voice's settings carry over, even when
+    # the page sends the old settings back.
     body['voice']['elevenlabs_voice_id'] = 'Other12345678'
     assert client.put('/api/characters/ch_bloxy', json=body).status_code == 200
-    assert 'voice_import' not in voice(db), 'a record for another voice is dropped'
+    saved = voice(db)
+    assert 'voice_import' not in saved, 'a record for another voice is dropped'
+    assert saved['elevenlabs_voice_id'] == 'Other12345678'
+    assert not any(k in saved for k in voicecfg.ELEVENLABS_KEYS), 'the old voice settings are dropped'
+
+
+def test_a_bake_off_pick_drops_a_record_that_no_longer_describes_the_voice(client, db):
+    from blox.voice import bakeoff
+    assert upload(client, '/api/voice-json/apply', GOOD).status_code == 200
+    char = repo.characters(active_only=False, d=db)['ch_bloxy']
+    v = bakeoff.use_voice('ch_bloxy', char, 'piper', '77', db)
+    assert v['engine'] == 'piper' and 'voice_import' not in v and 'voice_import' not in voice(db)
+    assert voice(db)['elevenlabs_settings'] == GOOD['settings'], 'kept with the ElevenLabs voice id they belong to'
+    assert upload(client, '/api/voice-json/apply', GOOD).status_code == 200
+    char = repo.characters(active_only=False, d=db)['ch_bloxy']
+    v = bakeoff.use_voice('ch_bloxy', char, 'elevenlabs', 'Zz99Yy88Xx77', db)
+    assert 'voice_import' not in v and not any(k in v for k in voicecfg.ELEVENLABS_KEYS)
+    # Picking the imported voice itself keeps its record.
+    assert upload(client, '/api/voice-json/apply', GOOD).status_code == 200
+    char = repo.characters(active_only=False, d=db)['ch_bloxy']
+    v = bakeoff.use_voice('ch_bloxy', char, 'elevenlabs', GOOD['voice_id'], db)
+    assert v['voice_import']['voice_id'] == GOOD['voice_id'] and v['elevenlabs_settings'] == GOOD['settings']
+
+
+def test_hear_free_voice_never_uses_an_imported_paid_voice(client, db, fake_http, tmp_path, monkeypatch):
+    """The Characters page's free preview stays free after an ElevenLabs voice.json import (key saved, too)."""
+    import wave
+
+    import numpy as np
+
+    from blox import vault
+    from blox.voice import piper
+    vault.put('ELEVENLABS_API_KEY', 'xi-test', db)
+    d = tmp_path / 'voices'
+    monkeypatch.setenv('BLOX_VOICES_DIR', str(d))
+    (d / piper.DEFAULT_MODEL).mkdir(parents=True)
+    (d / piper.DEFAULT_MODEL / f'{piper.DEFAULT_MODEL}.onnx').write_bytes(b'onnx')
+    (d / piper.DEFAULT_MODEL / f'{piper.DEFAULT_MODEL}.onnx.json').write_text('{}')
+    real_run = piper.media.run
+    spoken = []
+
+    def run(args, timeout=None, **kw):
+        if args[1:3] == ['-m', 'piper']:
+            spoken.append(args)
+            sr = 22050
+            t = np.arange(int(1.2 * sr)) / sr
+            with wave.open(args[args.index('-f') + 1], 'wb') as w:
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(sr)
+                w.writeframes((0.3 * np.sin(2 * np.pi * 160 * t) * 32767).astype(np.int16).tobytes())
+            return b'', b''
+        return real_run(args, timeout=timeout, **kw)
+    monkeypatch.setattr(piper.media, 'run', run)
+    assert upload(client, '/api/voice-json/apply', GOOD).status_code == 200
+    assert voice(db)['engine'] == 'elevenlabs'
+    r = client.post('/api/characters/ch_bloxy/voice-preview', json={})
+    assert r.status_code == 200, r.get_json()
+    assert spoken, 'Piper spoke the preview'
+    assert fake_http.calls == [], 'no request to ElevenLabs (or anywhere)'
+    assert db.query('SELECT * FROM paid_calls') == []

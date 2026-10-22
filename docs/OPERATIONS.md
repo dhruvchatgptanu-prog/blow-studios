@@ -82,13 +82,32 @@ Settings → Production → voice provider.
   and the speed for each part of the story (hook, body, end). It keeps the consent and approval record
   with the voice and shows it, read-only, on the character. Every value is checked. A file with any
   field named like a key, token or secret is refused, and a `clone` voice needs `consent.who` and
-  `consent.date`. Unknown fields are ignored. Blox never clones a voice or creates one: it only uses the
-  voice id you give. The import is in the audit log. An ElevenLabs line is spoken at your speed × the
-  part's speed, and the same speaker's neighbouring lines go with it so the delivery flows. Keep your
-  API key on Connections, never in the file.
+  `consent.date`. Unknown fields (such as `reference`) are ignored. Text that only describes the voice
+  is never a reason to refuse your file: a long `applies_to` is kept shortened to 300 characters, and a
+  long `consent.statement` to 1,000, with a note in the preview. Your file itself is not changed. Blox
+  never clones a voice or creates one: it only uses the voice id you give. The import is in the audit
+  log. An ElevenLabs line is spoken at your speed × the part's speed. Keep your API key on Connections,
+  never in the file.
+* **Neighbouring lines.** For a voice from voice.json, each ElevenLabs request also carries the same
+  speaker's two lines before and one line after, so the delivery flows. They are part of what makes a
+  take. So when a line's text changes (you edit the plan, or a line is rewritten to fit), up to three
+  neighbouring lines of that speaker are voiced, and billed, again too. The credit check counts them.
+  Other ElevenLabs voices are sent as before, so older projects are not voiced again.
+* **Keeping the record honest.** The voice.json record stays on the character while it still describes
+  the voice in use. Choosing another engine, another voice id, or another voice in the bake-off drops it.
+  The imported model, settings and speeds belong to one ElevenLabs voice id: typing another id and
+  saving removes them, so import a voice.json for the new voice. **Hear free voice** on Characters
+  always uses the free Piper voice, never the character's paid voice.
 * **ElevenLabs credits.** Before the first paid ElevenLabs line of a video, Blox reads the characters
-  left on your plan (a free account check). If the video would use more than a quarter of them, it stops
-  and the video waits for you. The message gives both numbers.
+  left on your plan (a free account check). A video may use at most a quarter of what was left when it
+  started. That covers everything it sends: the first takes, a line voiced again at a faster speed to fit
+  its slot, a line you voice again, and a rewritten line. A take already paid for is reused, not billed
+  again. When a faster take would go over the quarter, Blox does not send it; the next line moves or the
+  line is rewritten instead, and the retime report shows `native_speed_skipped`. When the video itself
+  would go over, it stops and waits for you. The message gives the numbers. To go on anyway, press
+  **Use the credits anyway** on the video: it voices that video once, then the usual check applies again.
+  Your approval is in the audit log. The credit check needs an API key that may read your account (in
+  ElevenLabs, read access to "User"). A key without it is refused with that reason, and nothing is voiced.
 
 ## Production style settings
 

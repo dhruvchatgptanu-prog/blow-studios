@@ -30,12 +30,13 @@ Speechify prosody rate, OpenAI ``speed`` on models that take it, ElevenLabs
 rubberband filter (pitch only) or is skipped with the reason on the result.
 """
 import base64
+import json
 import math
 import os
 import re
 import tempfile
 
-from .. import config, media, paid, vault
+from .. import config, db as dbmod, media, paid, vault
 from ..http import ProviderError, request
 from ..manifest import schema as S
 from ..util import Blocked, Retry, stable_hash
@@ -64,6 +65,8 @@ ELEVENLABS_CONTEXT_CHARS = 600
 ELEVENLABS_SUBSCRIPTION_URL = 'https://api.elevenlabs.io/v1/user/subscription'
 # Stop for the owner before voicing a video that would use more than this share of the ElevenLabs characters left.
 ELEVENLABS_CREDIT_SHARE_MAX = 0.25
+# The owner's button on a video stopped by the credit check (static/app.js, action approve_credits).
+CREDIT_APPROVE_BUTTON = 'Use the credits anyway'
 
 
 def line_rate(line):
@@ -189,9 +192,12 @@ def elevenlabs_context(m, line, pronunciations=None):
 
 def elevenlabs_request(line, voice, pr, manifest=None):
     """Model, voice settings and continuity text of a line's ElevenLabs request (manifest: for the section and
-    the neighbouring lines; without it the line counts as 'body' and has no neighbours)."""
+    the neighbouring lines; without it the line counts as 'body' and has no neighbours). Only a voice described by
+    a voice.json gets the neighbouring lines (voicecfg.sends_context); other voices keep their old request."""
     section = line_section(manifest, line) if manifest and 'start_frame' in line else 'body'
-    prev, nxt = elevenlabs_context(manifest, line, pr.get('pronunciations'))
+    prev, nxt = '', ''
+    if voicecfg.sends_context(voice):
+        prev, nxt = elevenlabs_context(manifest, line, pr.get('pronunciations'))
     return {'model': voicecfg.elevenlabs_model(voice, pr['elevenlabs_model']), 'section': section,
             'settings': elevenlabs_voice_settings(line, voice, section), 'previous_text': prev, 'next_text': nxt}
 
@@ -239,6 +245,12 @@ def elevenlabs_credits():
         j = r.json()
         limit, used = _credit_count(j['character_limit']), _credit_count(j['character_count'])
     except ProviderError as e:
+        if e.auth and 'permission' in str(e.code or '').lower():
+            # A scoped key: it may make speech but may not read the account, so the credits cannot be checked.
+            raise Blocked('Your ElevenLabs API key works, but it is not allowed to read your account, so Blox '
+                          'could not check the credits left and voiced nothing. In ElevenLabs, give the key read '
+                          'access to "User" (or make a key that has it), save it on Connections, then retry.',
+                          state='needs_credentials')
         if e.auth:
             raise Blocked('ElevenLabs did not accept the API key when Blox checked the credits left. Check the key '
                           'on Connections.', state='needs_credentials')
@@ -252,16 +264,76 @@ def elevenlabs_credits():
     return {'character_limit': limit, 'character_count': used, 'remaining': max(0, limit - used)}
 
 
-def check_elevenlabs_credits(needed):
-    """Stop for the owner when a video's ElevenLabs lines (``needed`` characters) would use more than a quarter
-    of the characters left on the plan. Returns the credit report when it is fine to go on."""
+class CreditStop(Blocked):
+    """The ElevenLabs credit check stopped a video for the owner: it would use more than a quarter of the characters
+    that were left on the plan. ``needed`` is what it still needs, ``already`` what it has used, ``left`` what the
+    plan has left now; the owner may approve going on once (CREDIT_APPROVE_BUTTON)."""
+
+    def __init__(self, message, needed, already, left):
+        super().__init__(message, state='needs_review')
+        self.needed, self.already, self.left = needed, already, left
+
+
+def credit_allowance(left, already=0, approved=False):
+    """ElevenLabs characters one video may use in all: a quarter of what was left on the plan when it started (what
+    is left now plus what the video has already used), or everything left once the owner approved going on."""
+    base = max(0, left) + max(0, already)
+    return base if approved else ELEVENLABS_CREDIT_SHARE_MAX * base
+
+
+def check_elevenlabs_credits(needed, already=0, approved=False):
+    """Stop for the owner when a video's ElevenLabs lines (``needed`` characters, on top of the ``already`` it has
+    used) would take it past a quarter of the characters left on the plan (CreditStop). With the owner's approval
+    only a plan that has too few characters left stops it. Returns the credit report, with ``allowed`` (what the
+    video may use in all), when it is fine to go on."""
     credits = elevenlabs_credits()
     left = credits['remaining']
-    if needed > ELEVENLABS_CREDIT_SHARE_MAX * left:
-        raise Blocked(f'This video needs about {needed:,} ElevenLabs characters and your plan has {left:,} left. '
-                      f'That is more than a quarter of what is left, so Blox stopped before voicing it. Add '
-                      f'credits or shorten the script, then retry.', state='needs_review')
-    return credits
+    allowed = credit_allowance(left, already, approved)
+    if already + needed <= allowed:
+        return dict(credits, allowed=allowed)
+    if approved:
+        raise Blocked(f'This video needs about {needed:,} more ElevenLabs characters and your plan has only '
+                      f'{left:,} left. Add credits or shorten the script, then retry.', state='needs_review')
+    used = (f'This video has used about {already:,} ElevenLabs characters and needs about {needed:,} more; '
+            if already else f'This video needs about {needed:,} ElevenLabs characters and ')
+    raise CreditStop(f'{used}your plan has {left:,} left. That is more than a quarter of what '
+                     f'{"was left when the video started" if already else "is left"}, so Blox stopped before voicing '
+                     f'{"more of it" if already else "it"}. Add credits or shorten the script, then retry. Or press '
+                     f'"{CREDIT_APPROVE_BUTTON}" on the video to go on this once.', needed, already, left)
+
+
+def paid_key(video_id, line, spec_hash):
+    """The paid-call ledger key of one take of a line (one take is billed once, see blox.paid)."""
+    return f'tts:{video_id}:{line["id"]}:{spec_hash}'
+
+
+def billed_characters(line, character, pr, video_id=None, attempt=0, manifest=None):
+    """ElevenLabs characters voicing this take of the line will bill: its spoken text, or 0 when the line uses
+    another engine or this exact take was already paid for (its ledger entry is complete, so it is reused)."""
+    if voicecfg.engine_for((character or {}).get('voice'), pr['tts_provider']) != 'elevenlabs':
+        return 0
+    ls = line_spec(line, character, pr, attempt, manifest)
+    if video_id is not None:
+        row = paid.get(paid_key(video_id, line, ls['hash']))
+        if row and row['status'] == 'completed':
+            return 0
+    return len(ls['say'])
+
+
+def elevenlabs_sent(video_id, d=None):
+    """ElevenLabs characters already sent for a video, from the paid-call ledger: completed requests and requests
+    whose outcome is unknown (they may have been charged). Untrusted-safe: odd entries count as 0."""
+    d = d or dbmod.get()
+    total = 0
+    for r in d.query("SELECT request_summary FROM paid_calls WHERE provider='elevenlabs' AND operation='tts' AND "
+                     "video_id=? AND status IN ('completed', 'intent', 'ambiguous')", (video_id,)):
+        try:
+            n = json.loads(r['request_summary'] or '{}').get('chars', 0)
+        except (ValueError, TypeError, AttributeError):
+            n = 0
+        if isinstance(n, int) and not isinstance(n, bool) and 0 <= n <= 1_000_000:
+            total += n
+    return total
 
 
 def _local_tts(text, voice, out_path):
@@ -493,7 +565,7 @@ def synthesize_line(line, character, prefs, work_dir, video_id, attempt=0, use_a
             raise Blocked('Connect Speechify (API key on Connections) or choose another voice engine',
                           state='needs_credentials')
         est = estimate_cost(say, provider, prefs['budget']['prices'], line['pace'])
-        key = f'tts:{video_id}:{line["id"]}:{h}'
+        key = paid_key(video_id, line, h)
 
         def call():
             if provider == 'openai':

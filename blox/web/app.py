@@ -336,7 +336,16 @@ def create_app():
             videos.merge_metadata(vid, {'owner_approved': True, 'owner_approved_at': now()}, d)
         elif action == 'unapprove':
             videos.merge_metadata(vid, {'owner_approved': False}, d)
-        elif action == 'resume':
+        elif action in ('resume', 'approve_credits'):
+            if action == 'approve_credits':
+                # The owner goes on once after the ElevenLabs credit check stopped this video (over a quarter of
+                # the characters left). Only for that stop; the numbers recorded are the ones the owner was shown.
+                stop = v['metadata'].get('credit_stop')
+                if v['status'] != 'needs_review' or not isinstance(stop, dict):
+                    raise ValueError('Only a video stopped by the ElevenLabs credit check can go on this way')
+                seen = {k: stop.get(k) for k in ('chars', 'left') if isinstance(stop.get(k), int)}
+                videos.merge_metadata(vid, {'credit_approval': dict(seen, at=now())}, d)
+                store.audit('elevenlabs_credits_approved', dict(seen, video=vid), actor='owner', d=d)
             videos.resume(vid, d=d)
             st = videos.get(vid, d)['status']
             if st in ('discovered', 'researched', 'concept_selected', 'scripted'):
@@ -755,7 +764,9 @@ def create_app():
         if mv and C.measured_voice(prev) == mv and piper_mod.speaker_for(cid, prev) == piper_mod.speaker_for(cid, clean_voice) \
                 and prev.get('piper_length_scale') == clean_voice.get('piper_length_scale'):
             clean_voice.update({k: float(voice[k]) for k in S.MEASURED_VOICE_KEYS})
-        clean_voice.update(voicecfg.kept_import(prev, clean_voice))  # voice.json consent record: import-only
+        # The voice.json record is import-only and kept while it describes the voice in use; imported ElevenLabs
+        # settings are dropped when the ElevenLabs voice id changes.
+        clean_voice = voicecfg.after_edit(prev, clean_voice)
         repo.save_character(cid, name, clean_bible, clean_voice, bool(body.get('active', True)))
         store.audit('character_saved', {'id': cid}, actor='owner')
         return jsonify(ok=True)
@@ -797,6 +808,9 @@ def create_app():
         body = request.get_json(silent=True) or {}
         from ..voice import piper, tts
         voice = dict(chars[cid]['voice'])
+        # Always the free Piper voice: a character's engine override (e.g. an imported ElevenLabs voice) is left out
+        # here, so this button never sends a paid request.
+        voice.pop('engine', None)
         if body.get('piper_speaker') not in (None, ''):
             voice['piper_speaker'] = _speaker(body.get('piper_speaker'))
         voice.update(_delivery(body))  # hear unsaved pitch/delivery edits

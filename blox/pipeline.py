@@ -344,10 +344,21 @@ def voice(ctx):
     force = ctx.payload.get('force', {})
     rows = {r['line_key']: r for r in repo.lines(mid, d)}
     # Before the first paid ElevenLabs line: stop for the owner if this video would use over a quarter of the
-    # characters left on the plan (free engines need no check).
-    production.credit_guard(m, cast, p, only=[ln['id'] for ln in m['lines'] if not (
-        ln['id'] in rows and rows[ln['id']]['status'] == 'done' and rows[ln['id']]['text'] == ln['text']
-        and not force.get(ln['id']))])
+    # characters that were left on the plan when it started (what it already used counts; free engines need no
+    # check). The same allowance covers this run's re-voices to fit. The owner may approve going on once.
+    meta = videos.get(vid, d)['metadata']
+    approved = bool(meta.get('credit_approval'))
+    credit = production.CreditBudget(already=production.tts.elevenlabs_sent(vid, d), approved=approved)
+    try:
+        production.credit_guard(m, cast, p, budget=credit, video_id=vid,
+                                attempts={k: r['repair_attempts'] for k, r in rows.items()},
+                                only=[ln['id'] for ln in m['lines'] if not (
+                                    ln['id'] in rows and rows[ln['id']]['status'] == 'done'
+                                    and rows[ln['id']]['text'] == ln['text'] and not force.get(ln['id']))])
+    except production.tts.CreditStop as e:
+        videos.merge_metadata(vid, {'credit_stop': {'chars': e.already + e.needed, 'needed': e.needed,
+                                                    'already': e.already, 'left': e.left, 'at': now()}}, d)
+        raise
 
     def alignment(res):
         return {'words': res['words'], 'provider': res['provider'], 'test_voice': res['test_voice'],
@@ -371,7 +382,11 @@ def voice(ctx):
     results = repo.line_results(mid, d)
     attempts = {r['line_key']: r['repair_attempts'] for r in repo.lines(mid, d)}
     m2, fitted, report = production.retime(m, results, p,
-                                           revoice=production.revoicer(m, cast, p, wd, vid, attempts=attempts))
+                                           revoice=production.revoicer(m, cast, p, wd, vid, attempts=attempts,
+                                                                       budget=credit))
+    if approved or meta.get('credit_stop'):
+        # The owner's approval covers one voicing run; a later run is checked again.
+        videos.merge_metadata(vid, {'credit_approval': None, 'credit_stop': None}, d)
     too_long = [r for r in report if r['action'] == 'rewrite_needed']
     if too_long:
         n_rw = int(videos.get(vid, d)['metadata'].get('line_rewrites', 0))
