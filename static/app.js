@@ -176,6 +176,7 @@ async function videoDetail() {
   bind('[data-act]', 'click', async e => {
     const act = e.target.dataset.act;
     if (act === 'cancel' && !confirm('Cancel this video? Provider work already submitted may still finish and be charged.')) return;
+    if (act === 'approve_credits' && !confirm('Voice this video with ElevenLabs although it uses more than a quarter of the credits left? This is for this video, this once.')) return;
     const r = await api(`videos/${S.videoId}/${act}`, 'POST', {});
     if (r.id) { S.videoId = r.id; S.plan = null; }
     toast('Done: ' + act); productions();
@@ -186,6 +187,7 @@ function actionButtons(v) {
   const b = [];
   if (['scripted', 'concept_selected', 'discovered', 'researched'].includes(v.status)) b.push('<button class="primary" data-act="produce">Produce</button>');
   if (['blocked', 'needs_review', 'needs_credentials'].includes(v.status)) b.push('<button class="primary" data-act="resume">Resume</button>');
+  if (v.status === 'needs_review' && v.metadata.credit_stop) b.push('<button data-act="approve_credits">Use the credits anyway</button>');
   if (v.status === 'approved') b.push(v.metadata.owner_approved ? '<button data-act="unapprove">Withdraw approval</button>' : '<button class="primary" data-act="approve">Approve for publishing</button>');
   if (v.metadata.plan) b.push('<button data-act="duplicate">Duplicate</button>');
   if (!['published', 'cancelled', 'failed'].includes(v.status)) b.push('<button class="danger" data-act="cancel">Cancel</button>');

@@ -184,10 +184,12 @@ def rescore(cid, char, d=None):
 
 
 def use_voice(cid, char, engine, voice_name, d=None):
-    """Write the candidate into the character's voice config (engine override plus the engine's voice key)."""
+    """Write the candidate into the character's voice config (engine override plus the engine's voice key). A
+    voice.json record or imported ElevenLabs settings that no longer describe the voice in use are dropped."""
     d = d or dbmod.get()
     voice = voice_override(char.get('voice'), engine, voice_name)
     voice.update(voicecfg.clean(voice))
+    voice = voicecfg.after_edit(char.get('voice'), voice)
     repo.save_character(cid, char['name'], char['bible'], voice, bool(char.get('active', True)), d)
     store.audit('voice_chosen', {'id': cid, 'engine': engine, 'voice': str(voice_name)}, actor='owner', d=d)
     return voice

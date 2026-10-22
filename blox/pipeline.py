@@ -341,26 +341,52 @@ def voice(ctx):
     m = mf['body']
     cast = _cast(m, d)
     wd = work_dir(vid, 'voice')
+    force = ctx.payload.get('force', {})
+    rows = {r['line_key']: r for r in repo.lines(mid, d)}
+    # Before the first paid ElevenLabs line: stop for the owner if this video would use over a quarter of the
+    # characters that were left on the plan when it started (what it already used counts; free engines need no
+    # check). The same allowance covers this run's re-voices to fit. The owner may approve going on once.
+    meta = videos.get(vid, d)['metadata']
+    approved = bool(meta.get('credit_approval'))
+    credit = production.CreditBudget(already=production.tts.elevenlabs_sent(vid, d), approved=approved)
+    try:
+        production.credit_guard(m, cast, p, budget=credit, video_id=vid,
+                                attempts={k: r['repair_attempts'] for k, r in rows.items()},
+                                only=[ln['id'] for ln in m['lines'] if not (
+                                    ln['id'] in rows and rows[ln['id']]['status'] == 'done'
+                                    and rows[ln['id']]['text'] == ln['text'] and not force.get(ln['id']))])
+    except production.tts.CreditStop as e:
+        videos.merge_metadata(vid, {'credit_stop': {'chars': e.already + e.needed, 'needed': e.needed,
+                                                    'already': e.already, 'left': e.left, 'at': now()}}, d)
+        raise
+
+    def alignment(res):
+        return {'words': res['words'], 'provider': res['provider'], 'test_voice': res['test_voice'],
+                'asr_text': res['asr_text'], 'voiced_regions': res['voiced_regions'], 'peak_dbfs': res['peak_dbfs'],
+                'internal_silence_s': res['internal_silence_s'], 'voice_meta': res.get('voice_meta'),
+                'pitch_skipped': (res.get('post') or {}).get('pitch_skipped')}
     for ln in m['lines']:
         ctx.beat()
         row = repo.upsert_line(vid, mid, ln, d)
-        if row['status'] == 'done' and row['text'] == ln['text'] and not ctx.payload.get('force', {}).get(ln['id']):
+        if row['status'] == 'done' and row['text'] == ln['text'] and not force.get(ln['id']):
             continue
-        who = cast.get(ln['speaker']) if ln['speaker'] != 'narrator' else {'name': 'Narrator', 'voice': {}}
+        who = production.speaker_of(ln, cast, p)
         attempt = row['repair_attempts']
-        res = production.tts.synthesize_line(ln, who, p, wd, vid, attempt=attempt)
+        res = production.tts.synthesize_line(ln, who, p, wd, vid, attempt=attempt, manifest=m)
         repo.upsert_line(vid, mid, ln, d, status='done', file=repo.rel(res['file']), duration_s=res['duration_s'],
                          spoken_text=res['spoken_text'], alignment_kind=res['alignment_kind'], spec_hash=res['spec_hash'],
-                         text=ln['text'], voice=res['voice'],
-                         alignment={'words': res['words'], 'provider': res['provider'], 'test_voice': res['test_voice'],
-                                    'asr_text': res['asr_text'], 'voiced_regions': res['voiced_regions'],
-                                    'peak_dbfs': res['peak_dbfs'], 'internal_silence_s': res['internal_silence_s'],
-                                    'voice_meta': res.get('voice_meta')})
+                         text=ln['text'], voice=res['voice'], alignment=alignment(res))
     credits = sorted({(r['alignment'] or {}).get('voice_meta', {}).get('attribution')
                       for r in repo.lines(mid, d) if ((r['alignment'] or {}).get('voice_meta') or {}).get('attribution')})
     videos.merge_metadata(vid, {'voice_credits': credits}, d)
     results = repo.line_results(mid, d)
-    m2, fitted, report = production.retime(m, results, p)
+    attempts = {r['line_key']: r['repair_attempts'] for r in repo.lines(mid, d)}
+    m2, fitted, report = production.retime(m, results, p,
+                                           revoice=production.revoicer(m, cast, p, wd, vid, attempts=attempts,
+                                                                       budget=credit))
+    if approved or meta.get('credit_stop'):
+        # The owner's approval covers one voicing run; a later run is checked again.
+        videos.merge_metadata(vid, {'credit_approval': None, 'credit_stop': None}, d)
     too_long = [r for r in report if r['action'] == 'rewrite_needed']
     if too_long:
         n_rw = int(videos.get(vid, d)['metadata'].get('line_rewrites', 0))
@@ -378,7 +404,13 @@ def voice(ctx):
                       ', '.join(f'{r["line"]} ({r["needed_s"]}s > {r["window_s"]}s)' for r in too_long),
                       state='needs_review')
     for lid, r in fitted.items():
-        if r.get('tempo'):
+        if r.get('native_speed'):
+            # Voiced again at the engine's own faster speed (time stretching off): the new take replaces the line.
+            ln = next(x for x in m2['lines'] if x['id'] == lid)
+            repo.upsert_line(vid, mid, ln, d, file=repo.rel(r['file']), duration_s=r['duration_s'],
+                             spoken_text=r['spoken_text'], alignment_kind=r['alignment_kind'],
+                             spec_hash=r['spec_hash'], alignment=dict(alignment(r), native_speed=r['native_speed']))
+        elif r.get('tempo'):
             ln = next(x for x in m2['lines'] if x['id'] == lid)
             row = next(x for x in repo.lines(mid, d) if x['line_key'] == lid)
             al = row['alignment']

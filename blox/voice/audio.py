@@ -171,18 +171,27 @@ def has_filter(name):
         return False
 
 
-def pitch_filter(semitones, formants='preserve', sr=SR):
+# Recorded on a voiced line when its pitch shift was left out (see pitch_filter's resample_fallback).
+PITCH_SKIPPED = ('Pitch shift skipped: this FFmpeg has no rubberband filter, and the other way to shift pitch '
+                 'changes the speed of the voice, which is turned off (time stretch speech).')
+
+
+def pitch_filter(semitones, formants='preserve', sr=SR, resample_fallback=True):
     """FFmpeg filter chain that shifts pitch by ``semitones`` and keeps the duration.
 
     With librubberband (``rubberband`` filter) the formants are preserved by default, so a shifted voice keeps its
-    natural timbre; ``formants='shift'`` moves them with the pitch (a smaller, younger-sounding speaker). Without
-    it, the fallback resamples: asetrate raises the pitch and the formants together (the "chipmunk" effect),
+    natural timbre; ``formants='shift'`` moves them with the pitch (a smaller, younger-sounding speaker). The
+    rubberband filter changes the pitch only (its tempo stays 1), so the speech is not time-stretched. Without it,
+    the fallback resamples: asetrate raises the pitch and the formants together (the "chipmunk" effect),
     aresample restores the sample rate and atempo restores the duration. That fallback cannot preserve formants,
-    so it sounds natural only within about +/-2 semitones."""
+    so it sounds natural only within about +/-2 semitones, and it time-stretches the voice: with
+    ``resample_fallback=False`` (the owner's no-time-stretch rule) it is never used and '' is returned instead."""
     r = 2.0 ** (float(semitones) / 12.0)
     if has_filter('rubberband'):
         return (f'rubberband=pitch={r:.6f}:formant={"shifted" if formants == "shift" else "preserved"}'
                 ':pitchq=quality')
+    if not resample_fallback:
+        return ''
     return f'aresample={sr},asetrate={sr * r:.3f},aresample={sr},atempo={1.0 / r:.6f}'
 
 

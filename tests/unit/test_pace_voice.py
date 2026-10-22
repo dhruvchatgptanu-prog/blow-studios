@@ -137,6 +137,8 @@ def test_retime_fits_with_tempo_only_within_the_cap(tmp_path, pace, rate, over, 
     res = {'file': path, 'duration_s': round(len(t) / A.SR, 3), 'words': [{'word': 'hey', 'start': 0.0, 'end': secs}],
            'alignment_kind': 'estimated'}
     p = copy.deepcopy(prefs.DEFAULTS)
+    # The FFmpeg tempo path exists only with time stretching on (the default is off: see test_voice_natural.py).
+    p['production']['time_stretch_speech'] = True
     m2, results, report = production.retime(m, {first['id']: res}, p, max_shift_s=0.0)
     got = [r for r in report if r['line'] == first['id']]
     assert got and got[0]['action'] == action, report
