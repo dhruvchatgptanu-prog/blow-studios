@@ -892,7 +892,7 @@
     "id": "l9",
     "speaker": "bloxy",
     "kind": "narration",
-    "text": "She walked, I ran, she still won.",
+    "text": "She found me. She was just walking.",
     "t": 17.95,
     "emotion": "embarrassed",
     "pace": "normal",
@@ -940,7 +940,7 @@
     "id": "l13",
     "speaker": "bloxy",
     "kind": "narration",
-    "text": "Like this video. It hides me better.",
+    "text": "Hit like. Each like digs me deeper.",
     "t": 27.0,
     "emotion": "bored",
     "pace": "normal",
@@ -1120,7 +1120,7 @@
    ]
   },
   "inspiration": {
-   "note": "Original first-person story (new premise, not from the idea bank). Twist: the narrator gives himself away by narrating. Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 30.9 s finished, narration about 4.20 words per second (hook 4.71, body 4.20, end 3.95).",
+   "note": "Original first-person story (new premise, not from the idea bank). Twist: the narrator gives himself away by narrating. Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 30.9 s finished, narration about 4.20 words per second (hook 4.71, body 4.20, end 3.95). Editor: clearer round-two line; the mid-gag now plays on the hole he sits in.",
    "idea_bank": null,
    "sources": []
   }
@@ -1601,7 +1601,7 @@
    {
     "start_s": 46,
     "purpose": "payoff",
-    "description": "Ms. Tally, the teacher with a bedtime."
+    "description": "Ms. Tally, the teacher with a bedtime: her mum set it."
    },
    {
     "start_s": 48,
@@ -1670,7 +1670,7 @@
      "expression": "scared"
     },
     {
-     "t": 33.4,
+     "t": 35.0,
      "arms": {
       "right": "rest"
      }
@@ -1752,13 +1752,10 @@
      "expression": "confused"
     },
     {
-     "t": 33.4,
+     "t": 35.0,
      "arms": {
       "right": "hold_prop"
-     }
-    },
-    {
-     "t": 35.0,
+     },
      "expression": "embarrassed"
     },
     {
@@ -1991,7 +1988,7 @@
     "id": "l12",
     "speaker": "pip",
     "kind": "narration",
-    "text": "Quick, hit like. Teachers can't take likes.",
+    "text": "Quick, hit like. It lowers my detention.",
     "t": 26.0,
     "emotion": "bored",
     "pace": "normal",
@@ -2099,7 +2096,7 @@
     "id": "l21",
     "speaker": "pip",
     "kind": "narration",
-    "text": "And she had to be in bed by seven.",
+    "text": "Then her mum said one more thing.",
     "t": 43.35,
     "emotion": "smug",
     "pace": "slow",
@@ -2219,20 +2216,20 @@
    ]
   },
   "inspiration": {
-   "note": "Idea bank premise (owner's own list): \"I Answered My Teacher's Phone\". Plot, lines and twist written new for this batch. Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 34.5 s finished, narration about 4.20 words per second (hook 4.69, body 4.21, end 3.93).",
+   "note": "Idea bank premise (owner's own list): \"I Answered My Teacher's Phone\". Plot, lines and twist written new for this batch. Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 34.5 s finished, narration about 4.20 words per second (hook 4.69, body 4.21, end 3.93). Editor: the mid-gag lowers his detention; the line before the payoff no longer gives the bedtime away; the phone now changes hands on the cut to \"Hi, Mum\".",
    "idea_bank": "I Answered My Teacher's Phone 😳",
    "sources": []
   },
   "props_events": [
    {
-    "t": 33.2,
+    "t": 35.0,
     "prop": "phone",
     "event": "detach",
     "character": "pip",
     "hand": "right"
    },
    {
-    "t": 33.3,
+    "t": 35.0,
     "prop": "phone",
     "event": "attach",
     "character": "tally",
@@ -2244,10 +2241,10 @@
   "source": "claude_session_2026_10_22_first_person",
   "format": "first_person_story",
   "title": "I Ordered 500 Pizzas With One Thumb 😳",
-  "logline": "Bloxy means to order one pizza, orders 500, and covers it with a lie that comes true.",
+  "logline": "Bloxy means to order five pizzas, orders 500, and covers it with a lie that comes true.",
   "duration_s": 48.7,
   "story": {
-   "premise": "First person: one slip of the thumb orders 500 pizzas to Bloxy's house.",
+   "premise": "First person: Bloxy means to order five pizzas; his thumb hits the zero twice and 500 come to his house.",
    "conflict": "The pizzas keep coming, the house fills up, and Rook is the delivery driver.",
    "stakes": "Bloxy has to explain 500 pizzas, so he says it is for a huge party that does not exist.",
    "reveal": "Rook tells the whole town about the free party and 499 people really show up.",
@@ -2676,7 +2673,7 @@
    {
     "start_s": 2,
     "purpose": "setup",
-    "description": "He meant to order one. His thumb sat on the zero."
+    "description": "He meant to order five. His thumb hit the zero twice. And no refunds."
    },
    {
     "start_s": 8,
@@ -3023,7 +3020,7 @@
     "id": "l2",
     "speaker": "bloxy",
     "kind": "narration",
-    "text": "I meant to order one.",
+    "text": "I meant to order five.",
     "t": 2.4,
     "emotion": "worried",
     "pace": "fast",
@@ -3035,7 +3032,7 @@
     "id": "l3",
     "speaker": "bloxy",
     "kind": "narration",
-    "text": "My thumb sat on the zero.",
+    "text": "My thumb hit the zero. Twice.",
     "t": 4.3,
     "emotion": "embarrassed",
     "pace": "normal",
@@ -3047,7 +3044,7 @@
     "id": "l4",
     "speaker": "bloxy",
     "kind": "narration",
-    "text": "For eleven seconds.",
+    "text": "And no refunds.",
     "t": 6.7,
     "emotion": "embarrassed",
     "pace": "fast",
@@ -3378,7 +3375,7 @@
    ]
   },
   "inspiration": {
-   "note": "Original first-person story (new premise, not from the idea bank). Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 32.5 s finished, narration about 4.14 words per second (hook 4.67, body 4.15, end 3.85).",
+   "note": "Original first-person story (new premise, not from the idea bank). Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 32.5 s finished, narration about 4.14 words per second (hook 4.67, body 4.15, end 3.85). Editor: the numbers add up (he meant five; the zero twice makes 500).",
    "idea_bank": null,
    "sources": []
   },
@@ -3400,7 +3397,7 @@
   "duration_s": 49.45,
   "story": {
    "premise": "First person: for no reason anyone can find, Pip falls over whenever someone says hi.",
-   "conflict": "Bloxy tests it nine times, a whole school says hi, Rook says it in three languages.",
+   "conflict": "Bloxy tests it nine times, a whole school says hi, Rook says it in fifty languages.",
    "stakes": "The whole town is about to say hi at once.",
    "reveal": "Pip never says hi back, and eleven years of unanswered hellos came back at once.",
    "ending": "Saying hi back cures it, until someone says hello.",
@@ -3416,7 +3413,7 @@
    "t_end": 2.9
   },
   "payoff": {
-   "text": "The curse was karma for never saying hi back; saying hi back keeps Pip standing.",
+   "text": "The curse was karma for never saying hi back; the cure is basic manners.",
    "t_start": 44.0
   },
   "setting": {
@@ -3799,7 +3796,7 @@
    {
     "start_s": 2,
     "purpose": "setup",
-    "description": "Pip is calm and dry; it started on Monday with no warning."
+    "description": "Pip is calm and dry and never waves back; it started on Monday with no warning."
    },
    {
     "start_s": 7,
@@ -3814,7 +3811,7 @@
    {
     "start_s": 17,
     "purpose": "escalation",
-    "description": "Rook finds out and says hi in three languages."
+    "description": "Rook finds out and says hi in fifty languages."
    },
    {
     "start_s": 24,
@@ -3834,7 +3831,7 @@
    {
     "start_s": 44,
     "purpose": "payoff",
-    "description": "Pip stands tall, polite at last."
+    "description": "Pip stands tall: the cure was basic manners."
    },
    {
     "start_s": 46,
@@ -4232,7 +4229,7 @@
     "id": "l2",
     "speaker": "pip",
     "kind": "narration",
-    "text": "I was a calm person. I never fell.",
+    "text": "I never waved. I never fell.",
     "t": 2.85,
     "emotion": "bored",
     "pace": "normal",
@@ -4328,7 +4325,7 @@
     "id": "l10",
     "speaker": "pip",
     "kind": "narration",
-    "text": "Rook said hi in three languages.",
+    "text": "Rook said hi in fifty languages.",
     "t": 18.95,
     "emotion": "angry",
     "pace": "normal",
@@ -4340,7 +4337,7 @@
     "id": "l11",
     "speaker": "pip",
     "kind": "narration",
-    "text": "I fell over in all three.",
+    "text": "I fell over in all fifty.",
     "t": 21.15,
     "emotion": "bored",
     "pace": "normal",
@@ -4448,7 +4445,7 @@
     "id": "l20",
     "speaker": "pip",
     "kind": "narration",
-    "text": "Karma said hi first.",
+    "text": "The cure? Basic manners.",
     "t": 44.4,
     "emotion": "smug",
     "pace": "slow",
@@ -4561,7 +4558,7 @@
    ]
   },
   "inspiration": {
-   "note": "Original first-person story (new premise, not from the idea bank). Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 33.0 s finished, narration about 4.26 words per second (hook 4.44, body 4.30, end 3.84).",
+   "note": "Original first-person story (new premise, not from the idea bank). Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 33.0 s finished, narration about 4.25 words per second (hook 4.44, body 4.29, end 3.84). Editor: the clue is planted early (he never waves); every escalation is a bigger number (1, 10, 40, 50, 500); new payoff \"The cure? Basic manners.\"",
    "idea_bank": null,
    "sources": []
   }
@@ -4569,13 +4566,13 @@
  {
   "source": "claude_session_2026_10_22_first_person",
   "format": "first_person_story",
-  "title": "I Challenged the Best Jumper in the Sky 😳",
-  "logline": "Bloxy races Rook, the best jumper in the sky, to the gold flag, and the race is decided by one tiny block.",
-  "duration_s": 49.0,
+  "title": "I Challenged the Greatest Jumper Alive 😳",
+  "logline": "Bloxy races Rook, the greatest jumper alive, to the gold flag, and the race is decided by one tiny block.",
+  "duration_s": 48.4,
   "story": {
-   "premise": "First person: Bloxy challenges Rook, who jumps in his sleep, to a race across the sky obby.",
+   "premise": "First person: Bloxy challenges Rook, who jumps in his sleep and only ever jumps giant gaps, to a race across the sky obby.",
    "conflict": "Rook clears every gap without effort; Bloxy lands on his face.",
-   "stakes": "First to the gold flag wins the title of best jumper in the sky.",
+   "stakes": "First to the gold flag wins the title of greatest jumper alive.",
    "reveal": "Rook can clear giant gaps but has never jumped anything small: one tiny block stops him.",
    "ending": "Rook trips over the block twice and Bloxy walks to the flag: technically the best jumper.",
    "ending_type": "twist",
@@ -4585,13 +4582,13 @@
    "loop_type": "callback"
   },
   "hook": {
-   "text": "The best jumper in the sky",
+   "text": "The greatest jumper alive",
    "question": "Can anyone beat Rook?",
-   "t_end": 2.75
+   "t_end": 2.15
   },
   "payoff": {
-   "text": "The best jumper in the sky lost to one tiny step, so Bloxy wins by walking.",
-   "t_start": 42.0
+   "text": "The greatest jumper alive lost to one tiny step, so Bloxy wins by walking.",
+   "t_start": 41.4
   },
   "setting": {
    "preset": "sky_obby",
@@ -4693,7 +4690,7 @@
    {
     "id": "s1",
     "start_s": 0.0,
-    "end_s": 2.7,
+    "end_s": 2.1,
     "transition_in": "cut",
     "camera": {
      "subject": "rook",
@@ -4708,8 +4705,8 @@
    },
    {
     "id": "s2",
-    "start_s": 2.7,
-    "end_s": 4.7,
+    "start_s": 2.1,
+    "end_s": 4.1,
     "transition_in": "cut",
     "camera": {
      "subject": "rook",
@@ -4724,8 +4721,8 @@
    },
    {
     "id": "s3",
-    "start_s": 4.7,
-    "end_s": 7.3,
+    "start_s": 4.1,
+    "end_s": 6.7,
     "transition_in": "cut",
     "camera": {
      "subject": "rook",
@@ -4740,8 +4737,8 @@
    },
    {
     "id": "s4",
-    "start_s": 7.3,
-    "end_s": 9.6,
+    "start_s": 6.7,
+    "end_s": 9.0,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -4756,8 +4753,8 @@
    },
    {
     "id": "s5",
-    "start_s": 9.6,
-    "end_s": 11.1,
+    "start_s": 9.0,
+    "end_s": 10.5,
     "transition_in": "cut",
     "camera": {
      "subject": "rook",
@@ -4772,8 +4769,8 @@
    },
    {
     "id": "s6",
-    "start_s": 11.1,
-    "end_s": 13.8,
+    "start_s": 10.5,
+    "end_s": 13.2,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -4788,8 +4785,8 @@
    },
    {
     "id": "s7",
-    "start_s": 13.8,
-    "end_s": 15.4,
+    "start_s": 13.2,
+    "end_s": 14.8,
     "transition_in": "cut",
     "camera": {
      "subject": "rook",
@@ -4804,8 +4801,8 @@
    },
    {
     "id": "s8",
-    "start_s": 15.4,
-    "end_s": 18.65,
+    "start_s": 14.8,
+    "end_s": 18.05,
     "transition_in": "cut",
     "camera": {
      "subject": "rook",
@@ -4820,8 +4817,8 @@
    },
    {
     "id": "s9",
-    "start_s": 18.65,
-    "end_s": 19.85,
+    "start_s": 18.05,
+    "end_s": 19.25,
     "transition_in": "cut",
     "camera": {
      "subject": "rook",
@@ -4836,8 +4833,8 @@
    },
    {
     "id": "s10",
-    "start_s": 19.85,
-    "end_s": 23.0,
+    "start_s": 19.25,
+    "end_s": 22.4,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -4852,8 +4849,8 @@
    },
    {
     "id": "s11",
-    "start_s": 23.0,
-    "end_s": 26.05,
+    "start_s": 22.4,
+    "end_s": 25.45,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -4868,8 +4865,8 @@
    },
    {
     "id": "s12",
-    "start_s": 26.05,
-    "end_s": 28.35,
+    "start_s": 25.45,
+    "end_s": 27.75,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -4884,8 +4881,8 @@
    },
    {
     "id": "s13",
-    "start_s": 28.35,
-    "end_s": 30.95,
+    "start_s": 27.75,
+    "end_s": 30.35,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -4900,8 +4897,8 @@
    },
    {
     "id": "s14",
-    "start_s": 30.95,
-    "end_s": 33.25,
+    "start_s": 30.35,
+    "end_s": 32.65,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -4916,8 +4913,8 @@
    },
    {
     "id": "s15",
-    "start_s": 33.25,
-    "end_s": 36.0,
+    "start_s": 32.65,
+    "end_s": 35.4,
     "transition_in": "cut",
     "camera": {
      "subject": "rook",
@@ -4932,8 +4929,8 @@
    },
    {
     "id": "s16",
-    "start_s": 36.0,
-    "end_s": 38.95,
+    "start_s": 35.4,
+    "end_s": 38.35,
     "transition_in": "cut",
     "camera": {
      "subject": "prop:tiny_block",
@@ -4948,8 +4945,8 @@
    },
    {
     "id": "s17",
-    "start_s": 38.95,
-    "end_s": 40.95,
+    "start_s": 38.35,
+    "end_s": 40.35,
     "transition_in": "cut",
     "camera": {
      "subject": "rook",
@@ -4960,13 +4957,13 @@
      "move": "zoom_punch",
      "ease": "in_out",
      "shake": 0,
-     "punch_t": 39.35
+     "punch_t": 38.75
     }
    },
    {
     "id": "s18",
-    "start_s": 40.95,
-    "end_s": 42.95,
+    "start_s": 40.35,
+    "end_s": 42.35,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -4981,8 +4978,8 @@
    },
    {
     "id": "s19",
-    "start_s": 42.95,
-    "end_s": 44.95,
+    "start_s": 42.35,
+    "end_s": 44.35,
     "transition_in": "cut",
     "camera": {
      "subject": "rook",
@@ -4997,8 +4994,8 @@
    },
    {
     "id": "s20",
-    "start_s": 44.95,
-    "end_s": 49.0,
+    "start_s": 44.35,
+    "end_s": 48.4,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -5021,45 +5018,45 @@
    {
     "start_s": 2,
     "purpose": "setup",
-    "description": "Rook poses. The rules: first to the gold flag wins."
+    "description": "Rook poses: he only ever jumps giant gaps. The rules: first to the gold flag wins."
    },
    {
-    "start_s": 11,
+    "start_s": 10.4,
     "purpose": "escalation",
     "description": "Bloxy jumps the first gap and lands on his face."
    },
    {
-    "start_s": 15,
+    "start_s": 14.4,
     "purpose": "escalation",
     "description": "Rook clears the next gap with his eyes closed."
    },
    {
-    "start_s": 19,
+    "start_s": 18.4,
     "purpose": "escalation",
     "description": "Bloxy looks down: clouds, very far down."
    },
    {
-    "start_s": 23,
+    "start_s": 22.4,
     "purpose": "mid_gag",
     "description": "Bloxy to the camera, hugging the platform edge."
    },
    {
-    "start_s": 26,
+    "start_s": 25.4,
     "purpose": "climax",
     "description": "Bloxy finds a spring pad and bounces over the biggest gap, landing by Rook."
    },
    {
-    "start_s": 36,
+    "start_s": 35.4,
     "purpose": "twist",
     "description": "Between Rook and the flag: one tiny block. He freezes."
    },
    {
-    "start_s": 42,
+    "start_s": 41.4,
     "purpose": "payoff",
     "description": "Rook trips over the tiny block; Bloxy walks to the flag."
    },
    {
-    "start_s": 44,
+    "start_s": 43.4,
     "purpose": "loop",
     "description": "Bloxy celebrates at the flag; it runs back into the opening line."
    }
@@ -5080,30 +5077,30 @@
      "facing": 20
     },
     {
-     "t": 7.3,
+     "t": 6.7,
      "expression": "determined"
     },
     {
-     "t": 11.1,
+     "t": 10.5,
      "expression": "determined"
     },
     {
-     "t": 19.85,
+     "t": 19.25,
      "expression": "scared"
     },
     {
-     "t": 23.0,
+     "t": 22.4,
      "expression": "worried",
      "eye_target": {
       "kind": "camera"
      }
     },
     {
-     "t": 26.05,
+     "t": 25.45,
      "expression": "mischief"
     },
     {
-     "t": 30.95,
+     "t": 30.35,
      "expression": "proud",
      "facing": 30,
      "eye_target": {
@@ -5112,11 +5109,11 @@
      }
     },
     {
-     "t": 40.95,
+     "t": 40.35,
      "expression": "smug"
     },
     {
-     "t": 44.95,
+     "t": 44.35,
      "expression": "proud",
      "facing": -10,
      "eye_target": {
@@ -5138,23 +5135,23 @@
      "facing": 70
     },
     {
-     "t": 2.7,
+     "t": 2.1,
      "expression": "smug"
     },
     {
-     "t": 4.7,
+     "t": 4.1,
      "expression": "proud"
     },
     {
-     "t": 9.6,
+     "t": 9.0,
      "expression": "mischief"
     },
     {
-     "t": 13.8,
+     "t": 13.2,
      "expression": "bored"
     },
     {
-     "t": 15.4,
+     "t": 14.8,
      "expression": "smug",
      "eyes": {
       "open": 0.05,
@@ -5162,7 +5159,7 @@
      }
     },
     {
-     "t": 17.4,
+     "t": 16.8,
      "facing": -20,
      "eye_target": {
       "kind": "character",
@@ -5170,19 +5167,19 @@
      }
     },
     {
-     "t": 18.65,
+     "t": 18.05,
      "expression": "smug_max"
     },
     {
-     "t": 33.25,
+     "t": 32.65,
      "expression": "worried"
     },
     {
-     "t": 38.95,
+     "t": 38.35,
      "expression": "frozen"
     },
     {
-     "t": 42.95,
+     "t": 42.35,
      "expression": "screaming"
     }
    ],
@@ -5221,7 +5218,7 @@
    {
     "character": "rook",
     "type": "turn",
-    "t": 3.5,
+    "t": 2.9,
     "anticipation_frames": 3,
     "main_frames": 12,
     "follow_through_frames": 4,
@@ -5233,7 +5230,7 @@
    {
     "character": "rook",
     "type": "point",
-    "t": 9.9,
+    "t": 9.3,
     "anticipation_frames": 3,
     "main_frames": 8,
     "follow_through_frames": 4,
@@ -5245,7 +5242,7 @@
    {
     "character": "bloxy",
     "type": "jump",
-    "t": 11.2,
+    "t": 10.6,
     "anticipation_frames": 6,
     "main_frames": 41,
     "follow_through_frames": 6,
@@ -5260,7 +5257,7 @@
    {
     "character": "bloxy",
     "type": "fall_down",
-    "t": 13.0,
+    "t": 12.4,
     "anticipation_frames": 3,
     "main_frames": 14,
     "follow_through_frames": 6,
@@ -5270,7 +5267,7 @@
    {
     "character": "rook",
     "type": "jump",
-    "t": 15.4,
+    "t": 14.8,
     "anticipation_frames": 6,
     "main_frames": 39,
     "follow_through_frames": 6,
@@ -5285,7 +5282,7 @@
    {
     "character": "bloxy",
     "type": "get_up",
-    "t": 19.85,
+    "t": 19.25,
     "anticipation_frames": 3,
     "main_frames": 18,
     "follow_through_frames": 5,
@@ -5295,7 +5292,7 @@
    {
     "character": "bloxy",
     "type": "run",
-    "t": 26.25,
+    "t": 25.65,
     "anticipation_frames": 4,
     "main_frames": 21,
     "follow_through_frames": 6,
@@ -5310,7 +5307,7 @@
    {
     "character": "bloxy",
     "type": "jump",
-    "t": 28.45,
+    "t": 27.85,
     "anticipation_frames": 6,
     "main_frames": 26,
     "follow_through_frames": 6,
@@ -5325,7 +5322,7 @@
    {
     "character": "rook",
     "type": "flinch",
-    "t": 39.15,
+    "t": 38.55,
     "anticipation_frames": 2,
     "main_frames": 8,
     "follow_through_frames": 6,
@@ -5335,7 +5332,7 @@
    {
     "character": "rook",
     "type": "stumble",
-    "t": 43.05,
+    "t": 42.45,
     "anticipation_frames": 3,
     "main_frames": 14,
     "follow_through_frames": 5,
@@ -5345,7 +5342,7 @@
    {
     "character": "bloxy",
     "type": "run",
-    "t": 43.45,
+    "t": 42.85,
     "anticipation_frames": 4,
     "main_frames": 24,
     "follow_through_frames": 6,
@@ -5360,7 +5357,7 @@
    {
     "character": "bloxy",
     "type": "celebrate",
-    "t": 45.75,
+    "t": 45.15,
     "anticipation_frames": 4,
     "main_frames": 16,
     "follow_through_frames": 6,
@@ -5373,7 +5370,7 @@
     "id": "l1",
     "speaker": "bloxy",
     "kind": "narration",
-    "text": "I challenged the best jumper in the sky.",
+    "text": "I challenged the greatest jumper alive.",
     "t": 0.0,
     "emotion": "determined",
     "pace": "fast",
@@ -5386,7 +5383,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "Rook jumps in his sleep.",
-    "t": 2.7,
+    "t": 2.1,
     "emotion": "neutral",
     "pace": "normal",
     "volume": "normal",
@@ -5397,8 +5394,8 @@
     "id": "l3",
     "speaker": "bloxy",
     "kind": "narration",
-    "text": "He owns a crown just for jumping.",
-    "t": 4.7,
+    "text": "He only ever jumps giant gaps.",
+    "t": 4.1,
     "emotion": "neutral",
     "pace": "normal",
     "volume": "normal",
@@ -5410,7 +5407,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "First to the gold flag wins.",
-    "t": 7.3,
+    "t": 6.7,
     "emotion": "determined",
     "pace": "normal",
     "volume": "normal",
@@ -5422,7 +5419,7 @@
     "speaker": "rook",
     "kind": "dialogue",
     "text": "Your turn, Bloxy.",
-    "t": 9.6,
+    "t": 9.0,
     "emotion": "smug",
     "pace": "fast",
     "volume": "normal",
@@ -5434,7 +5431,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "I jumped and landed on my face.",
-    "t": 11.1,
+    "t": 10.5,
     "emotion": "embarrassed",
     "pace": "normal",
     "volume": "normal",
@@ -5446,7 +5443,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "Rook didn't even look.",
-    "t": 13.8,
+    "t": 13.2,
     "emotion": "bored",
     "pace": "fast",
     "volume": "normal",
@@ -5458,7 +5455,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "He jumped the next gap with his eyes closed.",
-    "t": 15.4,
+    "t": 14.8,
     "emotion": "startled",
     "pace": "normal",
     "volume": "normal",
@@ -5470,7 +5467,7 @@
     "speaker": "rook",
     "kind": "dialogue",
     "text": "Too easy.",
-    "t": 18.65,
+    "t": 18.05,
     "emotion": "smug",
     "pace": "fast",
     "volume": "normal",
@@ -5482,7 +5479,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "I looked down. The clouds looked tiny.",
-    "t": 19.85,
+    "t": 19.25,
     "emotion": "scared",
     "pace": "normal",
     "volume": "normal",
@@ -5494,7 +5491,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "Each like makes me lighter, so please help.",
-    "t": 23.0,
+    "t": 22.4,
     "emotion": "worried",
     "pace": "normal",
     "volume": "normal",
@@ -5506,7 +5503,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "So I found a spring pad.",
-    "t": 26.05,
+    "t": 25.45,
     "emotion": "smug",
     "pace": "normal",
     "volume": "normal",
@@ -5518,7 +5515,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "I bounced so high I saw tomorrow.",
-    "t": 28.35,
+    "t": 27.75,
     "emotion": "excited",
     "pace": "normal",
     "volume": "normal",
@@ -5530,7 +5527,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "I landed right next to him.",
-    "t": 30.95,
+    "t": 30.35,
     "emotion": "proud",
     "pace": "normal",
     "volume": "normal",
@@ -5542,7 +5539,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "He looked worried, just a little.",
-    "t": 33.25,
+    "t": 32.65,
     "emotion": "smug",
     "pace": "normal",
     "volume": "normal",
@@ -5554,7 +5551,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "Between him and the flag: one tiny block.",
-    "t": 36.0,
+    "t": 35.4,
     "emotion": "neutral",
     "pace": "normal",
     "volume": "normal",
@@ -5566,7 +5563,7 @@
     "speaker": "rook",
     "kind": "dialogue",
     "text": "Is that... a step?",
-    "t": 38.95,
+    "t": 38.35,
     "emotion": "scared",
     "pace": "normal",
     "volume": "normal",
@@ -5578,7 +5575,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "He'd never jumped anything small.",
-    "t": 40.95,
+    "t": 40.35,
     "emotion": "smug",
     "pace": "normal",
     "volume": "normal",
@@ -5590,7 +5587,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "He lost to a step.",
-    "t": 42.95,
+    "t": 42.35,
     "emotion": "smug",
     "pace": "normal",
     "volume": "normal",
@@ -5601,8 +5598,8 @@
     "id": "l20",
     "speaker": "bloxy",
     "kind": "narration",
-    "text": "Technically, I'm now the best jumper in the sky.",
-    "t": 44.95,
+    "text": "Technically, I'm now the greatest jumper alive.",
+    "t": 44.35,
     "emotion": "proud",
     "pace": "slow",
     "volume": "normal",
@@ -5617,49 +5614,49 @@
    },
    {
     "cue": "ding",
-    "t": 7.5
+    "t": 6.9
    },
    {
     "cue": "thud",
-    "t": 12.3
+    "t": 11.7
    },
    {
     "cue": "swoosh_up",
-    "t": 15.7
+    "t": 15.1
    },
    {
     "cue": "gasp_sting",
-    "t": 20.15,
+    "t": 19.55,
     "gain_db": -6
    },
    {
     "cue": "click",
-    "t": 23.1
+    "t": 22.5
    },
    {
     "cue": "boing",
-    "t": 28.55
+    "t": 27.95
    },
    {
     "cue": "stomp",
-    "t": 30.95
+    "t": 30.35
    },
    {
     "cue": "stinger",
-    "t": 39.15
+    "t": 38.55
    },
    {
     "cue": "bonk",
-    "t": 43.35
+    "t": 42.75
    },
    {
     "cue": "fail_horn",
-    "t": 43.75,
+    "t": 43.15,
     "gain_db": -6
    },
    {
     "cue": "tada",
-    "t": 45.85
+    "t": 45.25
    }
   ],
   "music": [
@@ -5668,18 +5665,18 @@
     "cue": "triumph"
    },
    {
-    "t": 19.85,
+    "t": 19.25,
     "cue": "tension"
    },
    {
-    "t": 42.95,
+    "t": 42.35,
     "cue": "playful"
    }
   ],
   "effects": [
    {
     "type": "shake",
-    "t": 43.35,
+    "t": 42.75,
     "frames": 8,
     "strength": 0.5
    }
@@ -5690,8 +5687,8 @@
    "music_dropout": true
   },
   "metadata": {
-   "title": "I Challenged the Best Jumper in the Sky 😳",
-   "description": "Who is the best jumper YOU know? 👇 Original animated story with blocky characters. #shorts #animation #story",
+   "title": "I Challenged the Greatest Jumper Alive 😳",
+   "description": "Who is the greatest jumper YOU know? 👇 Original animated story with blocky characters. #shorts #animation #story",
    "tags": [
     "animation",
     "story",
@@ -5704,7 +5701,7 @@
    ]
   },
   "inspiration": {
-   "note": "Original first-person story (new premise, not from the idea bank). Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 32.7 s finished, narration about 4.21 words per second (hook 4.71, body 4.21, end 3.96).",
+   "note": "Original first-person story (new premise, not from the idea bank). Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 32.3 s finished, narration about 4.19 words per second (hook 4.62, body 4.20, end 3.91). Editor: retitled from \"I Challenged the Best Jumper in the Sky\" (no second \"best ... on Earth/in the Sky\" title in the batch; 6 words); the twist is planted (\"He only ever jumps giant gaps\").",
    "idea_bank": null,
    "sources": []
   }
@@ -5719,7 +5716,7 @@
    "premise": "First person: Pip falls asleep in the reading corner and is locked in school overnight.",
    "conflict": "A lamp turns on by itself, a warm pizza slides out, his homework gets done in pink pen.",
    "stakes": "Pip is alone in the dark school with whoever is doing all this, and the cupboard is opening.",
-   "reveal": "His little sister Dot has been locked in since Tuesday and quietly looked after him.",
+   "reveal": "His little sister Dot moved into the school on Tuesday and has quietly looked after him all night.",
    "ending": "Dot has turned the school into a five-star hotel and plans to charge rent.",
    "ending_type": "twist",
    "mode": "grounded",
@@ -6202,7 +6199,7 @@
    {
     "start_s": 32,
     "purpose": "twist",
-    "description": "Out steps Dot: she has been locked in since Tuesday."
+    "description": "Out steps Dot: she moved into the school on Tuesday."
    },
    {
     "start_s": 43,
@@ -6613,7 +6610,7 @@
     "id": "l16",
     "speaker": "pip",
     "kind": "narration",
-    "text": "She got locked in on Tuesday.",
+    "text": "She moved in here on Tuesday.",
     "t": 35.35,
     "emotion": "neutral",
     "pace": "normal",
@@ -6783,7 +6780,7 @@
    ]
   },
   "inspiration": {
-   "note": "Original first-person story (new premise, not from the idea bank). Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 31.9 s finished, narration about 4.17 words per second (hook 4.44, body 4.19, end 3.75).",
+   "note": "Original first-person story (new premise, not from the idea bank). Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 31.9 s finished, narration about 4.17 words per second (hook 4.44, body 4.19, end 3.75). Editor: Dot chose to move into the school (nobody locked a little girl in for days).",
    "idea_bank": null,
    "sources": []
   }
@@ -6791,9 +6788,9 @@
  {
   "source": "claude_session_2026_10_22_first_person",
   "format": "first_person_story",
-  "title": "I Let the Comments Control Every Jump I Made 😳",
+  "title": "I Let the Comments Control Every Jump 😳",
   "logline": "Bloxy lets the top comment decide every jump on a lava obby, and the comments keep sending him back for a reason.",
-  "duration_s": 50.3,
+  "duration_s": 49.55,
   "story": {
    "premise": "First person: the top comment decides every move Bloxy makes on a lava obby.",
    "conflict": "The comments send him left, back with his eyes closed, into a dance, and away from the finish eleven times.",
@@ -6809,11 +6806,11 @@
   "hook": {
    "text": "The comments control every jump",
    "question": "Why do the comments keep sending him back?",
-   "t_end": 3.3
+   "t_end": 2.55
   },
   "payoff": {
    "text": "The comments stalled Bloxy on purpose: they were his friends setting up his party.",
-   "t_start": 44.0
+   "t_start": 43.25
   },
   "setting": {
    "preset": "lava_obby",
@@ -6924,7 +6921,7 @@
    {
     "id": "s1",
     "start_s": 0.0,
-    "end_s": 3.25,
+    "end_s": 2.5,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -6939,8 +6936,8 @@
    },
    {
     "id": "s2",
-    "start_s": 3.25,
-    "end_s": 5.85,
+    "start_s": 2.5,
+    "end_s": 5.1,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -6955,8 +6952,8 @@
    },
    {
     "id": "s3",
-    "start_s": 5.85,
-    "end_s": 8.8,
+    "start_s": 5.1,
+    "end_s": 8.05,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -6971,8 +6968,8 @@
    },
    {
     "id": "s4",
-    "start_s": 8.8,
-    "end_s": 11.75,
+    "start_s": 8.05,
+    "end_s": 11.0,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -6987,8 +6984,8 @@
    },
    {
     "id": "s5",
-    "start_s": 11.75,
-    "end_s": 14.15,
+    "start_s": 11.0,
+    "end_s": 13.4,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -7003,8 +7000,8 @@
    },
    {
     "id": "s6",
-    "start_s": 14.15,
-    "end_s": 16.45,
+    "start_s": 13.4,
+    "end_s": 15.7,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -7019,8 +7016,8 @@
    },
    {
     "id": "s7",
-    "start_s": 16.45,
-    "end_s": 19.4,
+    "start_s": 15.7,
+    "end_s": 18.65,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -7035,8 +7032,8 @@
    },
    {
     "id": "s8",
-    "start_s": 19.4,
-    "end_s": 21.3,
+    "start_s": 18.65,
+    "end_s": 20.55,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -7051,8 +7048,8 @@
    },
    {
     "id": "s9",
-    "start_s": 21.3,
-    "end_s": 24.0,
+    "start_s": 20.55,
+    "end_s": 23.25,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -7067,8 +7064,8 @@
    },
    {
     "id": "s10",
-    "start_s": 24.0,
-    "end_s": 27.05,
+    "start_s": 23.25,
+    "end_s": 26.3,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -7083,8 +7080,8 @@
    },
    {
     "id": "s11",
-    "start_s": 27.05,
-    "end_s": 28.95,
+    "start_s": 26.3,
+    "end_s": 28.2,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -7099,8 +7096,8 @@
    },
    {
     "id": "s12",
-    "start_s": 28.95,
-    "end_s": 31.55,
+    "start_s": 28.2,
+    "end_s": 30.8,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -7115,8 +7112,8 @@
    },
    {
     "id": "s13",
-    "start_s": 31.55,
-    "end_s": 35.0,
+    "start_s": 30.8,
+    "end_s": 34.25,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -7131,8 +7128,8 @@
    },
    {
     "id": "s14",
-    "start_s": 35.0,
-    "end_s": 36.2,
+    "start_s": 34.25,
+    "end_s": 35.45,
     "transition_in": "cut",
     "camera": {
      "subject": "pip",
@@ -7147,8 +7144,8 @@
    },
    {
     "id": "s15",
-    "start_s": 36.2,
-    "end_s": 38.0,
+    "start_s": 35.45,
+    "end_s": 37.25,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -7159,13 +7156,13 @@
      "move": "zoom_punch",
      "ease": "in_out",
      "shake": 0,
-     "punch_t": 36.4
+     "punch_t": 35.65
     }
    },
    {
     "id": "s16",
-    "start_s": 38.0,
-    "end_s": 40.7,
+    "start_s": 37.25,
+    "end_s": 39.95,
     "transition_in": "cut",
     "camera": {
      "subject": "dot",
@@ -7180,8 +7177,8 @@
    },
    {
     "id": "s17",
-    "start_s": 40.7,
-    "end_s": 43.3,
+    "start_s": 39.95,
+    "end_s": 42.55,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -7196,8 +7193,8 @@
    },
    {
     "id": "s18",
-    "start_s": 43.3,
-    "end_s": 45.15,
+    "start_s": 42.55,
+    "end_s": 44.4,
     "transition_in": "cut",
     "camera": {
      "subject": "dot",
@@ -7212,8 +7209,8 @@
    },
    {
     "id": "s19",
-    "start_s": 45.15,
-    "end_s": 46.95,
+    "start_s": 44.4,
+    "end_s": 46.2,
     "transition_in": "cut",
     "camera": {
      "subject": "two_shot",
@@ -7228,8 +7225,8 @@
    },
    {
     "id": "s20",
-    "start_s": 46.95,
-    "end_s": 50.3,
+    "start_s": 46.2,
+    "end_s": 49.55,
     "transition_in": "cut",
     "camera": {
      "subject": "bloxy",
@@ -7250,52 +7247,52 @@
     "description": "Bloxy leaps left over the lava because a comment said so."
    },
    {
-    "start_s": 3,
+    "start_s": 2.25,
     "purpose": "setup",
     "description": "The rule: the top comment wins, no matter what."
    },
    {
-    "start_s": 5,
+    "start_s": 4.25,
     "purpose": "escalation",
     "description": "Comment one: jump left. He did."
    },
    {
-    "start_s": 8,
+    "start_s": 7.25,
     "purpose": "escalation",
     "description": "Comment two: jump back with his eyes closed."
    },
    {
-    "start_s": 11,
+    "start_s": 10.25,
     "purpose": "escalation",
     "description": "Comment three: dance for one minute."
    },
    {
-    "start_s": 16,
+    "start_s": 15.25,
     "purpose": "escalation",
     "description": "Every time he nears the finish, the comments send him back."
    },
    {
-    "start_s": 24,
+    "start_s": 23.25,
     "purpose": "mid_gag",
     "description": "Bloxy reads the next comment to the camera."
    },
    {
-    "start_s": 27,
+    "start_s": 26.25,
     "purpose": "climax",
     "description": "The comments go quiet; one last comment: go to the finish. He jumps the biggest gap."
    },
    {
-    "start_s": 35,
+    "start_s": 34.25,
     "purpose": "twist",
     "description": "Pip and Dot pop up behind the crate: surprise party."
    },
    {
-    "start_s": 44,
+    "start_s": 43.25,
     "purpose": "payoff",
-    "description": "The comments were his friends all along."
+    "description": "The comments were his friends all along: worst six hours, best birthday."
    },
    {
-    "start_s": 46,
+    "start_s": 45.25,
     "purpose": "loop",
     "description": "Today's top comment says do it again."
    }
@@ -7315,15 +7312,15 @@
      "facing": 10
     },
     {
-     "t": 3.25,
+     "t": 2.5,
      "expression": "determined"
     },
     {
-     "t": 5.85,
+     "t": 5.1,
      "expression": "proud"
     },
     {
-     "t": 8.8,
+     "t": 8.05,
      "expression": "scared",
      "eyes": {
       "open": 0.05,
@@ -7331,42 +7328,42 @@
      }
     },
     {
-     "t": 11.75,
+     "t": 11.0,
      "expression": "embarrassed"
     },
     {
-     "t": 14.15,
+     "t": 13.4,
      "expression": "scared"
     },
     {
-     "t": 16.45,
+     "t": 15.7,
      "expression": "angry"
     },
     {
-     "t": 19.4,
+     "t": 18.65,
      "expression": "bored"
     },
     {
-     "t": 21.3,
+     "t": 20.55,
      "expression": "sad"
     },
     {
-     "t": 24.0,
+     "t": 23.25,
      "expression": "bored",
      "eye_target": {
       "kind": "camera"
      }
     },
     {
-     "t": 27.05,
+     "t": 26.3,
      "expression": "worried"
     },
     {
-     "t": 28.95,
+     "t": 28.2,
      "expression": "determined"
     },
     {
-     "t": 36.2,
+     "t": 35.45,
      "expression": "startled",
      "facing": 40,
      "eye_target": {
@@ -7375,15 +7372,15 @@
      }
     },
     {
-     "t": 40.7,
+     "t": 39.95,
      "expression": "happy"
     },
     {
-     "t": 45.15,
+     "t": 44.4,
      "expression": "laughing"
     },
     {
-     "t": 46.95,
+     "t": 46.2,
      "expression": "scared",
      "eye_target": {
       "kind": "camera"
@@ -7405,11 +7402,11 @@
      "facing": -40
     },
     {
-     "t": 35.0,
+     "t": 34.25,
      "expression": "excited"
     },
     {
-     "t": 45.15,
+     "t": 44.4,
      "expression": "happy"
     }
    ],
@@ -7428,15 +7425,15 @@
      "facing": -20
     },
     {
-     "t": 38.0,
+     "t": 37.25,
      "expression": "happy"
     },
     {
-     "t": 43.3,
+     "t": 42.55,
      "expression": "smug"
     },
     {
-     "t": 45.15,
+     "t": 44.4,
      "expression": "excited"
     }
    ]
@@ -7480,7 +7477,7 @@
    {
     "character": "bloxy",
     "type": "jump",
-    "t": 9.0,
+    "t": 8.25,
     "anticipation_frames": 6,
     "main_frames": 35,
     "follow_through_frames": 6,
@@ -7495,7 +7492,7 @@
    {
     "character": "bloxy",
     "type": "dance",
-    "t": 11.95,
+    "t": 11.2,
     "anticipation_frames": 3,
     "main_frames": 50,
     "follow_through_frames": 6,
@@ -7505,7 +7502,7 @@
    {
     "character": "bloxy",
     "type": "walk",
-    "t": 16.55,
+    "t": 15.8,
     "anticipation_frames": 4,
     "main_frames": 36,
     "follow_through_frames": 6,
@@ -7520,7 +7517,7 @@
    {
     "character": "bloxy",
     "type": "facepalm",
-    "t": 19.7,
+    "t": 18.95,
     "anticipation_frames": 3,
     "main_frames": 10,
     "follow_through_frames": 8,
@@ -7530,7 +7527,7 @@
    {
     "character": "bloxy",
     "type": "nod",
-    "t": 29.15,
+    "t": 28.4,
     "anticipation_frames": 2,
     "main_frames": 10,
     "follow_through_frames": 3,
@@ -7540,7 +7537,7 @@
    {
     "character": "bloxy",
     "type": "jump",
-    "t": 31.75,
+    "t": 31.0,
     "anticipation_frames": 6,
     "main_frames": 24,
     "follow_through_frames": 6,
@@ -7555,7 +7552,7 @@
    {
     "character": "pip",
     "type": "stand_up",
-    "t": 35.0,
+    "t": 34.25,
     "anticipation_frames": 3,
     "main_frames": 12,
     "follow_through_frames": 4,
@@ -7565,7 +7562,7 @@
    {
     "character": "dot",
     "type": "stand_up",
-    "t": 35.0,
+    "t": 34.25,
     "anticipation_frames": 3,
     "main_frames": 12,
     "follow_through_frames": 4,
@@ -7575,7 +7572,7 @@
    {
     "character": "pip",
     "type": "celebrate",
-    "t": 35.7,
+    "t": 34.95,
     "anticipation_frames": 4,
     "main_frames": 16,
     "follow_through_frames": 6,
@@ -7585,7 +7582,7 @@
    {
     "character": "bloxy",
     "type": "flinch",
-    "t": 36.0,
+    "t": 35.25,
     "anticipation_frames": 2,
     "main_frames": 8,
     "follow_through_frames": 6,
@@ -7595,7 +7592,7 @@
    {
     "character": "dot",
     "type": "shrug",
-    "t": 43.6,
+    "t": 42.85,
     "anticipation_frames": 3,
     "main_frames": 10,
     "follow_through_frames": 5,
@@ -7605,7 +7602,7 @@
    {
     "character": "bloxy",
     "type": "celebrate",
-    "t": 45.15,
+    "t": 44.4,
     "anticipation_frames": 4,
     "main_frames": 16,
     "follow_through_frames": 6,
@@ -7618,10 +7615,10 @@
     "id": "l1",
     "speaker": "bloxy",
     "kind": "narration",
-    "text": "I let the comments control every jump I made.",
+    "text": "I let the comments control every jump.",
     "t": 0.0,
     "emotion": "excited",
-    "pace": "normal",
+    "pace": "fast",
     "volume": "normal",
     "pause_after_ms": 0,
     "delivery": ""
@@ -7631,7 +7628,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "The top comment wins, no matter what.",
-    "t": 3.25,
+    "t": 2.5,
     "emotion": "determined",
     "pace": "normal",
     "volume": "normal",
@@ -7643,7 +7640,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "Comment one said jump left, so I did.",
-    "t": 5.85,
+    "t": 5.1,
     "emotion": "neutral",
     "pace": "normal",
     "volume": "normal",
@@ -7655,7 +7652,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "Comment two: jump back with my eyes closed.",
-    "t": 8.8,
+    "t": 8.05,
     "emotion": "scared",
     "pace": "normal",
     "volume": "normal",
@@ -7667,7 +7664,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "Comment three: dance for one minute.",
-    "t": 11.75,
+    "t": 11.0,
     "emotion": "embarrassed",
     "pace": "normal",
     "volume": "normal",
@@ -7679,7 +7676,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "I danced next to actual lava.",
-    "t": 14.15,
+    "t": 13.4,
     "emotion": "scared",
     "pace": "normal",
     "volume": "normal",
@@ -7691,7 +7688,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "Every time I got close, they said back.",
-    "t": 16.45,
+    "t": 15.7,
     "emotion": "angry",
     "pace": "normal",
     "volume": "normal",
@@ -7703,7 +7700,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "I went back eleven times.",
-    "t": 19.4,
+    "t": 18.65,
     "emotion": "bored",
     "pace": "fast",
     "volume": "normal",
@@ -7715,7 +7712,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "Six hours on the same three platforms.",
-    "t": 21.3,
+    "t": 20.55,
     "emotion": "bored",
     "pace": "normal",
     "volume": "normal",
@@ -7727,7 +7724,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "Comment twelve: like this video. You do it.",
-    "t": 24.0,
+    "t": 23.25,
     "emotion": "bored",
     "pace": "normal",
     "volume": "normal",
@@ -7739,7 +7736,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "Then the comments went quiet.",
-    "t": 27.05,
+    "t": 26.3,
     "emotion": "worried",
     "pace": "fast",
     "volume": "normal",
@@ -7751,7 +7748,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "One last comment: go to the finish.",
-    "t": 28.95,
+    "t": 28.2,
     "emotion": "determined",
     "pace": "normal",
     "volume": "normal",
@@ -7763,7 +7760,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "I jumped the biggest gap of my life.",
-    "t": 31.55,
+    "t": 30.8,
     "emotion": "excited",
     "pace": "normal",
     "volume": "normal",
@@ -7775,7 +7772,7 @@
     "speaker": "pip",
     "kind": "dialogue",
     "text": "Surprise!",
-    "t": 35.0,
+    "t": 34.25,
     "emotion": "excited",
     "pace": "fast",
     "volume": "loud",
@@ -7787,7 +7784,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "It was a party for me.",
-    "t": 35.7,
+    "t": 34.95,
     "emotion": "startled",
     "pace": "normal",
     "volume": "normal",
@@ -7799,7 +7796,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "It was my birthday, and I forgot.",
-    "t": 38.0,
+    "t": 37.25,
     "emotion": "embarrassed",
     "pace": "normal",
     "volume": "normal",
@@ -7811,7 +7808,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "The comments kept me busy on purpose.",
-    "t": 40.7,
+    "t": 39.95,
     "emotion": "happy",
     "pace": "normal",
     "volume": "normal",
@@ -7823,7 +7820,7 @@
     "speaker": "dot",
     "kind": "dialogue",
     "text": "We needed six hours.",
-    "t": 43.3,
+    "t": 42.55,
     "emotion": "smug",
     "pace": "fast",
     "volume": "normal",
@@ -7834,8 +7831,8 @@
     "id": "l19",
     "speaker": "bloxy",
     "kind": "narration",
-    "text": "The comments were my friends.",
-    "t": 44.95,
+    "text": "Worst six hours. Best birthday.",
+    "t": 44.2,
     "emotion": "happy",
     "pace": "normal",
     "volume": "normal",
@@ -7847,7 +7844,7 @@
     "speaker": "bloxy",
     "kind": "narration",
     "text": "Today's top comment says do it again.",
-    "t": 46.95,
+    "t": 46.2,
     "emotion": "scared",
     "pace": "slow",
     "volume": "normal",
@@ -7862,58 +7859,58 @@
    },
    {
     "cue": "ding",
-    "t": 3.45
+    "t": 2.7
    },
    {
     "cue": "click",
-    "t": 6.05
+    "t": 5.3
    },
    {
     "cue": "whoosh",
-    "t": 9.4
+    "t": 8.65
    },
    {
     "cue": "click",
-    "t": 11.95
+    "t": 11.2
    },
    {
     "cue": "click",
-    "t": 16.65
+    "t": 15.9
    },
    {
     "cue": "fail_horn",
-    "t": 19.9,
+    "t": 19.15,
     "gain_db": -8
    },
    {
     "cue": "click",
-    "t": 24.1
+    "t": 23.35
    },
    {
     "cue": "click",
-    "t": 29.05
+    "t": 28.3
    },
    {
     "cue": "swoosh_up",
-    "t": 31.95
+    "t": 31.2
    },
    {
     "cue": "tada",
-    "t": 35.0
+    "t": 34.25
    },
    {
     "cue": "crowd_ooh",
-    "t": 35.3,
+    "t": 34.55,
     "gain_db": -6
    },
    {
     "cue": "laugh_burst",
-    "t": 45.45,
+    "t": 44.7,
     "gain_db": -10
    },
    {
     "cue": "click",
-    "t": 47.15
+    "t": 46.4
    }
   ],
   "music": [
@@ -7922,15 +7919,15 @@
     "cue": "triumph"
    },
    {
-    "t": 16.45,
+    "t": 15.7,
     "cue": "tension"
    },
    {
-    "t": 35.7,
+    "t": 34.95,
     "cue": "playful"
    },
    {
-    "t": 46.95,
+    "t": 46.2,
     "cue": "tension"
    }
   ],
@@ -7941,7 +7938,7 @@
    "music_dropout": true
   },
   "metadata": {
-   "title": "I Let the Comments Control Every Jump I Made 😳",
+   "title": "I Let the Comments Control Every Jump 😳",
    "description": "What should the comments make him do next? 👇 Original animated story with blocky characters. #shorts #animation #story",
    "tags": [
     "animation",
@@ -7955,7 +7952,7 @@
    ]
   },
   "inspiration": {
-   "note": "Original first-person story (new premise, not from the idea bank). Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 33.5 s finished, narration about 4.20 words per second (hook 4.35, body 4.22, end 3.91).",
+   "note": "Original first-person story (new premise, not from the idea bank). Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 33.0 s finished, narration about 4.21 words per second (hook 4.67, body 4.22, end 3.91). Editor: retitled from \"I Let the Comments Control Every Jump I Made\" (7 words, no filler); new payoff \"Worst six hours. Best birthday.\"",
    "idea_bank": null,
    "sources": []
   }
@@ -7968,7 +7965,7 @@
   "duration_s": 46.0,
   "story": {
    "premise": "First person: Bloxy pretends to be the new principal and everybody believes him.",
-   "conflict": "He cancels homework, makes recess four hours and pizza day twice a week; even Ms. Tally salutes.",
+   "conflict": "He cancels homework, makes recess four hours and Fridays and Mondays holidays; even Ms. Tally salutes.",
    "stakes": "The lie works so well that he now has a principal's real job to do.",
    "reveal": "The kid who failed every test, whose parents the principal must call, is Bloxy.",
    "ending": "He calls his own mum on speakerphone and grounds himself.",
@@ -8384,7 +8381,7 @@
    {
     "start_s": 12,
     "purpose": "escalation",
-    "description": "Recess is four hours; pizza day twice a week."
+    "description": "Recess is four hours; Friday and Monday are holidays."
    },
    {
     "start_s": 19,
@@ -8738,7 +8735,7 @@
     "id": "l8",
     "speaker": "bloxy",
     "kind": "narration",
-    "text": "Friday was pizza day. So was Monday.",
+    "text": "Friday was a holiday. So was Monday.",
     "t": 14.85,
     "emotion": "smug",
     "pace": "normal",
@@ -9006,7 +9003,7 @@
    ]
   },
   "inspiration": {
-   "note": "Idea bank premise (owner's own list): \"I Pretended to Be the New Principal\". Plot, lines and twist written new for this batch. Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 30.7 s finished, narration about 4.15 words per second (hook 4.67, body 4.15, end 3.85).",
+   "note": "Idea bank premise (owner's own list): \"I Pretended to Be the New Principal\". Plot, lines and twist written new for this batch. Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 30.7 s finished, narration about 4.15 words per second (hook 4.67, body 4.15, end 3.85). Editor: \"Friday was a holiday. So was Monday.\" replaces a third pizza joke; the folder changes hands on the cut to Bloxy, so it does not jump across the room mid-shot.",
    "idea_bank": "I Pretended to Be the New Principal 😳",
    "sources": []
   },
@@ -9019,14 +9016,14 @@
     "hand": "right"
    },
    {
-    "t": 31.9,
+    "t": 33.35,
     "prop": "folder",
     "event": "detach",
     "character": "tally",
     "hand": "right"
    },
    {
-    "t": 32.0,
+    "t": 33.35,
     "prop": "folder",
     "event": "attach",
     "character": "bloxy",
@@ -9038,14 +9035,14 @@
   "source": "claude_session_2026_10_22_first_person",
   "format": "first_person_story",
   "title": "I Accidentally Became Mayor of the Whole Town 😳",
-  "logline": "Pip signs a form he thinks is for free pizza and wakes up mayor of the whole town.",
+  "logline": "Pip signs a form he thinks is for free cookies and wakes up mayor of the whole town.",
   "duration_s": 47.15,
   "story": {
-   "premise": "First person: Rook hands Pip a \"free pizza\" form; it makes him mayor.",
-   "conflict": "The key to the town, free pizza Fridays, then 900 letters a day and no sleep.",
+   "premise": "First person: Rook hands Pip a \"free cookies\" form; it makes him mayor.",
+   "conflict": "The key to the town, free cookie Fridays, then 900 letters a day and no sleep.",
    "stakes": "Pip has not slept in four days and the town keeps writing.",
-   "reveal": "Rook was the old mayor and escaped the job with the same pizza-form trick.",
-   "ending": "Pip makes his own pizza form; Bloxy signs it in one second and becomes mayor.",
+   "reveal": "Rook was the old mayor and escaped the job with the same cookie-form trick.",
+   "ending": "Pip makes his own cookie form and Bloxy signs it, but Bloxy's first law makes Pip mayor again.",
    "ending_type": "twist",
    "mode": "world_scale",
    "mechanism": "world_status",
@@ -9058,7 +9055,7 @@
    "t_end": 2.8
   },
   "payoff": {
-   "text": "Pip escapes the way Rook did: a pizza form makes Bloxy the new mayor.",
+   "text": "Pip escapes the way Rook did, and it comes straight back: Bloxy's first law makes Pip mayor again.",
    "t_start": 41.0
   },
   "setting": {
@@ -9431,7 +9428,7 @@
    {
     "start_s": 2,
     "purpose": "setup",
-    "description": "Rook's \"free pizza\" form. Pip signed it. It was not for pizza."
+    "description": "Rook's \"free cookies\" form. Pip signed it. It was not for cookies."
    },
    {
     "start_s": 8,
@@ -9441,7 +9438,7 @@
    {
     "start_s": 13,
     "purpose": "escalation",
-    "description": "First law: free pizza Fridays. Bloxy cheers."
+    "description": "First law: free cookie Fridays. Bloxy cheers."
    },
    {
     "start_s": 16,
@@ -9456,12 +9453,12 @@
    {
     "start_s": 26,
     "purpose": "climax",
-    "description": "Pip asks Rook how he escaped being mayor: the pizza form."
+    "description": "Pip asks Rook how he escaped being mayor: the cookie form."
    },
    {
     "start_s": 36,
     "purpose": "twist",
-    "description": "Pip makes his own pizza form; Bloxy signs instantly."
+    "description": "Pip makes his own cookie form; Bloxy signs instantly."
    },
    {
     "start_s": 41,
@@ -9471,7 +9468,7 @@
    {
     "start_s": 43,
     "purpose": "loop",
-    "description": "Bloxy is the one who accidentally became mayor; back to the opening line."
+    "description": "Bloxy's first law makes Pip mayor again; back to the opening line."
    }
   ],
   "performance": {
@@ -9541,14 +9538,11 @@
      "expression": "mischief"
     },
     {
-     "t": 41.25,
+     "t": 41.9,
      "arms": {
       "left": "rest",
       "right": "rest"
-     }
-    },
-    {
-     "t": 41.9,
+     },
      "expression": "relieved"
     },
     {
@@ -9631,14 +9625,11 @@
      "expression": "happy"
     },
     {
-     "t": 41.25,
+     "t": 41.9,
      "arms": {
       "left": "rest",
       "right": "hold_prop"
-     }
-    },
-    {
-     "t": 41.9,
+     },
      "expression": "proud"
     }
    ]
@@ -9742,7 +9733,7 @@
     "id": "l2",
     "speaker": "pip",
     "kind": "narration",
-    "text": "Rook handed me a form for free pizza.",
+    "text": "Rook handed me a form for free cookies.",
     "t": 2.75,
     "emotion": "neutral",
     "pace": "slow",
@@ -9754,7 +9745,7 @@
     "id": "l3",
     "speaker": "pip",
     "kind": "narration",
-    "text": "I signed it. It wasn't for pizza.",
+    "text": "I signed it. It wasn't for cookies.",
     "t": 5.8,
     "emotion": "worried",
     "pace": "normal",
@@ -9790,7 +9781,7 @@
     "id": "l6",
     "speaker": "pip",
     "kind": "narration",
-    "text": "My first law: free pizza Fridays.",
+    "text": "My first law: free cookie Fridays.",
     "t": 13.25,
     "emotion": "proud",
     "pace": "normal",
@@ -9850,7 +9841,7 @@
     "id": "l11",
     "speaker": "pip",
     "kind": "narration",
-    "text": "Like this video. It counts as a vote.",
+    "text": "Hit like to vote me out. Please.",
     "t": 24.0,
     "emotion": "bored",
     "pace": "normal",
@@ -9886,7 +9877,7 @@
     "id": "l14",
     "speaker": "rook",
     "kind": "dialogue",
-    "text": "Pizza form.",
+    "text": "Cookie form.",
     "t": 32.65,
     "emotion": "smug",
     "pace": "normal",
@@ -9910,7 +9901,7 @@
     "id": "l16",
     "speaker": "pip",
     "kind": "narration",
-    "text": "So I made my own pizza form.",
+    "text": "So I made my own cookie form.",
     "t": 36.0,
     "emotion": "smug",
     "pace": "slow",
@@ -9934,7 +9925,7 @@
     "id": "l18",
     "speaker": "bloxy",
     "kind": "dialogue",
-    "text": "Free pizza!",
+    "text": "Free cookies!",
     "t": 40.95,
     "emotion": "excited",
     "pace": "fast",
@@ -9958,7 +9949,7 @@
     "id": "l20",
     "speaker": "pip",
     "kind": "narration",
-    "text": "He accidentally became mayor of the whole town.",
+    "text": "His first law? I'm mayor of the whole town.",
     "t": 43.65,
     "emotion": "smug",
     "pace": "slow",
@@ -10057,11 +10048,11 @@
     "storytime",
     "shorts",
     "mayor",
-    "pizza"
+    "cookies"
    ]
   },
   "inspiration": {
-   "note": "Idea bank premise (owner's own list): \"I Accidentally Became Mayor\". Plot, lines and twist written new for this batch. Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 31.4 s finished, narration about 4.24 words per second (hook 4.62, body 4.25, end 4.00).",
+   "note": "Idea bank premise (owner's own list): \"I Accidentally Became Mayor\". Plot, lines and twist written new for this batch. Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 31.4 s finished, narration about 4.24 words per second (hook 4.62, body 4.24, end 4.02). Editor: cookies instead of pizza; the mid-gag asks for likes to vote him out; a real karma loop (Bloxy's first law makes Pip mayor again, back into the hook line); the key changes hands on cuts.",
    "idea_bank": "I Accidentally Became Mayor 😳",
    "sources": []
   },
@@ -10074,28 +10065,28 @@
     "hand": "right"
    },
    {
-    "t": 8.65,
+    "t": 8.35,
     "prop": "town_key",
     "event": "detach",
     "character": "rook",
     "hand": "right"
    },
    {
-    "t": 8.75,
+    "t": 8.35,
     "prop": "town_key",
     "event": "attach",
     "character": "pip",
     "hand": "right"
    },
    {
-    "t": 41.05,
+    "t": 41.9,
     "prop": "town_key",
     "event": "detach",
     "character": "pip",
     "hand": "right"
    },
    {
-    "t": 41.15,
+    "t": 41.9,
     "prop": "town_key",
     "event": "attach",
     "character": "bloxy",
@@ -10107,14 +10098,14 @@
   "source": "claude_session_2026_10_22_first_person",
   "format": "first_person_story",
   "title": "I Lost My Best Friend's Birthday Gift 😳",
-  "logline": "Five minutes before Pip's party, Bloxy cannot find the present, and it was closer than he thought.",
+  "logline": "Five minutes before Pip's party, Bloxy cannot find the present, and everyone can see it but him.",
   "duration_s": 45.95,
   "story": {
    "premise": "First person: Bloxy loses Pip's birthday present five minutes before the party.",
-   "conflict": "He searches under the bed, the desk, the lamp, the ceiling; Dot brings a metal detector.",
+   "conflict": "He searches under the bed, the desk, the lamp, the ceiling, the street; Dot brings a metal detector.",
    "stakes": "Pip walks in smiling and asks for his present.",
-   "reveal": "The present was in Bloxy's hood all day, bouncing on his back.",
-   "ending": "Happy birthday from his hood; next year he is wearing a T-shirt.",
+   "reveal": "The present was in Bloxy's own hand all morning, in plain sight of everyone but him.",
+   "ending": "Pip liked the old tooth more, and now Bloxy cannot find the tooth.",
    "ending_type": "twist",
    "mode": "grounded",
    "mechanism": "everyday_accident",
@@ -10127,14 +10118,14 @@
    "t_end": 2.45
   },
   "payoff": {
-   "text": "The present was in Bloxy's own hood the whole time.",
+   "text": "The present was in Bloxy's own hand the whole time, and Pip liked the old tooth more.",
    "t_start": 40.0
   },
   "setting": {
    "preset": "bedroom",
    "time_of_day": "morning",
    "lighting": "warm_key_cool_fill",
-   "description": "Bloxy's bedroom in the morning: bed, desk and lamp, everything searched.",
+   "description": "Bloxy's bedroom in the morning: bed, desk and lamp, everything searched. The wrapped present is in Bloxy's right hand from the first frame.",
    "props": [
     {
      "id": "bed",
@@ -10164,6 +10155,16 @@
       2.5,
       0.0
      ]
+    },
+    {
+     "id": "gift",
+     "type": "gift",
+     "position": [
+      0.3,
+      0.55,
+      0.0
+     ],
+     "color": "#E63946"
     }
    ]
   },
@@ -10493,7 +10494,7 @@
    {
     "start_s": 0,
     "purpose": "hook",
-    "description": "Bloxy spins around his room in a panic."
+    "description": "Bloxy spins around his room in a panic, the wrapped present plainly in his right hand."
    },
    {
     "start_s": 2,
@@ -10508,7 +10509,7 @@
    {
     "start_s": 12,
     "purpose": "escalation",
-    "description": "The desk, the lamp, the ceiling."
+    "description": "The desk, the lamp, the ceiling, then the whole street."
    },
    {
     "start_s": 18,
@@ -10518,7 +10519,7 @@
    {
     "start_s": 25,
     "purpose": "mid_gag",
-    "description": "Bloxy to the camera, desperate."
+    "description": "Bloxy to the camera, desperate, the present still in his hand."
    },
    {
     "start_s": 27,
@@ -10528,17 +10529,17 @@
    {
     "start_s": 33,
     "purpose": "twist",
-    "description": "Something falls out of Bloxy's hood: the present."
+    "description": "Pip points at Bloxy's hand: the present was there all morning."
    },
    {
     "start_s": 40,
     "purpose": "payoff",
-    "description": "Bloxy hands it over with a bow."
+    "description": "Pip liked the old tooth more."
    },
    {
     "start_s": 42,
     "purpose": "loop",
-    "description": "Next year, a T-shirt."
+    "description": "Now Bloxy cannot find the tooth."
    }
   ],
   "performance": {
@@ -10553,7 +10554,11 @@
       0.0,
       0.4
      ],
-     "facing": 0
+     "facing": 0,
+     "arms": {
+      "left": "rest",
+      "right": "hold_prop"
+     }
     },
     {
      "t": 2.4,
@@ -10609,8 +10614,24 @@
      "expression": "frozen"
     },
     {
+     "t": 35.6,
+     "eye_target": {
+      "kind": "forward"
+     },
+     "head": {
+      "pitch": 25
+     }
+    },
+    {
      "t": 37.9,
-     "expression": "embarrassed"
+     "expression": "embarrassed",
+     "eye_target": {
+      "kind": "character",
+      "id": "pip"
+     },
+     "head": {
+      "pitch": 0
+     }
     },
     {
      "t": 40.6,
@@ -10818,6 +10839,18 @@
    },
    {
     "character": "pip",
+    "type": "point",
+    "t": 33.2,
+    "anticipation_frames": 3,
+    "main_frames": 8,
+    "follow_through_frames": 4,
+    "hold_frames": 10,
+    "params": {
+     "hand": "right"
+    }
+   },
+   {
+    "character": "pip",
     "type": "flinch",
     "t": 35.8,
     "anticipation_frames": 2,
@@ -10914,7 +10947,7 @@
     "id": "l7",
     "speaker": "bloxy",
     "kind": "narration",
-    "text": "Then I checked my sock drawer again.",
+    "text": "Then I searched the whole street.",
     "t": 15.35,
     "emotion": "sad",
     "pace": "normal",
@@ -10962,7 +10995,7 @@
     "id": "l11",
     "speaker": "bloxy",
     "kind": "narration",
-    "text": "Subscribe, it helps me find stuff.",
+    "text": "Hit like if you spot it.",
     "t": 25.0,
     "emotion": "worried",
     "pace": "normal",
@@ -11010,7 +11043,7 @@
     "id": "l15",
     "speaker": "bloxy",
     "kind": "narration",
-    "text": "Then something fell out of my hood.",
+    "text": "Then Pip pointed at my hand.",
     "t": 33.0,
     "emotion": "startled",
     "pace": "normal",
@@ -11022,7 +11055,7 @@
     "id": "l16",
     "speaker": "bloxy",
     "kind": "narration",
-    "text": "The present was in my hood.",
+    "text": "The present was in my hand.",
     "t": 35.6,
     "emotion": "startled",
     "pace": "normal",
@@ -11034,7 +11067,7 @@
     "id": "l17",
     "speaker": "bloxy",
     "kind": "narration",
-    "text": "It bounced on my back all day.",
+    "text": "I'd been holding it all morning.",
     "t": 37.9,
     "emotion": "embarrassed",
     "pace": "normal",
@@ -11046,7 +11079,7 @@
     "id": "l18",
     "speaker": "bloxy",
     "kind": "narration",
-    "text": "Happy birthday from my hood.",
+    "text": "He liked the tooth more.",
     "t": 40.6,
     "emotion": "happy",
     "pace": "normal",
@@ -11058,7 +11091,7 @@
     "id": "l19",
     "speaker": "bloxy",
     "kind": "narration",
-    "text": "Next year, I'm wearing a T-shirt.",
+    "text": "Now I can't find the tooth.",
     "t": 42.6,
     "emotion": "determined",
     "pace": "slow",
@@ -11154,7 +11187,7 @@
   },
   "metadata": {
    "title": "I Lost My Best Friend's Birthday Gift 😳",
-   "description": "Where do YOU lose things? 👇 Original animated story with blocky characters. #shorts #animation #story",
+   "description": "Did YOU spot it? 👇 Original animated story with blocky characters. #shorts #animation #story",
    "tags": [
     "animation",
     "story",
@@ -11167,10 +11200,19 @@
    ]
   },
   "inspiration": {
-   "note": "Original first-person story (new premise, not from the idea bank). Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 30.6 s finished, narration about 4.15 words per second (hook 4.67, body 4.15, end 3.91).",
+   "note": "Original first-person story (new premise, not from the idea bank). Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 30.6 s finished, narration about 4.13 words per second (hook 4.67, body 4.12, end 3.88). Editor: the old twist (a present falling out of a hood) could not be shown; now the present is in his hand from the first frame, the mid-gag asks viewers to spot it, Pip points at it, and the payoff and loop are about the tooth Dot found.",
    "idea_bank": null,
    "sources": []
-  }
+  },
+  "props_events": [
+   {
+    "t": 0.0,
+    "prop": "gift",
+    "event": "attach",
+    "character": "bloxy",
+    "hand": "right"
+   }
+  ]
  },
  {
   "source": "claude_session_2026_10_22_first_person",
@@ -11559,7 +11601,7 @@
    {
     "start_s": 0,
     "purpose": "hook",
-    "description": "Pip relaxes at home while Ms. Tally glares with a calendar."
+    "description": "Pip shrugs at home on a Monday morning while Ms. Tally glares with a calendar."
    },
    {
     "start_s": 2,
@@ -11749,6 +11791,16 @@
    ]
   },
   "actions": [
+   {
+    "character": "pip",
+    "type": "shrug",
+    "t": 0.3,
+    "anticipation_frames": 3,
+    "main_frames": 10,
+    "follow_through_frames": 5,
+    "hold_frames": 0,
+    "params": {}
+   },
    {
     "character": "tally",
     "type": "walk",
@@ -11986,7 +12038,7 @@
     "id": "l13",
     "speaker": "pip",
     "kind": "narration",
-    "text": "Like this on a Tuesday, please.",
+    "text": "Hit like. Unless today is Monday.",
     "t": 27.0,
     "emotion": "bored",
     "pace": "normal",
@@ -12184,7 +12236,7 @@
    ]
   },
   "inspiration": {
-   "note": "Original first-person story (new premise, not from the idea bank). Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 31.3 s finished, narration about 4.23 words per second (hook 4.44, body 4.27, end 3.80).",
+   "note": "Original first-person story (new premise, not from the idea bank). Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 31.3 s finished, narration about 4.23 words per second (hook 4.44, body 4.27, end 3.80). Editor: new mid-gag \"Hit like. Unless today is Monday.\"; Pip shrugs in the hook.",
    "idea_bank": null,
    "sources": []
   },
@@ -12201,12 +12253,12 @@
  {
   "source": "claude_session_2026_10_22_first_person",
   "format": "first_person_story",
-  "title": "I Could Only Speak in Questions for a Day 😳",
+  "title": "I Could Only Speak in Questions 😳",
   "logline": "Pip loses a bet to his little sister and may only speak in questions for a day, which makes him the wisest person in town.",
   "duration_s": 49.0,
   "story": {
    "premise": "First person: one normal sentence and Pip owes Dot ten coins, so he only asks questions.",
-   "conflict": "Bloxy, Dot and a lost kid all try to get a straight answer out of him.",
+   "conflict": "Bloxy, Dot and a lost Bloxy all try to get a straight answer out of him.",
    "stakes": "Dot is trying to trap him into one normal sentence all day.",
    "reveal": "Everyone thinks his questions are deep; Dot, the one who set the bet, asks to be his student.",
    "ending": "She pays him ten coins for lessons. Should he keep asking questions?",
@@ -12604,7 +12656,7 @@
    {
     "start_s": 10,
     "purpose": "escalation",
-    "description": "Bloxy offers pizza; Pip answers with a question."
+    "description": "Bloxy offers free ice cream; Pip answers with a question."
    },
    {
     "start_s": 16,
@@ -12614,7 +12666,7 @@
    {
     "start_s": 21,
     "purpose": "escalation",
-    "description": "A lost kid asks the way home; Pip answers with a question."
+    "description": "Bloxy, still thinking, gets lost and asks the way home; Pip answers with a question."
    },
    {
     "start_s": 29,
@@ -12655,7 +12707,18 @@
       0.0,
       0.5
      ],
-     "facing": 10
+     "facing": 10,
+     "arms": {
+      "left": "rest",
+      "right": "cover_mouth"
+     }
+    },
+    {
+     "t": 3.15,
+     "arms": {
+      "left": "rest",
+      "right": "rest"
+     }
     },
     {
      "t": 6.0,
@@ -12753,7 +12816,11 @@
     },
     {
      "t": 43.7,
-     "expression": "happy"
+     "expression": "happy",
+     "arms": {
+      "left": "rest",
+      "right": "rest"
+     }
     }
    ],
    "bloxy": [
@@ -12884,7 +12951,7 @@
     "id": "l1",
     "speaker": "pip",
     "kind": "narration",
-    "text": "I could only speak in questions for a day.",
+    "text": "I could only speak in questions. All day.",
     "t": 0.0,
     "emotion": "worried",
     "pace": "normal",
@@ -12932,7 +12999,7 @@
     "id": "l5",
     "speaker": "pip",
     "kind": "narration",
-    "text": "Bloxy asked if I wanted pizza.",
+    "text": "Bloxy offered me free ice cream.",
     "t": 10.0,
     "emotion": "curious",
     "pace": "normal",
@@ -13004,7 +13071,7 @@
     "id": "l11",
     "speaker": "pip",
     "kind": "narration",
-    "text": "A lost kid asked me the way home.",
+    "text": "Then Bloxy asked me the way home.",
     "t": 21.3,
     "emotion": "curious",
     "pace": "slow",
@@ -13212,7 +13279,7 @@
    "music_dropout": true
   },
   "metadata": {
-   "title": "I Could Only Speak in Questions for a Day 😳",
+   "title": "I Could Only Speak in Questions 😳",
    "description": "Could YOU only ask questions for a day? 👇 Original animated story with blocky characters. #shorts #animation #story",
    "tags": [
     "animation",
@@ -13226,7 +13293,7 @@
    ]
   },
   "inspiration": {
-   "note": "Idea bank premise (owner's own list): \"I Can Only Speak in Questions\". Plot, lines and twist written new for this batch. Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 32.7 s finished, narration about 4.21 words per second (hook 4.50, body 4.22, end 3.96).",
+   "note": "Idea bank premise (owner's own list): \"I Can Only Speak in Questions\". Plot, lines and twist written new for this batch. Written by Claude in a chat session on 2026-10-22 for the owner's first-person story format (the owner's playbook: title grammar, beats, pace and twist bank; no reference video's plot, lines or looks were used). Validates with zero errors and zero warnings at production pace 1.5 (voices 1.3x, the demo cast's measured voices): 32.7 s finished, narration about 4.20 words per second (hook 4.44, body 4.21, end 3.96). Editor: retitled from \"I Could Only Speak in Questions for a Day\" (the idea bank's own 6 words); no off-screen \"lost kid\" (Bloxy gets lost); ice cream instead of pizza; his hand covers his mouth in the hook; the coin changes hands on the cut.",
    "idea_bank": "I Can Only Speak in Questions 😳",
    "sources": []
   },
@@ -13239,14 +13306,14 @@
     "hand": "right"
    },
    {
-    "t": 43.9,
+    "t": 43.7,
     "prop": "coin",
     "event": "detach",
     "character": "dot",
     "hand": "right"
    },
    {
-    "t": 44.0,
+    "t": 43.7,
     "prop": "coin",
     "event": "attach",
     "character": "pip",
