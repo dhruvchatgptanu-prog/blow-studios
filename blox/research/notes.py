@@ -12,15 +12,23 @@ URL lists, playbooks). They are stored verbatim (size-capped) with provenance, s
 The extraction is surfaced read-only in the research brief ("owner-supplied notes") and given to the
 story model as *pattern hints inside an untrusted block*, never as instructions. Lines that trip the
 injection screen are dropped from the hints and counted.
+
+Capture rows (``reference.jsonl`` from the owner's capture tool: one object per studied video with an id,
+a title, a channel and a numeric view count) are also kept as ``reference_titles`` in the extracted JSON,
+validated field by field and capped, so new titles can be checked for closeness to them. Transcripts are
+never stored, and the hook and ending excerpts are kept only for the owner's own videos (rows with
+``own_channel`` true); they are removed from the stored note text for every other row.
 """
 import csv
 import io
 import json
+import math
 import re
 import zipfile
 from pathlib import PurePosixPath
 
 from .. import db as dbmod, store, untrusted
+from ..learning import MECHANISMS, enum_value
 from ..util import new_id, now
 
 KINDS = {'.md': 'markdown', '.markdown': 'markdown', '.txt': 'text', '.csv': 'csv', '.json': 'json',
@@ -30,6 +38,14 @@ UPLOAD_CAP = 8 * 1024 * 1024
 ZIP_MEMBERS_MAX = 50
 ZIP_MEMBER_CAP = 2 * 1024 * 1024
 LIMITS = {'titles': 30, 'video_ids': 60, 'urls': 60, 'numbers': 80, 'rules': 40}
+REFERENCE_ROWS_MAX = 2000          # capture rows kept per note
+REFERENCE_TITLES_MAX = 20_000      # reference titles read back across all notes
+EXCERPT_WORDS = 12
+# Keys that hold transcript text; dropped from every stored row.
+TRANSCRIPT_KEYS = {'transcript', 'transcripts', 'transcript_text', 'captions', 'caption_text', 'subtitles', 'subs',
+                   'segments', 'cues', 'asr', 'asr_text', 'full_text', 'text_full', 'words_timed', 'timed_words'}
+_ROW_ID = re.compile(r'^[A-Za-z0-9_-]{1,64}$')
+_HANDLE = re.compile(r'^@?[A-Za-z0-9._-]{1,100}$')
 
 _URL = re.compile(r'https?://[^\s<>"\')\]]+', re.I)
 _YT_URL = re.compile(r'(?:youtube\.com/(?:watch\?(?:[^\s&]*&)*v=|shorts/|embed/|live/)|youtu\.be/)([A-Za-z0-9_-]{11})',
@@ -237,7 +253,7 @@ def extract(text, kind):
         if kind == 'json':
             try:
                 docs = [json.loads(text)]
-            except ValueError:
+            except (ValueError, RecursionError):
                 docs = []
         else:
             for ln in text.splitlines():
@@ -245,7 +261,7 @@ def extract(text, kind):
                 if ln:
                     try:
                         docs.append(json.loads(ln))
-                    except ValueError:
+                    except (ValueError, RecursionError):
                         continue
         pairs = []
         for doc in docs:
@@ -265,22 +281,198 @@ def extract(text, kind):
     return ex
 
 
+# ---------------------------------------------------------------- capture rows (reference.jsonl)
+_RISKY_PAIR = re.compile(r'"(?:[A-Za-z_]*_excerpt|excerpts?|' + '|'.join(sorted(TRANSCRIPT_KEYS)) +
+                         r')"\s*:\s*(?:"(?:[^"\\]|\\.)*"|\[[^\]]*\])\s*,?', re.I)
+
+
+def _num(v, lo, hi, digits=2):
+    # The range test comes first: it is safe for huge integers (and false for NaN and infinities).
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or not lo <= v <= hi or not math.isfinite(v):
+        return None
+    return round(float(v), digits)
+
+
+def _own(o):
+    return o.get('own_channel') is True or o.get('own') is True
+
+
+def is_capture_row(o):
+    """A row from the owner's capture tool: an object with an id, a title, a channel and a numeric view count."""
+    return (isinstance(o, dict) and isinstance(o.get('id'), str) and isinstance(o.get('title'), str)
+            and isinstance(o.get('channel'), str) and isinstance(o.get('views'), (int, float))
+            and not isinstance(o.get('views'), bool))
+
+
+def _excerpt(v):
+    if not isinstance(v, str):
+        return None
+    s = ' '.join(untrusted.clean(v, 400).split()[:EXCERPT_WORDS])
+    return s if s and not untrusted.injection_signals(s) else None
+
+
+def reference_row(o):
+    """One validated ``reference_titles`` entry from a capture row, or None when a required field is unusable.
+
+    Only the listed fields are kept; numbers outside sensible ranges become None. The hook and ending excerpts
+    are kept (as at most 12 words) only for the owner's own videos."""
+    if not is_capture_row(o):
+        return None
+    rid = untrusted.clean(o['id'], 64)
+    title = untrusted.clean(o['title'], 200)
+    channel = untrusted.clean(o['channel'], 100)
+    views = _num(o['views'], 0, 1e12, 0)
+    if (not _ROW_ID.match(rid) or not title or not channel or views is None
+            or untrusted.injection_signals(title) or untrusted.injection_signals(channel)):
+        return None
+    handle = untrusted.clean(o.get('handle'), 100) if isinstance(o.get('handle'), str) else ''
+    own = _own(o)
+    row = {'id': rid, 'channel': channel, 'handle': handle if _HANDLE.match(handle) else '', 'own': own,
+           'title': title, 'views': int(views), 'mechanism': enum_value(o.get('mechanism'), MECHANISMS),
+           'duration_s': _num(o.get('duration_s'), 0.1, 3600), 'wps_speech': _num(o.get('wps_speech'), 0.1, 12, 3),
+           'first_word_s': _num(o.get('first_word_s'), 0, 600), 'max_shot_s': _num(o.get('max_shot_s'), 0.01, 3600)}
+    if own:
+        for k in ('hook_excerpt', 'ending_excerpt'):
+            ex = _excerpt(o.get(k))
+            if ex:
+                row[k] = ex
+    return row
+
+
+def _scrub(obj, depth=0):
+    """Copy of a parsed JSON value without transcripts, and without excerpts unless the object is the owner's own."""
+    if depth > 8:
+        return None
+    if isinstance(obj, dict):
+        own = _own(obj)
+        out = {}
+        for k, v in obj.items():
+            kl = str(k).lower()
+            if kl in TRANSCRIPT_KEYS:
+                continue
+            if kl.endswith('_excerpt') or kl in ('excerpt', 'excerpts'):
+                ex = _excerpt(v) if own else None
+                if ex:
+                    out[k] = ex
+                continue
+            out[k] = _scrub(v, depth + 1)
+        return out
+    if isinstance(obj, list):
+        return [_scrub(v, depth + 1) for v in obj]
+    return obj
+
+
+def _rows_in(doc):
+    if isinstance(doc, list):
+        items = doc
+    elif is_capture_row(doc):
+        items = [doc]
+    elif isinstance(doc, dict):
+        items = next((doc[k] for k in ('rows', 'videos', 'reference', 'items') if isinstance(doc.get(k), list)), [])
+    else:
+        items = []
+    return [it for it in items if is_capture_row(it)]
+
+
+def screen_structured(text, kind):
+    """For .json/.jsonl notes: (text to store, reference rows or None).
+
+    The stored text drops transcripts and other creators' excerpts (re-serialising only the objects that change);
+    the reference rows are read from the whole upload, before the stored text is size-capped."""
+    text = untrusted.clean(text, len(text or '') + 1)
+    docs, out_lines, changed = [], [], False
+    if kind == 'jsonl':
+        for ln in text.splitlines():
+            s = ln.strip()
+            if not s:
+                out_lines.append(ln)
+                continue
+            try:
+                doc = json.loads(s)
+            except (ValueError, RecursionError):
+                fixed = _RISKY_PAIR.sub('', ln)
+                changed |= fixed != ln
+                out_lines.append(fixed)
+                continue
+            docs.append(doc)
+            clean_doc = _scrub(doc)
+            if clean_doc != doc:
+                changed = True
+                out_lines.append(json.dumps(clean_doc, ensure_ascii=False))
+            else:
+                out_lines.append(ln)
+        stored = '\n'.join(out_lines) if changed else text
+    else:
+        try:
+            doc = json.loads(text)
+        except (ValueError, RecursionError):
+            return _RISKY_PAIR.sub('', text), None
+        docs.append(doc)
+        clean_doc = _scrub(doc)
+        stored = json.dumps(clean_doc, ensure_ascii=False, indent=1) if clean_doc != doc else text
+    rows, seen, skipped = [], set(), 0
+    for doc in docs:
+        for o in _rows_in(doc):
+            r = reference_row(o)
+            if r is None:
+                skipped += 1
+                continue
+            if r['id'] in seen:
+                continue
+            if len(rows) >= REFERENCE_ROWS_MAX:
+                skipped += 1
+                continue
+            seen.add(r['id'])
+            rows.append(r)
+    if not rows and not skipped:
+        return stored, None
+    return stored, {'rows': rows, 'skipped': skipped}
+
+
+def reference_titles(d=None, limit=REFERENCE_TITLES_MAX):
+    """All imported reference rows, newest note first, one per video id."""
+    d = d or dbmod.get()
+    out, seen = [], set()
+    for r in d.query("SELECT extracted FROM research_notes WHERE kind IN ('json', 'jsonl') "
+                     'ORDER BY created_at DESC, id DESC'):
+        try:
+            ex = json.loads(r['extracted'] or '{}')
+        except ValueError:
+            continue
+        for row in ex.get('reference_titles') or []:
+            if not isinstance(row, dict) or not isinstance(row.get('title'), str) or row.get('id') in seen:
+                continue
+            seen.add(row.get('id'))
+            out.append(row)
+            if len(out) >= limit:
+                return out
+    return out
+
+
 # ---------------------------------------------------------------- storage
 def add(text, title='', source='paste', kind='text', d=None, actor='owner'):
     d = d or dbmod.get()
     if kind not in set(KINDS.values()):
         raise ValueError('Unsupported note kind')
+    refs = None
+    if kind in ('json', 'jsonl') and isinstance(text, str):
+        text, refs = screen_structured(text, kind)
     clean = untrusted.clean(text, TEXT_CAP)
     if not clean.strip():
         raise ValueError('The note is empty')
     title = untrusted.clean(title, 160) or (clean.strip().splitlines()[0].lstrip('# ').strip()[:80] or 'Untitled note')
     source = untrusted.clean(source, 200) or 'paste'
     ex = extract(clean, kind)
+    if refs is not None:
+        ex['reference_titles'] = refs['rows']
+        ex['reference_titles_count'] = len(refs['rows'])
+        ex['reference_rows_skipped'] = refs['skipped']
     nid = new_id('rn_')
     d.execute('INSERT INTO research_notes(id, title, source, kind, text, extracted, created_at) VALUES (?,?,?,?,?,?,?)',
               (nid, title, source, kind, clean, json.dumps(ex, sort_keys=True), now()))
     store.audit('research_note_added', {'id': nid, 'kind': kind, 'source': source, 'chars': len(clean),
-                                        'injection_flags': len(ex['injection_flags'])}, actor=actor, d=d)
+                                        'injection_flags': len(ex['injection_flags']),
+                                        'reference_titles': ex.get('reference_titles_count', 0)}, actor=actor, d=d)
     return nid
 
 
@@ -331,6 +523,10 @@ def list_notes(d=None, limit=100):
                    'ORDER BY created_at DESC LIMIT ?', (limit,))
     for r in rows:
         r['extracted'] = json.loads(r['extracted'] or '{}')
+        # The listing carries the count only; the rows themselves are in get() and reference_titles().
+        refs = r['extracted'].pop('reference_titles', None)
+        if refs is not None:
+            r['extracted']['reference_titles_count'] = len(refs)
     return rows
 
 

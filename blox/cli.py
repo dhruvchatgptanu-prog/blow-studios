@@ -240,6 +240,8 @@ def cmd_import_stories(a):
     res = backlog.add(plans, a.source, prefsmod.get())
     for r in res:
         print(f"{r['status']:9} {r['title']}" + (f"  ({r['reason']})" if r.get('reason') else ''))
+        for w in ([r['note']] if r.get('note') else []) + r.get('warnings', []):
+            print(f"{'':9}   note: {w}")
     print(json.dumps(backlog.summary(prefsmod.get())))
 
 

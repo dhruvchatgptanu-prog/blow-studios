@@ -10,9 +10,15 @@ Signals (each a screening signal, not proof of originality):
 * single-reference dependence: one reference far closer than all others, or
   an inspiration record that names only one source when several were offered.
 Outcome: pass, rewrite (automatic, bounded) or hold (owner review).
+
+Titles are also checked on their own (``title_check``) against the reference titles the owner imported
+from his research (reference.jsonl rows in Research notes): a title too close to another creator's
+video is blocked; one close to the owner's own video only gets a note.
 """
+import difflib
 import math
 import re
+import unicodedata
 from collections import Counter
 
 DISCLAIMER = 'Similarity scores are screening signals, not proof of originality.'
@@ -154,3 +160,124 @@ def check(candidate, references, own, embed=None, inspiration_sources=None):
     report['method'] = method
     report['decision'] = decision
     return report
+
+
+# ---------------------------------------------------------------- title closeness against imported reference titles
+TITLE_BLOCK = 0.6
+TITLE_MAX_CHARS = 300
+# Small words every title in the format shares ("I ... the ...", "my ..."); left out so the shared title grammar
+# alone does not make two different stories look close.
+TITLE_STOPWORDS = frozenset('''i me my mine myself we us our you your he him his she her they them their it its
+a an the and or but so to of in on at for with by from into onto up out off as than then this that these those is was
+were be been am are'''.split())
+_TITLE_WORD = re.compile(r'[^\W_]+')
+
+
+def title_words(title):
+    """Normalised title words: lower case, emoji and punctuation removed, small shared words left out and a plural
+    "s" folded ("World's Strongest Dads" and "worlds strongest dad" give the same words)."""
+    s = unicodedata.normalize('NFKC', str(title or ''))[:TITLE_MAX_CHARS].lower()
+    s = re.sub(r"['\u2018\u2019`]", '', s)
+    out = []
+    for w in _TITLE_WORD.findall(s):
+        if w in TITLE_STOPWORDS:
+            continue
+        if len(w) > 3 and w.endswith('s') and not w.endswith('ss'):
+            w = w[:-1]
+        out.append(w)
+    return out
+
+
+def title_similarity(a, b):
+    """max(difflib ratio over the word sequences, word Jaccard) of two normalised word lists, 0..1."""
+    if not a or not b:
+        return 0.0
+    sa, sb = set(a), set(b)
+    jac = len(sa & sb) / len(sa | sb)
+    ratio = difflib.SequenceMatcher(None, a, b, autojunk=False).ratio()
+    return max(ratio, jac)
+
+
+def prepare_reference_titles(refs):
+    """Pre-normalised reference rows, so many titles can be checked against them (pass the result as ``refs``)."""
+    out = []
+    for r in refs or []:
+        if isinstance(r, tuple):
+            out.append(r)
+            continue
+        if not isinstance(r, dict) or not isinstance(r.get('title'), str):
+            continue
+        w = title_words(r['title'])
+        if w:
+            out.append((w, Counter(w), r))
+    return out
+
+
+def _refs(d, refs):
+    if refs is None:
+        from ..research import notes
+        refs = notes.reference_titles(d)
+    return prepare_reference_titles(refs)
+
+
+def title_check(title, d=None, refs=None):
+    """How close ``title`` is to the imported reference titles.
+
+    Returns {'score', 'closest': {'title', 'channel', 'own'} | None, 'blocked', 'note', 'reason'}. Blocked when the
+    score against another creator's title is at least 0.6; a close title of the owner's own channel only gives a
+    note. ``refs`` (rows from ``notes.reference_titles``) can be passed to check many titles at once."""
+    prepared = _refs(d, refs)
+    words_ = title_words(title)
+    best = {True: (0.0, None), False: (0.0, None)}  # own -> (score, row)
+    if words_:
+        cw = Counter(words_)
+        for rw, rc, row in prepared:
+            own = bool(row.get('own'))
+            cur = best[own][0]
+            common = sum((cw & rc).values())
+            if not common:
+                continue
+            upper = 2.0 * common / (len(words_) + len(rw))
+            jac = len(set(words_) & set(rw)) / len(set(words_) | set(rw))
+            if max(upper, jac) <= cur:
+                continue
+            sc = title_similarity(words_, rw)
+            if sc > cur:
+                best[own] = (sc, row)
+    other_score, other_row = best[False]
+    own_score, own_row = best[True]
+    blocked = other_row is not None and other_score >= TITLE_BLOCK
+    if blocked:
+        score, row = other_score, other_row
+    elif own_score > other_score:
+        score, row = own_score, own_row
+    else:
+        score, row = other_score, other_row
+    closest = None
+    if row is not None:
+        closest = {'title': row.get('title', ''), 'channel': row.get('channel', ''), 'own': bool(row.get('own'))}
+    note = reason = ''
+    if blocked:
+        by = other_row.get('channel') or 'another channel'
+        reason = (f'The title is too close to "{other_row.get("title", "")}" by {by} (similarity {other_score:.2f}; '
+                  f'the limit is {TITLE_BLOCK:.2f}). Write a different title.')
+        note = reason
+    elif own_row is not None and own_score >= TITLE_BLOCK:
+        note = f'A variation of your own video "{own_row.get("title", "")}" (similarity {own_score:.2f}).'
+    return {'score': round(score, 3), 'closest': closest, 'blocked': blocked, 'note': note, 'reason': reason,
+            'threshold': TITLE_BLOCK}
+
+
+def titles_check(titles, d=None, refs=None):
+    """The most serious ``title_check`` result over several titles (a plan's title and its publish title)."""
+    prepared = _refs(d, refs)
+    results = [title_check(t, refs=prepared) for t in dict.fromkeys(t for t in titles if isinstance(t, str) and t.strip())]
+    if not results:
+        return title_check('', refs=prepared)
+    return max(results, key=lambda r: (r['blocked'], bool(r['note']), r['score']))
+
+
+def manifest_title_check(m, d=None, refs=None):
+    """``titles_check`` for a compiled manifest: its title and its publish title."""
+    md = m.get('metadata') if isinstance(m.get('metadata'), dict) else {}
+    return titles_check([m.get('title'), md.get('title')], d, refs)

@@ -1,8 +1,12 @@
-"""Research notes endpoints: paste text, upload files (.md/.txt/.csv/.json/.jsonl or a .zip of them), list, delete."""
+"""Research notes endpoints: paste text, upload files (.md/.txt/.csv/.json/.jsonl or a .zip of them), list, delete;
+and the title closeness check against the imported reference titles."""
 from flask import abort, jsonify, request
 
 from .. import db as dbmod
 from ..research import notes
+from ..story import originality
+
+TITLE_CHECK_MAX = 300
 
 
 def register(app):
@@ -47,3 +51,14 @@ def register(app):
         if not notes.delete(nid, dbmod.get()):
             abort(404)
         return jsonify(ok=True)
+
+    @app.get('/api/title-check')
+    def title_check():
+        """How close a title is to the imported reference titles (the editor's title hint)."""
+        title = request.args.get('title', '')
+        if not title.strip():
+            raise ValueError('Enter a title to check')
+        if len(title) > TITLE_CHECK_MAX:
+            raise ValueError(f'Titles are limited to {TITLE_CHECK_MAX} characters')
+        refs = notes.reference_titles(dbmod.get())
+        return jsonify(dict(originality.title_check(title, refs=refs), references=len(refs)))

@@ -236,12 +236,23 @@ def develop_step(v, p, d, chars):
                               state='needs_review')
             m['inspiration'] = (meta.get('concept') or {}).get('inspiration', [])
             source = 'llm'
+        src_plan = item['plan'] if source == 'backlog' else plan
+        if source != 'template':
+            # Title closeness to the imported reference titles: another creator's close title holds the video.
+            tcheck = originality.manifest_title_check(m, d)
+            videos.merge_metadata(vid, {'title_check': tcheck}, d)
+            if tcheck['blocked']:
+                raise Blocked(tcheck['reason'] + (' Reject this story on the Story backlog page and add it again with '
+                                                  'a new title.' if source == 'backlog' else ''), state='needs_review')
         names = {c['id']: chars.get(c['character_id'], {}).get('name', c['id']) for c in m['cast']}
         mid = repo.save_manifest(vid, m, source, director.script(m, names), rep, d)
         meta_md = m.get('metadata') or {}
+        from .learning import story_fields
         videos.merge_metadata(vid, {'publish_metadata': {'title': meta_md.get('title') or m['title'],
                                                          'description': meta_md.get('description', ''),
-                                                         'tags': meta_md.get('tags', [])}}, d)
+                                                         'tags': meta_md.get('tags', [])},
+                                    'format_story': dict(story_fields(m, src_plan),
+                                                         logline=str(m.get('logline') or '')[:400])}, d)
         videos.transition(vid, 'scripted', f'Production manifest validated ({source})', expect='concept_selected',
                           manifest_id=mid, title=(meta_md.get('title') or m['title'])[:100], d=d)
         return True
