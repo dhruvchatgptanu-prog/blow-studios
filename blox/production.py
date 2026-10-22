@@ -14,7 +14,7 @@ from .animation import blender as BL, solver as SV
 from .assembly import assemble
 from .manifest import compile as C, schema as S, validate as V
 from .util import Blocked, stable_hash
-from .voice import tts
+from .voice import tts, voicecfg
 
 
 def cast_characters(m, characters):
@@ -54,6 +54,8 @@ def measure_lines(m, characters, prefs, work_dir=None):
     measured = {}
     for ln in m['lines']:
         who = cast.get(ln['speaker']) if ln['speaker'] != 'narrator' else {'name': 'Narrator', 'voice': {}}
+        if voicecfg.engine_for((who or {}).get('voice'), pr['tts_provider']) not in FREE_TTS + voicecfg.FREE_ENGINES:
+            continue  # a character set to a paid engine (e.g. an imported ElevenLabs voice) is never measured
         key = stable_hash([pr['tts_provider'], pr.get('piper_model'), pr['tts_model'], ln['text'], ln['pace'],
                            ln['emotion'], ln['volume'], ln.get('kind', 'dialogue'), ln.get('speech_rate', 1.0),
                            (who or {}).get('voice') or {}, (who or {}).get('id'), pr['pronunciations']])
@@ -92,26 +94,97 @@ def preflight(m, characters, prefs):
     return m
 
 
+def speaker_of(ln, cast, prefs):
+    """The character voicing a line ({'name', 'voice', ...}); the studio narrator for 'narrator' lines."""
+    if ln['speaker'] == 'narrator':
+        return {'name': 'Narrator', 'voice': prefs.get('narrator_voice', {})}
+    return cast.get(ln['speaker'])
+
+
+def elevenlabs_characters(m, cast, prefs, only=None):
+    """Characters of text the video's ElevenLabs lines send (only the lines in ``only`` when given)."""
+    pr = prefs['production']
+    total = 0
+    for ln in m['lines']:
+        if only is not None and ln['id'] not in only:
+            continue
+        who = speaker_of(ln, cast, prefs) or {}
+        if voicecfg.engine_for(who.get('voice'), pr['tts_provider']) == 'elevenlabs':
+            total += len(tts.spoken_text(ln['text'], pr['pronunciations']))
+    return total
+
+
+def credit_guard(m, cast, prefs, only=None):
+    """Before the first paid ElevenLabs line of a video: check the characters left on the owner's plan and stop
+    for the owner (Blocked, needs_review) when this video would use more than a quarter of them. Free and
+    other engines need no check. Returns the characters the video needs (0 when it uses no ElevenLabs voice)."""
+    need = elevenlabs_characters(m, cast, prefs, only)
+    if need:
+        tts.check_elevenlabs_credits(need)
+    return need
+
+
 def voice_lines(m, cast, prefs, work_dir, video_id, only=None, attempts=None, on_line=None):
+    credit_guard(m, cast, prefs, only=only)
     results = {}
     for ln in m['lines']:
         if only and ln['id'] not in only:
             continue
-        who = cast.get(ln['speaker']) if ln['speaker'] != 'narrator' else {'name': 'Narrator', 'voice': prefs.get('narrator_voice', {})}
+        who = speaker_of(ln, cast, prefs)
         results[ln['id']] = tts.synthesize_line(ln, who, prefs, work_dir, video_id,
-                                                attempt=(attempts or {}).get(ln['id'], 0))
+                                                attempt=(attempts or {}).get(ln['id'], 0), manifest=m)
         if on_line:
             on_line(ln['id'])
     return results
 
 
-def retime(m, results, prefs, max_shift_s=0.6):
+# A line re-voiced to fit is asked for a little more than its overrun (native speed controls are not exact), never
+# more than the line-fitting cap.
+NATIVE_FIT_MARGIN = 1.03
+
+
+def revoicer(m, cast, prefs, work_dir, video_id, attempts=None):
+    """The re-voice step retime uses when time stretching is off: ``revoice(line, factor)`` voices the line again
+    with its engine's own speed raised ``factor`` times (the line's ``fit_speed``), or returns None when the
+    engine has no native speed control or is already at the end of its range."""
+    pr = prefs['production']
+
+    def revoice(ln, factor):
+        who = speaker_of(ln, cast, prefs)
+        if not tts.can_speed_up(ln, who, pr, factor, manifest=m):
+            return None
+        res = tts.synthesize_line(dict(ln, fit_speed=factor), who, prefs, work_dir, video_id,
+                                  attempt=(attempts or {}).get(ln['id'], 0), manifest=m)
+        return dict(res, native_speed=factor)
+    return revoice
+
+
+def _native_fit(ln, r, window, cap, revoice, report):
+    """Re-voice a slightly long line once at a natively faster speed (never time-stretched). Returns
+    (result, action): 'fits' with the re-voiced line, or 'too_long' with the shorter of the two takes so the
+    caller moves the next line or asks for a rewrite."""
+    factor = round(min(cap, max(1.0, r['duration_s'] / max(0.05, window)) * NATIVE_FIT_MARGIN), 4)
+    new = revoice(ln, factor) if revoice and factor > 1.0 else None
+    if not new:
+        return r, 'too_long'
+    fits = new['duration_s'] <= window
+    report.append({'line': ln['id'], 'action': 'native_speed', 'speed': factor, 'before_s': r['duration_s'],
+                   'after_s': new['duration_s'], 'window_s': round(window, 3), 'fits': fits})
+    if fits:
+        return new, 'fits'
+    return (new if new['duration_s'] < r['duration_s'] else r), 'too_long'
+
+
+def retime(m, results, prefs, max_shift_s=0.6, revoice=None):
     """Fit measured line durations into the timeline.
 
-    Order of preference: (1) it fits; (2) a tempo change (<= max_tempo, or at a
-    production pace up to the pace, never above 1.5x with the speech rate);
+    Order of preference: (1) it fits; (2) a slightly long line speeds up within the cap (max_tempo, or at a
+    production pace up to the pace, never above 1.5x with the speech rate): with time stretching off (the
+    default, the owner's rule) it is voiced once more at the engine's own faster speed through ``revoice``
+    (see revoicer; reported as 'native_speed'); with it on, a gentle FFmpeg tempo change ('tempo');
     (3) start the following line later (bounded, never past the end);
     (4) report the line as too long so it is rewritten and re-voiced.
+    Without ``revoice``, or when the engine has no native speed, step (2) is skipped when stretching is off.
     Returns (manifest, results, report).
     """
     m = copy.deepcopy(m)
@@ -119,6 +192,7 @@ def retime(m, results, prefs, max_shift_s=0.6):
     D = m['duration_frames']
     report = []
     lines = m['lines']
+    stretch = bool(prefs['production'].get('time_stretch_speech', False))
     # Gentle tempo (max_tempo), or at a production pace up to the pace, never
     # above MAX_LINE_SPEEDUP in total with the native speech rate.
     max_tempo = C.tempo_cap(m, prefs['production']['max_tempo'])
@@ -128,7 +202,13 @@ def retime(m, results, prefs, max_shift_s=0.6):
             continue
         nxt = lines[i + 1]['start_frame'] if i + 1 < len(lines) else D
         window = (nxt - ln['start_frame']) / fps - (ln.get('pause_after_ms', 0) / 1000.0)
-        fitted, action = tts.fit_line(r, window, max_tempo, os.path.dirname(r['file']))
+        fitted, action = tts.fit_line(r, window, max_tempo, os.path.dirname(r['file']), stretch=stretch)
+        if action == 'speed_up':
+            fitted, action = _native_fit(ln, r, window, max_tempo, revoice, report)
+            r = fitted
+            if fitted.get('native_speed'):
+                # Kept on the line, so a later re-voice of it (a repair) speaks at the same native speed.
+                ln['fit_speed'] = fitted['native_speed']
         if action == 'too_long' and i + 1 < len(lines):
             need = r['duration_s'] - window
             cap = lines[i + 2]['start_frame'] if i + 2 < len(lines) else D
@@ -232,7 +312,8 @@ def produce_local(plan, characters, prefs, work_dir, video_id='local', quality='
     os.makedirs(work_dir, exist_ok=True)
     log('voicing lines')
     results = voice_lines(m, cast, prefs, os.path.join(work_dir, 'voice'), video_id)
-    m, results, retime_report = retime(m, results, prefs)
+    m, results, retime_report = retime(m, results, prefs,
+                                       revoice=revoicer(m, cast, prefs, os.path.join(work_dir, 'voice'), video_id))
     rep2 = V.validate(m, prefs, measured=True)
     log('solving motion')
     solved = solve(m, cast, results)

@@ -67,6 +67,28 @@ Settings → Production → voice provider.
   form, filled in for the shipped cast), which decide how much dialogue fits a plan. If you change a
   character's voice, pitch or rate, update them, or turn on Settings → Production → *measure lines on
   validate* so every line is voiced for real at validation time.
+* **Natural voices, never stretched** (your rule of 2026-10-19). Blox never speeds speech up or slows it
+  down after it is voiced. Pace comes from the script's length and the engine's own speed setting. When
+  a line is a little too long for its slot, Blox voices it once more at the engine's own faster speed
+  (Piper length scale, Kokoro speed, ElevenLabs speed 0.7–1.2, OpenAI speed on the models that take it),
+  never past the usual 1.5x limit. The retime report lists each one as `native_speed`. If the engine has
+  no speed setting, or the line still does not fit, the next line starts a little later or the line is
+  rewritten, as before. A character's pitch shift uses only FFmpeg's rubberband filter (pitch only).
+  Without that filter the shift is skipped and the line records why. The setting is
+  `production.time_stretch_speech` (off). Turn it on only to get the old gentle tempo change back.
+* **Your narrator voice from voice.json.** On Characters, **Import voice.json**: pick the character,
+  choose the file, check the preview, then **Apply**. Blox writes the engine (ElevenLabs, or a free
+  engine), the voice id, the model, the settings (stability, similarity, style, speaker boost, speed)
+  and the speed for each part of the story (hook, body, end). It keeps the consent and approval record
+  with the voice and shows it, read-only, on the character. Every value is checked. A file with any
+  field named like a key, token or secret is refused, and a `clone` voice needs `consent.who` and
+  `consent.date`. Unknown fields are ignored. Blox never clones a voice or creates one: it only uses the
+  voice id you give. The import is in the audit log. An ElevenLabs line is spoken at your speed × the
+  part's speed, and the same speaker's neighbouring lines go with it so the delivery flows. Keep your
+  API key on Connections, never in the file.
+* **ElevenLabs credits.** Before the first paid ElevenLabs line of a video, Blox reads the characters
+  left on your plan (a free account check). If the video would use more than a quarter of them, it stops
+  and the video waits for you. The message gives both numbers.
 
 ## Production style settings
 

@@ -17,17 +17,30 @@ Providers:
 A character may override the studio's provider with ``voice.engine``.
 
 Voices are synthetic voices from the provider's catalogue or voices the owner
-has rights to; this module never clones a person's voice.
+has rights to; this module never clones a person's voice and never calls a
+voice-cloning or voice-creation endpoint: an ElevenLabs voice is only ever the
+voice id the owner supplied (typed on Characters or imported from voice.json).
+
+Natural voices (owner's rule, 2026-10-19; pref ``time_stretch_speech``, off by
+default): speech is never time-stretched. A line slightly too long for its slot
+is voiced again at the engine's own faster speed (``fit_speed`` on the line,
+folded into the engine's native control: Piper length scale, Kokoro speed,
+Speechify prosody rate, OpenAI ``speed`` on models that take it, ElevenLabs
+``speed``) instead of FFmpeg ``atempo``, and a pitch shift only uses the
+rubberband filter (pitch only) or is skipped with the reason on the result.
 """
 import base64
+import math
 import os
 import re
 import tempfile
 
 from .. import config, media, paid, vault
-from ..http import request
-from ..util import Blocked, stable_hash
-from . import audio as A
+from ..http import ProviderError, request
+from ..manifest import schema as S
+from ..util import Blocked, Retry, stable_hash
+from . import audio as A, voicecfg
+from .sections import line_section
 
 TTS_INSTRUCTION_LIMIT = 1200
 OPENAI_VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'onyx', 'nova', 'sage', 'shimmer', 'verse',
@@ -46,12 +59,36 @@ PIPER_VOLUME_FX = {'loud': (0.5, 2.0), 'shout': (1.0, 4.0)}
 # Longest silence kept inside a Piper line at speech rate 1 (it shrinks with the rate). Piper leaves 0.2-0.5 s
 # between sentences; storytime delivery runs them together. Deliberate pauses belong in pause_after_ms.
 PIPER_MAX_GAP_S = 0.16
+# ElevenLabs: neighbouring lines sent as previous_text / next_text (continuity of delivery), capped in length.
+ELEVENLABS_CONTEXT_CHARS = 600
+ELEVENLABS_SUBSCRIPTION_URL = 'https://api.elevenlabs.io/v1/user/subscription'
+# Stop for the owner before voicing a video that would use more than this share of the ElevenLabs characters left.
+ELEVENLABS_CREDIT_SHARE_MAX = 0.25
 
 
 def line_rate(line):
     """Native speaking speed the line was compiled for (1.0 = normal)."""
     from .piper import speech_rate
     return speech_rate(line)
+
+
+def fit_speed(line):
+    """How much faster than its compiled speech rate a re-voiced line is spoken (``fit_speed``, set by line
+    fitting; 1.0 = not re-voiced). Never above the 1.5x line speed-up limit."""
+    try:
+        x = float(line.get('fit_speed', 1.0))
+    except (TypeError, ValueError):
+        return 1.0
+    return x if math.isfinite(x) and 1.0 <= x <= S.MAX_LINE_SPEEDUP else 1.0
+
+
+def engine_line(line):
+    """The line as a speech-rate-driven engine sees it: a fitting speed-up is folded into its native speech rate
+    (Piper length scale, Kokoro speed, Speechify rate, OpenAI speed), so it is synthesised faster, not stretched."""
+    f = fit_speed(line)
+    if f == 1.0:
+        return line
+    return dict(line, speech_rate=round(min(2.0, line_rate(line) * f), 4))
 
 
 def spoken_text(text, pronunciations):
@@ -103,25 +140,128 @@ def _openai_tts(text, voice_name, instr, model, out_path, speed=1.0):
     return {'path': out_path}
 
 
-def _elevenlabs_tts(text, voice_id, line, model, out_path):
+def elevenlabs_speed(line, voice, section='body'):
+    """ElevenLabs ``voice_settings.speed`` for a line, or None when the request leaves it out.
+
+    A voice with imported settings (voice.json) speaks at settings.speed x the section's speed (hook, body or end)
+    x any line-fitting speed-up; the studio speech rate does not apply to it (the owner's own speed setting
+    replaces it). Other voices speak at the line's speech rate. Both are clamped to ElevenLabs' 0.7-1.2."""
+    settings, sections = voicecfg.imported_elevenlabs(voice)
+    if settings is not None:
+        speed = settings.get('speed', 1.0) * sections.get(section, 1.0) * fit_speed(line)
+    else:
+        speed = line_rate(engine_line(line))
+        if speed == 1.0:
+            return None
+    return round(max(ELEVENLABS_SPEED[0], min(ELEVENLABS_SPEED[1], speed)), 3)
+
+
+def elevenlabs_voice_settings(line, voice=None, section='body'):
+    """The voice_settings object of an ElevenLabs request: the character's imported settings when it has them,
+    else defaults by emotion (more expressive for lively lines), plus the speed (elevenlabs_speed)."""
+    expressive = line['emotion'] not in ('neutral', 'bored')
+    out = {'stability': 0.35 if expressive else 0.55, 'similarity_boost': 0.75,
+           'style': 0.45 if expressive else 0.15, 'use_speaker_boost': True}
+    settings, _ = voicecfg.imported_elevenlabs(voice)
+    if settings is not None:
+        out.update({k: v for k, v in settings.items() if k != 'speed'})
+    speed = elevenlabs_speed(line, voice, section)
+    if speed is not None:
+        out['speed'] = speed
+    return out
+
+
+def elevenlabs_context(m, line, pronunciations=None):
+    """(previous_text, next_text) for an ElevenLabs request: the same speaker's neighbouring lines in the manifest,
+    up to two before and one after (as spoken), so delivery carries on naturally from line to line."""
+    if not m or not line.get('id'):
+        return '', ''
+    same = sorted((ln for ln in m.get('lines') or () if ln.get('speaker') == line.get('speaker')),
+                  key=lambda ln: ln.get('start_frame', 0))
+    ids = [ln.get('id') for ln in same]
+    if line['id'] not in ids:
+        return '', ''
+    i = ids.index(line['id'])
+    prev = ' '.join(spoken_text(str(ln.get('text', '')), pronunciations) for ln in same[max(0, i - 2):i])
+    nxt = spoken_text(str(same[i + 1].get('text', '')), pronunciations) if i + 1 < len(same) else ''
+    return prev.strip()[-ELEVENLABS_CONTEXT_CHARS:], nxt.strip()[:ELEVENLABS_CONTEXT_CHARS]
+
+
+def elevenlabs_request(line, voice, pr, manifest=None):
+    """Model, voice settings and continuity text of a line's ElevenLabs request (manifest: for the section and
+    the neighbouring lines; without it the line counts as 'body' and has no neighbours)."""
+    section = line_section(manifest, line) if manifest and 'start_frame' in line else 'body'
+    prev, nxt = elevenlabs_context(manifest, line, pr.get('pronunciations'))
+    return {'model': voicecfg.elevenlabs_model(voice, pr['elevenlabs_model']), 'section': section,
+            'settings': elevenlabs_voice_settings(line, voice, section), 'previous_text': prev, 'next_text': nxt}
+
+
+def _elevenlabs_tts(text, voice_id, line, model, out_path, settings=None, previous_text='', next_text=''):
     key = vault.get('ELEVENLABS_API_KEY')
     if not key:
         raise Blocked('Connect ElevenLabs or choose another voice provider', state='needs_credentials')
-    if not re.fullmatch(r'[A-Za-z0-9]{8,64}', voice_id or ''):
+    if not re.fullmatch(voicecfg.ELEVENLABS_VOICE_RE, voice_id or ''):
         raise Blocked('This character has no valid ElevenLabs voice ID', state='needs_review')
-    expressive = line['emotion'] not in ('neutral', 'bored')
-    settings = {'stability': 0.35 if expressive else 0.55, 'similarity_boost': 0.75,
-                'style': 0.45 if expressive else 0.15, 'use_speaker_boost': True}
-    if line_rate(line) != 1.0:
-        settings['speed'] = round(max(ELEVENLABS_SPEED[0], min(ELEVENLABS_SPEED[1], line_rate(line))), 3)
+    if settings is None:
+        settings = elevenlabs_voice_settings(line)
+    body = {'text': text, 'model_id': model, 'voice_settings': settings}
+    if previous_text:
+        body['previous_text'] = previous_text
+    if next_text:
+        body['next_text'] = next_text
     r = request('elevenlabs', 'POST', f'https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/with-timestamps',
                 headers={'xi-api-key': key}, params={'output_format': 'mp3_44100_128'},
-                json={'text': text, 'model_id': model, 'voice_settings': settings}, timeout=(10, 120))
+                json=body, timeout=(10, 120))
     j = r.json()
     with open(out_path, 'wb') as f:
         f.write(base64.b64decode(j['audio_base64']))
     al = j.get('alignment') or j.get('normalized_alignment')
     return {'path': out_path, 'char_alignment': al}
+
+
+def _credit_count(x):
+    if isinstance(x, bool) or not isinstance(x, (int, float)) or not math.isfinite(x) or not 0 <= x <= 1e12:
+        raise ValueError('bad count')
+    return int(x)
+
+
+def elevenlabs_credits():
+    """Characters left on the owner's ElevenLabs plan, from GET /v1/user/subscription.
+
+    This reads the account (like listing voices): it is not billed, so it does not go through the paid-call
+    ledger. The response is untrusted: only character_limit and character_count are read, as whole numbers."""
+    key = vault.get('ELEVENLABS_API_KEY')
+    if not key:
+        raise Blocked('Connect ElevenLabs or choose another voice provider', state='needs_credentials')
+    unreadable = 'ElevenLabs sent a credit report Blox could not read, so nothing was voiced. Try again later.'
+    try:
+        r = request('elevenlabs', 'GET', ELEVENLABS_SUBSCRIPTION_URL, headers={'xi-api-key': key}, timeout=(10, 30))
+        j = r.json()
+        limit, used = _credit_count(j['character_limit']), _credit_count(j['character_count'])
+    except ProviderError as e:
+        if e.auth:
+            raise Blocked('ElevenLabs did not accept the API key when Blox checked the credits left. Check the key '
+                          'on Connections.', state='needs_credentials')
+        if e.transient:
+            raise Retry('Could not reach ElevenLabs to check the credits left; trying again later.',
+                        delay=e.retry_after)
+        raise Blocked('Could not check the ElevenLabs credits left, so nothing was voiced. Try again later.',
+                      state='needs_review')
+    except (ValueError, TypeError, KeyError):
+        raise Blocked(unreadable, state='needs_review')
+    return {'character_limit': limit, 'character_count': used, 'remaining': max(0, limit - used)}
+
+
+def check_elevenlabs_credits(needed):
+    """Stop for the owner when a video's ElevenLabs lines (``needed`` characters) would use more than a quarter
+    of the characters left on the plan. Returns the credit report when it is fine to go on."""
+    credits = elevenlabs_credits()
+    left = credits['remaining']
+    if needed > ELEVENLABS_CREDIT_SHARE_MAX * left:
+        raise Blocked(f'This video needs about {needed:,} ElevenLabs characters and your plan has {left:,} left. '
+                      f'That is more than a quarter of what is left, so Blox stopped before voicing it. Add '
+                      f'credits or shorten the script, then retry.', state='needs_review')
+    return credits
 
 
 def _local_tts(text, voice, out_path):
@@ -141,22 +281,36 @@ def _local_tts(text, voice, out_path):
     return {'path': out_path}
 
 
-def post_filter(provider, voice, line):
-    """FFmpeg filter chain applied to a voiced line before cleanup: the character's pitch shift
-    (``voice.pitch_semitones``, any provider) plus, for Piper, the raised-voice colour of loud lines.
-    Returns '' when nothing applies."""
+def _post_shift(provider, voice, line):
+    """(semitones, formants, presence dB) a voiced line is coloured with after synthesis."""
     from .piper import voice_settings
     vs = voice_settings(voice)
     semitones, presence = vs.get('pitch_semitones', 0.0), 0.0
     if provider in ('piper', 'kokoro'):
         extra, presence = PIPER_VOLUME_FX.get(line.get('volume'), (0.0, 0.0))
         semitones += extra
+    return semitones, vs['pitch_formants'], presence
+
+
+def post_filter(provider, voice, line, resample_fallback=True):
+    """FFmpeg filter chain applied to a voiced line before cleanup: the character's pitch shift
+    (``voice.pitch_semitones``, any provider) plus, for Piper, the raised-voice colour of loud lines.
+    Returns '' when nothing applies. With ``resample_fallback=False`` (time stretching off) the pitch shift is
+    left out when the rubberband filter is missing (see pitch_skipped)."""
+    semitones, formants, presence = _post_shift(provider, voice, line)
     parts = []
     if abs(semitones) >= 0.05:
-        parts.append(A.pitch_filter(semitones, vs['pitch_formants']))
+        parts.append(A.pitch_filter(semitones, formants, resample_fallback=resample_fallback))
     if presence:
         parts.append(f'highshelf=f=2500:g={presence:g}')
-    return ','.join(parts)
+    return ','.join(p for p in parts if p)
+
+
+def pitch_skipped(provider, voice, line, resample_fallback=True):
+    """Why the line's pitch shift was left out (A.PITCH_SKIPPED), or None when it was applied or not wanted."""
+    if resample_fallback or abs(_post_shift(provider, voice, line)[0]) < 0.05 or A.has_filter('rubberband'):
+        return None
+    return A.PITCH_SKIPPED
 
 
 # ------------------------------------------------------------------ alignment
@@ -227,20 +381,27 @@ def estimated_words(text, samples):
 
 
 # ------------------------------------------------------------------ main entry
-def line_spec(line, character, pr, attempt=0):
+def line_spec(line, character, pr, attempt=0, manifest=None):
     """Everything that determines a line's raw audio: provider (the character's engine override or the studio's),
-    spoken text, voice settings and direction. Returns the spec, its hash and the raw file name."""
-    from .voicecfg import engine_for
+    spoken text, voice settings and direction. Returns the spec, its hash and the raw file name.
+
+    A re-voiced line's ``fit_speed`` and an ElevenLabs line's request (model, settings with the effective speed,
+    previous/next text) are part of the spec, so their audio is cached and billed apart from the original."""
     voice = (character or {}).get('voice') or {}
-    provider = engine_for(voice, pr['tts_provider'])
+    provider = voicecfg.engine_for(voice, pr['tts_provider'])
     say = spoken_text(line['text'], pr['pronunciations'])
-    spec = {'p': provider, 'text': say, 'voice': voice, 'emotion': line['emotion'], 'pace': line['pace'],
+    # The voice.json consent record (with its import time) does not change the audio, so it is not in the key.
+    sound = {k: v for k, v in voice.items() if k != 'voice_import'}
+    spec = {'p': provider, 'text': say, 'voice': sound, 'emotion': line['emotion'], 'pace': line['pace'],
             'volume': line['volume'], 'delivery': line.get('delivery', ''), 'model': pr['tts_model'],
             'attempt': attempt}
     if line_rate(line) != 1.0:
         spec['rate'] = line_rate(line)
+    if fit_speed(line) != 1.0:
+        spec['fit_speed'] = fit_speed(line)
     if line.get('kind') == 'narration':
         spec['kind'] = 'narration'
+    eleven = None
     if provider == 'piper':
         from . import piper
         spec['piper'] = [pr.get('piper_model', piper.DEFAULT_MODEL),
@@ -248,40 +409,83 @@ def line_spec(line, character, pr, attempt=0):
     elif provider == 'kokoro':
         from . import kokoro
         spec['kokoro'] = [pr.get('kokoro_model', kokoro.DEFAULT_MODEL),
-                          kokoro.voice_for((character or {}).get('id'), voice), kokoro.speed_for(line, voice)]
+                          kokoro.voice_for((character or {}).get('id'), voice),
+                          kokoro.speed_for(engine_line(line), voice)]
     elif provider == 'speechify':
         from . import speechify
         spec['speechify'] = [pr.get('speechify_model', speechify.DEFAULT_MODEL), voice.get('speechify_voice_id', '')]
+    elif provider == 'elevenlabs':
+        eleven = elevenlabs_request(line, voice, pr, manifest)
+        # Lines voiced before imported settings and continuity existed keep their cache key.
+        if (voicecfg.imported_elevenlabs(voice)[0] is not None or eleven['previous_text'] or eleven['next_text']
+                or eleven['model'] != pr['elevenlabs_model']):
+            spec['elevenlabs'] = {k: eleven[k] for k in ('model', 'settings', 'previous_text', 'next_text')}
     h = stable_hash(spec)
-    return {'provider': provider, 'say': say, 'voice': voice, 'spec': spec, 'hash': h,
+    return {'provider': provider, 'say': say, 'voice': voice, 'spec': spec, 'hash': h, 'elevenlabs': eleven,
             'raw': f'{line["id"]}_{h}_raw' + ('.mp3' if provider == 'elevenlabs' else '.wav')}
 
 
-def synthesize_line(line, character, prefs, work_dir, video_id, attempt=0, use_asr=None):
+def native_speed(line, character, pr, manifest=None):
+    """The engine's own speed control for this line, as its request or command carries it, or None when the
+    engine has none (the FFmpeg test voice; OpenAI models without a ``speed`` parameter)."""
+    voice = (character or {}).get('voice') or {}
+    provider = voicecfg.engine_for(voice, pr['tts_provider'])
+    el = engine_line(line)
+    if provider == 'piper':
+        from . import piper
+        return piper.delivery(el, voice)[0]
+    if provider == 'kokoro':
+        from . import kokoro
+        return kokoro.speed_for(el, voice)
+    if provider == 'speechify':
+        from . import speechify
+        return round(min(speechify.RATE_RANGE[1], max(speechify.RATE_RANGE[0], line_rate(el))), 2)
+    if provider == 'openai':
+        return round(max(0.25, min(4.0, line_rate(el))), 3) if pr['tts_model'] in OPENAI_SPEED_MODELS else None
+    if provider == 'elevenlabs':
+        section = line_section(manifest, line) if manifest and 'start_frame' in line else 'body'
+        return elevenlabs_speed(line, voice, section) or 1.0
+    return None
+
+
+def can_speed_up(line, character, pr, factor, manifest=None):
+    """True when the line's engine can natively speak ``factor`` times faster than it does now (it has a speed
+    control and is not already at the end of its range)."""
+    if factor <= 1.0:
+        return False
+    now = native_speed(line, character, pr, manifest)
+    if now is None:
+        return False
+    return native_speed(dict(line, fit_speed=factor), character, pr, manifest) != now
+
+
+def synthesize_line(line, character, prefs, work_dir, video_id, attempt=0, use_asr=None, manifest=None):
     """Generate, clean and align one line. Returns a result dict.
 
-    character: {'name', 'voice': {...}} or None for the narrator.
+    character: {'name', 'voice': {...}} or None for the narrator. manifest: the line's manifest, when known (the
+    ElevenLabs request uses its story sections and neighbouring lines; other engines ignore it).
     """
     pr = prefs['production']
-    ls = line_spec(line, character, pr, attempt)
+    ls = line_spec(line, character, pr, attempt, manifest)
     provider, say, voice, spec, h = ls['provider'], ls['say'], ls['voice'], ls['spec'], ls['hash']
     name = (character or {}).get('name', 'Narrator')
     voice_meta = None
     os.makedirs(work_dir, exist_ok=True)
     raw = os.path.join(work_dir, ls['raw'])
     char_al, prov_words = None, None
+    el = engine_line(line)  # the speech rate the engine is asked for (a fitting speed-up included)
     if provider == 'local_test':
         _local_tts(say, voice.get('local_test_voice', 'kal16'), raw)
     elif provider == 'piper':
         from . import piper
-        voice_meta = piper.synthesize(say, raw, spec['piper'][1], line, model=spec['piper'][0], voice=voice)
+        voice_meta = piper.synthesize(say, raw, spec['piper'][1], el, model=spec['piper'][0], voice=voice)
     elif provider == 'kokoro':
         from . import kokoro
         if os.path.exists(raw) and os.path.getsize(raw) > 2000:
             # Written atomically by the runner for this exact spec (bake-off batches render ahead).
-            voice_meta = kokoro.plan(say, raw, spec['kokoro'][1], line, model=spec['kokoro'][0], voice=voice)[1]
+            voice_meta = kokoro.plan(say, raw, spec['kokoro'][1], el, model=spec['kokoro'][0], voice=voice)[1]
         else:
-            voice_meta = kokoro.synthesize(say, raw, spec['kokoro'][1], line, model=spec['kokoro'][0], voice=voice)
+            voice_meta = kokoro.synthesize(say, raw, spec['kokoro'][1], el, model=spec['kokoro'][0], voice=voice)
         prov_words = voice_meta.get('words')
     else:
         if provider == 'speechify' and not vault.configured('SPEECHIFY_API_KEY'):
@@ -296,19 +500,24 @@ def synthesize_line(line, character, prefs, work_dir, video_id, attempt=0, use_a
                 v = voice.get('openai_voice') or 'alloy'
                 if v not in OPENAI_VOICES:
                     raise Blocked(f'Unknown OpenAI voice {v!r} for {name}', state='needs_review')
-                return _openai_tts(say, v, instructions(line, name, voice), pr['tts_model'], raw,
-                                   speed=line_rate(line))
+                return _openai_tts(say, v, instructions(el, name, voice), pr['tts_model'], raw,
+                                   speed=line_rate(el))
             if provider == 'speechify':
                 from . import speechify
-                return speechify.synthesize(say, voice.get('speechify_voice_id'), line, raw, spec['speechify'][0])
-            return _elevenlabs_tts(say, voice.get('elevenlabs_voice_id'), line, pr['elevenlabs_model'], raw)
+                return speechify.synthesize(say, voice.get('speechify_voice_id'), el, raw, spec['speechify'][0])
+            eleven = ls['elevenlabs']
+            return _elevenlabs_tts(say, voice.get('elevenlabs_voice_id'), line, eleven['model'], raw,
+                                   settings=eleven['settings'], previous_text=eleven['previous_text'],
+                                   next_text=eleven['next_text'])
 
         res = paid.run(key, provider=provider, operation='tts', category='tts', estimate=est, fn=call,
                        video_id=video_id, summary={'line': line['id'], 'chars': len(say)},
                        recover=lambda: ({'path': raw} if os.path.exists(raw) and os.path.getsize(raw) > 1000 else None))
         char_al = (res or {}).get('char_alignment')
         prov_words = (res or {}).get('words')
-    fx = post_filter(provider, voice, line)
+    stretch_ok = bool(pr.get('time_stretch_speech', False))
+    fx = post_filter(provider, voice, line, resample_fallback=stretch_ok)
+    skipped = pitch_skipped(provider, voice, line, resample_fallback=stretch_ok)
     src = raw
     if fx:
         src = os.path.join(work_dir, f'{line["id"]}_{h}_fx.wav')
@@ -319,7 +528,7 @@ def synthesize_line(line, character, prefs, work_dir, video_id, attempt=0, use_a
     trimmed, lead = A.trim_silence(samples)
     squeezed = 0.0
     if provider == 'piper':
-        trimmed, squeezed = A.squeeze_gaps(trimmed, max(0.08, PIPER_MAX_GAP_S / line_rate(line)))
+        trimmed, squeezed = A.squeeze_gaps(trimmed, max(0.08, PIPER_MAX_GAP_S / line_rate(el)))
     gain = 10 ** (LOUDNESS_VOLUME.get(line['volume'], 0.0) / 20)
     clean = os.path.join(work_dir, f'{line["id"]}_{h}.wav')
     tmp = clean + '.tmp.wav'
@@ -367,11 +576,12 @@ def synthesize_line(line, character, prefs, work_dir, video_id, attempt=0, use_a
         'internal_silence_s': round(max([b[0] - a[1] for a, b in zip(regions, regions[1:])] or [0.0]), 3),
         'test_voice': provider == 'local_test',
         'voice_meta': voice_meta,
-        'post': {'filter': fx, 'gaps_removed_s': squeezed},
+        'post': {'filter': fx, 'gaps_removed_s': squeezed, 'pitch_skipped': skipped},
+        'fit_speed': fit_speed(line),
     }
 
 
-def fit_line(line_result, window_s, max_tempo, work_dir):
+def fit_line(line_result, window_s, max_tempo, work_dir, stretch=True):
     """If a line is slightly long, apply a gentle tempo change (<= max_tempo).
 
     Callers pass ``manifest.compile.tempo_cap`` so that native speech rate times
@@ -379,6 +589,9 @@ def fit_line(line_result, window_s, max_tempo, work_dir):
 
     Returns (result, action) where action is 'fits', 'tempo' or 'too_long'.
     Aggressive stretching is never applied: callers must rewrite or retime.
+    With ``stretch=False`` (the owner's no-time-stretch rule) the audio is never
+    changed: a slightly long line returns 'speed_up' instead of 'tempo', and the
+    caller re-voices it at a natively faster engine speed (production.retime).
     """
     d = line_result['duration_s']
     if d <= window_s:
@@ -386,6 +599,8 @@ def fit_line(line_result, window_s, max_tempo, work_dir):
     ratio = d / max(0.05, window_s)
     if ratio > max_tempo:
         return line_result, 'too_long'
+    if not stretch:
+        return line_result, 'speed_up'
     out = line_result['file'].replace('.wav', f'_t{int(ratio * 1000)}.wav')
     media.run([config.FFMPEG_BIN, '-y', '-v', 'error', '-i', line_result['file'], '-af', f'atempo={ratio:.4f}',
                '-ar', str(A.SR), '-ac', '1', out])

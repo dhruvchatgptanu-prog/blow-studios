@@ -755,6 +755,7 @@ def create_app():
         if mv and C.measured_voice(prev) == mv and piper_mod.speaker_for(cid, prev) == piper_mod.speaker_for(cid, clean_voice) \
                 and prev.get('piper_length_scale') == clean_voice.get('piper_length_scale'):
             clean_voice.update({k: float(voice[k]) for k in S.MEASURED_VOICE_KEYS})
+        clean_voice.update(voicecfg.kept_import(prev, clean_voice))  # voice.json consent record: import-only
         repo.save_character(cid, name, clean_bible, clean_voice, bool(body.get('active', True)))
         store.audit('character_saved', {'id': cid}, actor='owner')
         return jsonify(ok=True)

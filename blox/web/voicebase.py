@@ -1,7 +1,12 @@
-"""Voice base endpoints: engines status, voice profiles (measure reference clips), the bake-off."""
+"""Voice base endpoints: engines status, voice profiles (measure reference clips), the bake-off, and the import
+of the owner's voice.json into a character's voice."""
+import re
+
 from flask import Blueprint, abort, jsonify, request
 
 from .. import db as dbmod, prefs as prefsmod, repo, store, vault
+from ..timeutil import iso_utc
+from ..util import now
 from ..voice import bakeoff, kokoro, piper, profiles, speechify, voicecfg
 
 bp = Blueprint('voicebase', __name__)
@@ -128,3 +133,61 @@ def speechify_voices():
     if not vault.configured(speechify.KEY):
         return jsonify(error='Save the Speechify API key on Connections first'), 400
     return jsonify(voices=speechify.list_voices())
+
+
+# ------------------------------------------------------------------ voice.json import (owner action)
+CHARACTER_RE = r'ch_[a-z0-9_]{2,30}'
+
+
+def _voice_json_input():
+    """(character id, character row, parsed voice.json) from a multipart upload (``file`` + ``character``) or a
+    JSON body {"character": "ch_...", "voice_json": {...}}. Everything in the file is untrusted: size-capped,
+    parsed without NaN/Infinity and validated by voicecfg.parse_voice_json."""
+    if request.files or (request.mimetype or '').startswith('multipart/'):
+        f = request.files.get('file')
+        if not f or not f.filename:
+            raise ValueError('Choose a voice.json file')
+        doc = voicecfg.load_voice_json(f.read(voicecfg.VOICE_JSON_MAX_BYTES + 1))
+        cid = request.form.get('character', '')
+    else:
+        if (request.content_length or 0) > 2 * voicecfg.VOICE_JSON_MAX_BYTES:
+            raise ValueError(f'voice.json must be at most {voicecfg.VOICE_JSON_MAX_BYTES // 1024} KB')
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            raise ValueError('Send a voice.json file, or a JSON body with character and voice_json')
+        cid, doc = body.get('character', ''), body.get('voice_json')
+    if not isinstance(cid, str) or not re.fullmatch(CHARACTER_RE, cid):
+        raise ValueError('Choose the character this voice is for')
+    char = _character(cid)
+    return cid, char, voicecfg.parse_voice_json(doc)
+
+
+def _import_view(cid, char, parsed, new_voice):
+    return {'character': {'id': cid, 'name': char['name']},
+            'changes': voicecfg.voice_changes(char.get('voice') or {}, new_voice),
+            'record': parsed['record'], 'ignored': parsed['ignored'], 'notes': parsed['notes']}
+
+
+@bp.post('/api/voice-json/preview')
+def voice_json_preview():
+    """What importing this voice.json would change on the character (nothing is saved)."""
+    cid, char, parsed = _voice_json_input()
+    new_voice = voicecfg.apply_voice_json(char.get('voice') or {}, parsed)
+    return jsonify(**_import_view(cid, char, parsed, new_voice))
+
+
+@bp.post('/api/voice-json/apply')
+def voice_json_apply():
+    """Write the voice.json into the character's voice (engine, voice id, ElevenLabs model, settings and speed
+    by section) and keep its consent/approval record with it (read-only on Characters). Audit-logged."""
+    cid, char, parsed = _voice_json_input()
+    record = dict(parsed['record'], imported_at=iso_utc(now()))
+    new_voice = voicecfg.apply_voice_json(char.get('voice') or {}, parsed, record)
+    view = _import_view(cid, char, parsed, new_voice)
+    repo.save_character(cid, char['name'], char.get('bible') or {}, new_voice, bool(char.get('active', 1)))
+    rec = parsed['record']
+    store.audit('voice_json_imported', {'id': cid, 'engine': rec['engine'], 'voice_id': rec['voice_id'],
+                                        'route': rec['route'], 'consent_date': (rec.get('consent') or {}).get('date'),
+                                        'approved_by_dhruv': rec.get('approved_by_dhruv'),
+                                        'changed': [c['field'] for c in view['changes']]}, actor='owner')
+    return jsonify(ok=True, voice=new_voice, **view)

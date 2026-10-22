@@ -119,6 +119,13 @@ DEFAULTS = {
         # stretching); faster than ~1.3x stops sounding natural, so the rest comes out of the pauses between lines.
         'pace': 1.5,
         'speech_rate': 1.3,
+        # Owner's rule (2026-10-19): never time-stretch speech. Stretched voices (FFmpeg atempo, or the resample
+        # fallback of the pitch shift) were rejected as inaudible. Off: a line slightly too long for its slot is
+        # voiced once more at the engine's own faster speed (Piper length scale, Kokoro speed, ElevenLabs speed,
+        # OpenAI speed where the model takes it), within the same limit; otherwise the next line moves or the line
+        # is rewritten. A pitch shift then uses only the rubberband filter (pitch only, duration kept) or is
+        # skipped. On: the old behaviour (a gentle tempo change of up to max_tempo).
+        'time_stretch_speech': False,
         # Voice every line with the free voice engine while a story is validated (editor, backlog import,
         # development) so its length is exact instead of estimated. Off by default: it costs a few seconds of
         # CPU per story the first time (durations are cached) and only free engines are used.
@@ -393,6 +400,7 @@ def validate(p):
     pr['pace'] = finite(pr['pace'], *PACE_RANGE, 'pace')
     pr['speech_rate'] = finite(pr['speech_rate'], *SPEECH_RATE_RANGE, 'speech rate')
     _bool(pr['measure_lines_on_validate'], 'measure lines on validate')
+    _bool(pr['time_stretch_speech'], 'time stretch speech')
     pr['min_expression_frames'] = integer(pr['min_expression_frames'], 4, 60, 'min expression frames')
     _bool(pr['allow_template_stories'], 'allow template stories')
 
