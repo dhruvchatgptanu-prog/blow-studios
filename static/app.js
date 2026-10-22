@@ -343,6 +343,7 @@ async function stories() {
     <div class="panel"><p class="small">${esc(b.note)}</p>
       <form id="import"><label>Paste story plans (a JSON list of plans, or {"plans": [...]}); the format is the plan JSON in the Director’s editor<textarea name="json" placeholder='[{"title": "…", "cast": […], "shots": […], …}]'></textarea></label>
       <div class="actions"><button class="primary">Validate and add</button></div></form><div id="import-out"></div></div>
+    <div id="formatkit-panel"></div>
     <div class="panel tablewrap">${b.stories.length ? `<table><tr><th>Story</th><th>Status</th><th>Source</th><th>Added</th><th>Notes</th><th></th></tr>${b.stories.map(x => `<tr><td><b>${esc(x.title)}</b><br><span class="small muted">${esc(x.logline)}</span></td>
       <td>${chip(x.status === 'ready' ? 'pass' : x.status === 'used' ? 'info' : 'fail', x.status)}${x.video_id ? `<br><a href="#" data-video="${esc(x.video_id)}" class="small">video</a>` : ''}</td><td class="small">${esc(x.source)}</td><td class="small">${when(x.created_at, {timeStyle: undefined})}</td>
       <td class="small muted">${esc(x.note || (x.validation.warnings || []).slice(0, 2).join('; '))}</td>
@@ -357,6 +358,7 @@ async function stories() {
     setTimeout(stories, 2500);
   });
   bind('[data-story]', 'click', async e => { await api(`backlog/${e.target.dataset.story}/${e.target.dataset.sact}`, 'POST', {}); stories(); });
+  if (window.FormatKit) FormatKit.mount($('#formatkit-panel')).catch(e => toast(e.message, true));  // static/formatkit.js
   bindCommon();
 }
 

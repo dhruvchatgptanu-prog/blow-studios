@@ -127,12 +127,21 @@ ACTION_PHASE_TEXT = {'anticipation': 'anticipation', 'main': 'main movement', 'f
                      'hold': 'held reaction'}
 
 
+PURPOSE_LABEL = {'mid_gag': 'MID-GAG (in-story like/subscribe line)', 'twist': 'TWIST (music drops out before it)',
+                 'loop': 'LOOP (runs back into the hook line)'}
+FORMAT_LABEL = {'first_person_story': 'first-person story ("I ... 😳")', 'storytime': 'storytime (narrated)',
+                'skit': 'skit (on-screen dialogue)'}
+
+
 def beat_text(m, beat, names):
     fps = m['fps']
     out = []
     a_s = beat['start_frame'] // fps
+    label = PURPOSE_LABEL.get(beat['purpose']) or beat['purpose'].upper() or 'BEAT'
+    if beat['purpose'] == 'loop' and (m.get('story') or {}).get('loop_type') == 'sequel_tease':
+        label = 'LOOP (teases a sequel)'
     head = (f'{tc(beat["start_frame"], fps)}–{tc(beat["end_frame"], fps)}  [frames {beat["start_frame"]}–{beat["end_frame"]}]'
-            f'  {beat["purpose"].upper() or "BEAT"} · shot {beat["shot"]}')
+            f'  {label} · shot {beat["shot"]}')
     out.append(head)
     if beat['description']:
         out.append('  ' + beat['description'])
@@ -239,6 +248,12 @@ def script(m, character_names=None):
         '',
     ]
     pace = m.get('pace') or {}
+    if m.get('format'):
+        st = m.get('story') or {}
+        parts = [f'{k.replace("_", " ")} {str(st[k]).replace("_", " ")}' for k in
+                 ('mechanism', 'mode', 'twist_type', 'loop_type') if st.get(k)]
+        head.insert(-1, f'Format: {FORMAT_LABEL.get(m["format"], m["format"])}' +
+                    (' · ' + ' · '.join(parts) if parts else '') + '.')
     if m.get('narrator'):
         head.insert(-1, f'Narrator: {names.get(m["narrator"], m["narrator"])} reads the narration lines as voice-over '
                         '(past tense, captioned, no lip sync).')

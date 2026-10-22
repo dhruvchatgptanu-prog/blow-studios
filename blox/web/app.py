@@ -19,6 +19,7 @@ from .. import (budget, breaker, channel_kit, config, db as dbmod, jobs, logs, m
 from ..animation import blender as BL
 from ..manifest import compile as C, director, schema as S, validate as V
 from ..research import service as research, transcripts, youtube_api as Y
+from ..story import formats as story_formats
 from ..timeutil import fmt, slot_times
 from ..util import Blocked, now
 from ..voice import piper as piper_mod, voicecfg
@@ -26,6 +27,7 @@ from ..youtube import oauth
 from . import security
 from .assets import register as register_assets
 from .channel_kit_api import register as register_channel_kit
+from .formats_api import register as register_formats
 from .notes_api import register as register_notes
 
 log = logs.get('blox.web')
@@ -864,7 +866,11 @@ def create_app():
             'PURPOSES', 'SETTING_PRESETS', 'TIME_OF_DAY', 'LIGHTING', 'PROP_TYPES', 'MOUTH_SHAPES', 'ARM_POSES',
             'POSTURES', 'STANCES', 'WEIGHTS', 'ACTIONS', 'FRAMINGS', 'CAMERA_ANGLES', 'CAMERA_SIDES', 'CAMERA_MOVES',
             'EASES', 'TRANSITIONS', 'EMOTIONS', 'PACES', 'VOLUMES', 'SFX_CUES', 'MUSIC_CUES', 'HOOK_TEXT_MAX_WORDS')} |
-            {'EXPRESSIONS': list(S.EXPRESSIONS), 'COORDINATE_SYSTEM': S.COORDINATE_SYSTEM})
+            {'EXPRESSIONS': list(S.EXPRESSIONS), 'COORDINATE_SYSTEM': S.COORDINATE_SYSTEM} |
+            {k: list(getattr(story_formats, k)) for k in ('FORMATS', 'MECHANISMS', 'TWIST_TYPES', 'MODES',
+                                                          'LOOP_TYPES')})
+
+    register_formats(app)
 
     register_assets(app)
     register_notes(app)

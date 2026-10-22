@@ -18,7 +18,11 @@ COORDINATE_SYSTEM = {
 }
 
 PURPOSES = ['hook', 'setup', 'inciting', 'escalation', 'reaction', 'reveal', 'climax', 'payoff', 'button',
-            'transition']
+            'transition', 'mid_gag', 'twist', 'loop']
+# Beat purposes of the first-person story format (blox.story.formats): 'mid_gag' is the short in-world
+# like/subscribe joke near the middle, 'twist' the turn the ending hangs on (the music drops out just before
+# it), 'loop' the last line that runs back into the hook line or teases a sequel. Escalation stays
+# 'escalation' and the peak is 'climax'.
 
 SETTING_PRESETS = {
     'sky_obby': 'Floating studded platforms above a sea of clouds, open blue sky',

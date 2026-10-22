@@ -70,7 +70,9 @@ def run(ck, m, line_audio, assembly, prefs, video_id=None, render_id='r', asr=No
            0.75, 'manifest+audio', frames=(0, min(D, 3 * fps)),
            repair=None if hook_ok else {'action': 'rewrite_script', 'reason': 'hook arrives late'})
     payoff_beats = [b for b in m['beats'] if b['purpose'] in ('payoff', 'button')]
-    payoff_ok = bool(payoff_beats) and payoff_beats[-1]['end_frame'] >= 0.9 * D and bool(m['payoff']['text'])
+    # A loop beat (first-person story format) closes the ending after the payoff, so it counts as the ending.
+    ending = [b for b in m['beats'] if b['purpose'] in ('payoff', 'button', 'loop')]
+    payoff_ok = bool(payoff_beats) and ending[-1]['end_frame'] >= 0.9 * D and bool(m['payoff']['text'])
     ck.add('payoff', 'Ending pays off the hook (structure)', 'story', 'pass' if payoff_ok else 'fail', 'major',
            {'payoff': m['payoff']['text'], 'resolves': m['payoff'].get('resolves'),
             'note': 'Structural check; the semantic link is judged by the script review when an LLM is connected.'},
@@ -172,6 +174,118 @@ def run(ck, m, line_audio, assembly, prefs, video_id=None, render_id='r', asr=No
     ck.add('claims', 'No unsupported factual claims', 'story', 'uncertain' if hits else 'pass',
            'major' if hits else 'minor', {'flags': hits[:8], 'note': 'Keyword screen; a person should confirm flagged text.'},
            0.6, 'heuristic')
+    first_person_checks(ck, m, line_audio)
+
+
+# ---------------------------------------------------------------- first-person story format (measured)
+FORMAT_NOTE = ('Style measurement of the first-person story format: reported, never holds or blocks the video '
+               '(the plan validator already enforces the structure).')
+
+
+def _voiced_spans(m, line_audio):
+    """line id -> (first word start s, last word end s, words, alignment kind) on the video timeline, for lines
+    with a usable word alignment."""
+    fps = m['fps']
+    out = {}
+    for ln in m['lines']:
+        la = line_audio.get(ln['id']) or {}
+        ws = la.get('words') if isinstance(la, dict) else None
+        if not isinstance(ws, list) or not ws:
+            continue
+        try:
+            a, b = float(ws[0]['start']), float(ws[-1]['end'])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if not (np.isfinite(a) and np.isfinite(b)) or b < a:
+            continue
+        off = ln['start_frame'] / fps
+        out[ln['id']] = (off + a, off + b, len(ws), str(la.get('alignment_kind') or 'unknown'))
+    return out
+
+
+def first_person_checks(ck, m, line_audio, cal=None):
+    """First-person story format measured on the voiced lines: first word time, narration pace by section, the
+    mid-video gag line inside its window, and the longest shot. All 'minor': stylistic measurements."""
+    from ..manifest.compile import beat_segments, purpose_runs
+    from ..story import formats as FM
+    from ..voice.sections import line_section
+    if m.get('format') != FM.FIRST_PERSON:
+        return
+    cal = cal or FM.calibration()
+    fps, D = m['fps'], m['duration_frames']
+    narrator = m.get('narrator')
+    narr = [ln for ln in m['lines'] if ln.get('kind') == 'narration' and (not narrator or ln['speaker'] == narrator)]
+    spans = _voiced_spans(m, line_audio)
+    kinds = sorted({spans[ln['id']][3] for ln in narr if ln['id'] in spans})
+    conf = 0.8 if kinds and all(k.startswith('measured') for k in kinds) else 0.5
+    # 1. First narrated word.
+    limit = cal['first_word_s'] + FM.FIRST_WORD_TOLERANCE_S
+    timed = [ln for ln in narr if ln['id'] in spans]
+    if timed:
+        ln = min(timed, key=lambda x: spans[x['id']][0])
+        t = spans[ln['id']][0]
+        ck.add('format_first_word', 'First narrated word at the very start', 'story', 'pass' if t <= limit else 'fail',
+               'minor', {'first_word_s': round(t, 3), 'limit_s': round(limit, 3), 'line': ln['id'],
+                         'alignment': spans[ln['id']][3], 'note': FORMAT_NOTE}, conf, 'alignment',
+               frames=(0, max(1, int(round(t * fps)))))
+    else:
+        ck.add('format_first_word', 'First narrated word at the very start', 'story', 'skipped', 'minor',
+               {'reason': 'No narration line has a word alignment', 'note': FORMAT_NOTE}, 0.3, 'alignment')
+    # 2. Narration pace by section (speech time: first word start to last word end of each line).
+    sections = {}
+    for ln in timed:
+        a, b, n, _k = spans[ln['id']]
+        s = sections.setdefault(line_section(m, ln), {'words': 0, 'speech_s': 0.0, 'lines': 0})
+        s['words'] += n
+        s['speech_s'] += b - a
+        s['lines'] += 1
+    evidence, bad = {}, []
+    for name, s in sections.items():
+        lo, hi = cal['wps_sections'][name]
+        wps = s['words'] / s['speech_s'] if s['speech_s'] > 0 else None
+        ok = wps is not None and lo <= wps <= hi
+        evidence[name] = {'words': s['words'], 'speech_s': round(s['speech_s'], 3), 'lines': s['lines'],
+                          'wps': round(wps, 2) if wps is not None else None, 'target': [lo, hi], 'ok': ok}
+        if not ok:
+            bad.append(name)
+    if sections:
+        ck.add('format_pace_sections', 'Narration pace by section (hook, body, end)', 'story',
+               'fail' if bad else 'pass', 'minor',
+               {'sections': evidence, 'outside': bad, 'alignment': kinds, 'note': FORMAT_NOTE}, conf, 'alignment')
+    else:
+        ck.add('format_pace_sections', 'Narration pace by section (hook, body, end)', 'story', 'skipped', 'minor',
+               {'reason': 'No narration line has a word alignment', 'note': FORMAT_NOTE}, 0.3, 'alignment')
+    # 3. The mid-video gag line, voiced inside its window.
+    lo, hi = cal['mid_gag_window']
+    win = [round(lo * D / fps, 2), round(hi * D / fps, 2)]
+    gag_lines = []
+    for g in purpose_runs(beat_segments(m), ('mid_gag',)):
+        gag_lines += [ln for ln in m['lines'] if g['start_frame'] <= ln['start_frame'] < g['end_frame']
+                      and ln['speaker'] == narrator and FM.LIKE_SUB.search(ln['text'])]
+    if not gag_lines:
+        ck.add('format_mid_gag', 'Mid-video like/subscribe gag voiced inside its window', 'story', 'fail', 'minor',
+               {'window_s': win, 'reason': 'No mid-gag line with a like or subscribe ask', 'note': FORMAT_NOTE},
+               0.9, 'manifest')
+    else:
+        ln = gag_lines[0]
+        a, b = (spans[ln['id']][:2] if ln['id'] in spans else
+                (ln['start_frame'] / fps, (ln['start_frame'] + (ln.get('measured_frames') or ln['est_frames'])) / fps))
+        ok = win[0] <= a <= win[1] and b - a <= cal['mid_gag_max_s']
+        ck.add('format_mid_gag', 'Mid-video like/subscribe gag voiced inside its window', 'story',
+               'pass' if ok else 'fail', 'minor',
+               {'line': ln['id'], 'voiced_s': [round(a, 3), round(b, 3)], 'window_s': win,
+                'max_s': cal['mid_gag_max_s'], 'aligned': ln['id'] in spans, 'note': FORMAT_NOTE},
+               conf if ln['id'] in spans else 0.4, 'alignment' if ln['id'] in spans else 'manifest',
+               frames=(int(a * fps), max(int(a * fps) + 1, int(round(b * fps)))))
+    # 4. Longest shot (shots are finished-video frames).
+    if m['shots']:
+        sh = max(m['shots'], key=lambda s: s['end_frame'] - s['start_frame'])
+        secs = (sh['end_frame'] - sh['start_frame']) / fps
+        ck.add('format_shot_length', 'Cut or move at least every few seconds (longest shot)', 'story',
+               'pass' if secs <= cal['max_shot_s'] + 1e-6 else 'fail', 'minor',
+               {'longest_shot': sh['id'], 'longest_s': round(secs, 3), 'max_s': cal['max_shot_s'],
+                'shots': len(m['shots']), 'note': FORMAT_NOTE}, 0.95, 'manifest',
+               frames=(sh['start_frame'], sh['end_frame']))
 
 
 def _caption_pixels(ck, m, assembly, prefs):

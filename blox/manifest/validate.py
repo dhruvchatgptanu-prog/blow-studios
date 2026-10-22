@@ -4,9 +4,11 @@ A passing manifest is necessary, not sufficient: QA still inspects the rendered
 video, because a valid plan does not prove the renderer followed it.
 """
 import math
+import re
 
 from . import geometry as G, schema as S
-from .compile import line_fit_allowance, pose_at, tc, words
+from ..story import formats as FM
+from .compile import beat_segments, line_fit_allowance, pose_at, purpose_runs, tc, words
 from .geometry import camera_azimuth, face_visible
 
 FULL_BODY = {'walk', 'run', 'jump', 'hop', 'crouch', 'stand_up', 'stumble', 'fall_down', 'get_up', 'turn',
@@ -47,8 +49,10 @@ def _range(r, path, value, lo, hi, where):
         r.err('out_of_range', f'{path} = {value!r} is outside {lo}..{hi}', where=where)
 
 
-def validate(m, prefs=None, characters=None, measured=False):
-    """Return a report dict. ``characters`` maps character_id -> bible (optional)."""
+def validate(m, prefs=None, characters=None, measured=False, calibration=None):
+    """Return a report dict. ``characters`` maps character_id -> bible (optional). ``calibration`` is the
+    first-person story calibration (default: blox.story.formats.calibration(), the owner's imported values
+    over the defaults); it is read only for a manifest in that format."""
     r = Report()
     fps = m.get('fps')
     D = m.get('duration_frames', 0)
@@ -76,6 +80,8 @@ def validate(m, prefs=None, characters=None, measured=False):
     _continuity(r, m)
     _captions(r, m, prefs)
     _story(r, m)
+    _format(r, m, calibration)
+    _ip_watch(r, m)
     _effects(r, m, min_expr)
     if characters:
         _silhouettes(r, m, characters)
@@ -673,3 +679,212 @@ def _story(r, m):
         r.warn('hook_late', 'Hook resolves its setup after 3 s; most Shorts viewers decide earlier')
     if not m['lines'] and not any(b['description'] for b in m['beats']):
         r.warn('no_story_text', 'No dialogue and no beat descriptions')
+
+
+# Well-known trademarked characters, brands and celebrities (a short watch list, every format). A mention is
+# not forbidden by itself, but a person should look before it is published: use original names instead.
+IP_WATCH = (
+    ('Mario', r'\bmario\b'), ('Luigi', r'\bluigi\b'), ('Pokémon', r'\bpok[eé]mon\b'), ('Pikachu', r'\bpikachu\b'),
+    ('Sonic the Hedgehog', r'\bsonic the hedgehog\b'), ('Spider-Man', r'\bspider[- ]?man\b'),
+    ('Batman', r'\bbatman\b'), ('Superman', r'\bsuperman\b'), ('the Avengers', r'\bavengers\b'),
+    ('Mickey Mouse', r'\bmickey mouse\b'), ('SpongeBob', r'\bsponge ?bob\b'), ('Shrek', r'\bshrek\b'),
+    ('Barbie', r'\bbarbie\b'), ('Harry Potter', r'\bharry potter\b'), ('Star Wars', r'\bstar wars\b'),
+    ('Darth Vader', r'\bdarth vader\b'), ('Peppa Pig', r'\bpeppa pig\b'), ('Bluey', r'\bbluey\b'),
+    ('Disney', r'\bdisney\b'), ('Nintendo', r'\bnintendo\b'), ('Fortnite', r'\bfortnite\b'),
+    ('Minecraft', r'\bminecraft\b'), ('Skibidi Toilet', r'\bskibidi\b'), ('Coca-Cola', r'\bcoca[- ]?cola\b'),
+    ("McDonald's", r"\bmcdonald'?s\b"), ('Nike', r'\bnike\b'), ('LEGO', r'\blego\b'), ('iPhone', r'\biphone\b'),
+    ('PlayStation', r'\bplaystation\b'), ('Xbox', r'\bxbox\b'), ('MrBeast', r'\bmr\.? ?beast\b'),
+    ('Taylor Swift', r'\btaylor swift\b'), ('Elon Musk', r'\belon musk\b'), ('Messi', r'\bmessi\b'),
+    ('Ronaldo', r'\bronaldo\b'),
+)
+_IP_RX = [(name, re.compile(rx, re.I)) for name, rx in IP_WATCH]
+
+
+def _metadata(m):
+    md = m.get('metadata')
+    return md if isinstance(md, dict) else {}
+
+
+def _ip_watch(r, m):
+    md = _metadata(m)
+    tags = md.get('tags') if isinstance(md.get('tags'), list) else []
+    fields = [('title', m.get('title')), ('metadata title', md.get('title')), ('logline', m.get('logline')),
+              ('description', md.get('description')), ('tags', ' '.join(str(t) for t in tags[:50])),
+              ('hook', (m.get('hook') or {}).get('text'))]
+    fields += [(f'line {ln["id"]}', ln['text']) for ln in m['lines']]
+    found = {}
+    for where, text in fields:
+        text = str(text or '').replace('’', "'")
+        for name, rx in _IP_RX:
+            if rx.search(text):
+                found.setdefault(name, []).append(where)
+    for name, places in found.items():
+        r.warn('ip_watch', f'"{name}" is a well-known trademark or person ({", ".join(places[:4])}); make sure the '
+                           'video may use it before publishing', fix='Use an original name instead')
+
+
+def _format(r, m, cal=None):
+    """The plan's story format and, for the first-person story format, its structure and style rules."""
+    fmt = m.get('format')
+    story = m.get('story') or {}
+    if fmt is not None and fmt not in FM.FORMATS:
+        r.err('format', f'Story format {fmt!r} is unknown', fix='Use one of: ' + ', '.join(FM.FORMATS))
+    for key, allowed in (('mechanism', FM.MECHANISMS), ('mode', FM.MODES), ('twist_type', FM.TWIST_TYPES),
+                         ('loop_type', FM.LOOP_TYPES)):
+        if story.get(key) and story[key] not in allowed:
+            r.err('format_story', f'story.{key} {story[key]!r} is unknown', fix='Use one of: ' + ', '.join(allowed))
+    if fmt == FM.FIRST_PERSON:
+        _first_person(r, m, cal if cal is not None else FM.calibration())
+
+
+def _line_frames(ln):
+    return ln.get('measured_frames') or ln['est_frames']
+
+
+def _first_person(r, m, cal):
+    """First-person "I ... 😳" story: an ordinary narrator does one outrageous thing and it snowballs. Errors are
+    the structure (hook line from the first frame, escalation, twist, mid-video gag, cut rhythm, labels);
+    warnings are the style (title grammar, the narrator's voice and pace, the loop back into the hook)."""
+    fps, D = m['fps'], m['duration_frames']
+    story = m.get('story') or {}
+    lines = m['lines']
+    narrator = m.get('narrator')
+    for key, allowed in (('mechanism', FM.MECHANISMS), ('mode', FM.MODES), ('twist_type', FM.TWIST_TYPES)):
+        if not story.get(key):
+            r.err('format_story', f'A first-person story needs story.{key}', fix='Use one of: ' + ', '.join(allowed))
+    if not narrator:
+        r.err('format_narrator', 'A first-person story needs a narrator (the "I" telling it)',
+              fix='Set narrator to the cast id of the protagonist')
+    first = lines[0] if lines else None
+    limit_s = cal['first_word_s'] + FM.FIRST_WORD_TOLERANCE_S
+    if not first or not narrator or first['speaker'] != narrator or first.get('kind') != 'narration' \
+            or first['start_frame'] > int(round(limit_s * fps)):
+        r.err('format_first_line', f'The first line must be the narrator\'s narration starting by {limit_s:.1f} s: '
+                                   'the hook says the title line from the first frame',
+              frames=(0, first['start_frame'] + 1) if first else None,
+              fix='Open with a narration line at t = 0 that says the title line')
+    if first:
+        end = first['start_frame'] + _line_frames(first)
+        if end > int(round(cal['hook_max_s'] * fps)):
+            r.err('format_hook_line', f'The hook line ends at {end / fps:.2f} s; it must end by {cal["hook_max_s"]:g} s',
+                  frames=(first['start_frame'], end), fix='Cut the hook line down to the title line')
+    segs = beat_segments(m)
+    steps = purpose_runs(segs, ('escalation', 'climax'), split_described=True)
+    if len(steps) < 3:
+        r.err('format_escalation', f'{len(steps)} escalation or peak beat(s); the story needs at least 3 steps that '
+                                   'snowball', fix='Give each escalation step its own described beat before the climax')
+    twists = purpose_runs(segs, ('twist',))
+    if not twists:
+        r.err('format_twist', 'No twist beat', fix='Add a beat with purpose "twist" before the payoff')
+    gags = purpose_runs(segs, ('mid_gag',))
+    lo, hi = cal['mid_gag_window']
+    if not gags:
+        r.err('format_mid_gag', f'No mid-video gag: a short beat between {lo:.0%} and {hi:.0%} of the video where '
+                                'the narrator asks for a like or a subscribe in a funny, in-story way',
+              fix='Add a beat with purpose "mid_gag" and a narrator line that mentions like or subscribe')
+    for g in gags:
+        frames = (g['start_frame'], g['end_frame'])
+        rel = g['start_frame'] / max(1, D)
+        if not lo - 1e-9 <= rel <= hi + 1e-9:
+            r.err('format_mid_gag', f'The mid-video gag starts at {rel:.0%} of the video ({tc(g["start_frame"], fps)}); '
+                                    f'it belongs between {lo:.0%} and {hi:.0%}', frames=frames,
+                  fix='Move the mid_gag beat')
+        dur = (g['end_frame'] - g['start_frame']) / fps
+        if dur > cal['mid_gag_max_s'] + 1e-6:
+            r.err('format_mid_gag', f'The mid-video gag lasts {dur:.2f} s; keep it to {cal["mid_gag_max_s"]:g} s',
+                  frames=frames, fix='Start the next beat sooner')
+        if not any(g['start_frame'] <= ln['start_frame'] < g['end_frame'] and ln['speaker'] == narrator
+                   and FM.LIKE_SUB.search(ln['text']) for ln in lines):
+            r.err('format_mid_gag', 'The mid-video gag has no narrator line asking for a like or a subscribe',
+                  frames=frames, fix='Give the narrator a deadpan line that asks for a like or a sub as if it helps '
+                                     'them inside the story')
+    for s in m['shots']:
+        secs = (s['end_frame'] - s['start_frame']) / fps
+        if secs > cal['max_shot_s'] + 1e-6:
+            r.err('format_shot_long', f'Shot {s["id"]} holds for {secs:.2f} s; this format cuts at least every '
+                                      f'{cal["max_shot_s"]:g} s', frames=(s['start_frame'], s['end_frame']),
+                  fix='Split the shot')
+    _first_person_style(r, m, cal, segs, first, twists)
+
+
+def _first_person_style(r, m, cal, segs, first, twists):
+    fps, D = m['fps'], m['duration_frames']
+    story = m.get('story') or {}
+    lines = m['lines']
+    narrator = m.get('narrator')
+    title = str(_metadata(m).get('title') or m.get('title') or '')
+    tr = FM.title_report(title)
+    tw = cal['title_words']
+    if not tw['min'] <= tr['words'] <= tw['max']:
+        r.warn('format_title_words', f'The title has {tr["words"]} words; this format uses {tw["min"]}-{tw["max"]} '
+                                     '(about 6)', fix='Title grammar: "I [did something] [one extreme thing] 😳"')
+    if not tr['has_emoji']:
+        r.err('format_title_no_emoji', 'The title has no emoji; this format\'s titles end with 😳',
+              fix='End the title with 😳')
+    elif not tr['flushed_last']:
+        r.warn('format_title_emoji', 'The title should end with 😳', fix='End the title with 😳')
+    if not tr['narrator']:
+        r.warn('format_title_narrator', 'The title does not name the narrator (I, me or my)',
+               fix='Title grammar: "I [did something] [one extreme thing] 😳"')
+    if tr['hashtags']:
+        r.warn('format_title_hashtag', 'The title has hashtags; this format keeps them out of the title',
+               fix='Move hashtags to the description')
+    narr = [ln for ln in lines if ln.get('kind') == 'narration' and (not narrator or ln['speaker'] == narrator)]
+    if narr:
+        fw = [w.lower() for w in FM.words(narr[0]['text'])]
+        if not fw or fw[0] not in ('i', 'my', "i'm", "i've", "i'd"):
+            r.warn('format_first_word', f'The first narration line starts with "{fw[0] if fw else ""}"; the first word '
+                                        'should be "I" (or "My")', fix='Start the hook line with "I"')
+        if tr['title_words']:
+            said = set(fw)
+            share = sum(1 for w in tr['title_words'] if w in said) / len(tr['title_words'])
+            if share < 0.6:
+                r.warn('format_hook_title', f'The hook line says {share:.0%} of the title\'s words; it should speak '
+                                            'the title line', fix='Make the first line the title, said out loud')
+    beats = m['beats']
+    if beats and beats[-1]['purpose'] != 'loop':
+        r.warn('format_loop_last', 'The last beat is not a loop beat: the ending should run back into the hook line '
+                                   'or tease a sequel', fix='End on a beat with purpose "loop"')
+    if story.get('loop_type') == 'callback' and first:
+        loops = purpose_runs(segs, ('loop',))
+        last = loops[-1] if loops else None
+        loop_lines = [ln for ln in lines if last and last['start_frame'] <= ln['start_frame'] < last['end_frame']
+                      and ln is not first] or [ln for ln in lines[-1:] if ln is not first]
+        shared = FM.content_words(first['text']) & FM.content_words(' '.join(ln['text'] for ln in loop_lines))
+        if loop_lines and len(shared) < 2:
+            r.warn('format_loop_callback', f'The loop line shares {len(shared)} key word(s) with the hook line; a '
+                                           'callback loop repeats at least 2 so the end flows back into the start',
+                   fix='Reuse words of the hook line in the last line')
+    if narr:
+        n = sum(len(words(ln['text'])) for ln in narr)
+        secs = sum(_line_frames(ln) for ln in narr) / fps
+        wps = n / max(secs, 1e-6)
+        w = cal['wps']
+        if not w['min'] <= wps <= w['max']:
+            r.warn('format_wps', f'Narration runs at about {wps:.2f} words/s (estimated from the voice); this format '
+                                 f'runs at {w["min"]:g}-{w["max"]:g} (target {w["target"]:g})',
+                   fix=('Cut words' if wps > w['max'] else 'Tighten the lines') + ': the voice is never sped up, '
+                       'so the pace comes from how much is said')
+    for ln in lines:
+        secs = _line_frames(ln) / fps
+        n = len(words(ln['text']))
+        if secs > 0 and n / secs > cal['beat_wps_max']:
+            r.warn('format_line_fast', f'Line {ln["id"]} packs {n / secs:.2f} words/s; a line takes at most '
+                                       f'{cal["beat_wps_max"]:g}',
+                   frames=(ln['start_frame'], ln['start_frame'] + _line_frames(ln)), fix='Split or shorten the line')
+        if narrator and ln['speaker'] != narrator and n > 5:
+            r.warn('format_other_long', f'Line {ln["id"]} ({ln["speaker"]}) has {n} words; other characters say 5 '
+                                        'or fewer', fix='Cut it to a short reaction')
+    for ln in narr:
+        if any(len(words(sent)) > 12 for sent in re.split(r'[.!?…]+', ln['text'])):
+            r.warn('format_sentence_long', f'Line {ln["id"]} has a sentence over 12 words; narration sentences '
+                                           'run 3-9 words', fix='Split the sentence')
+    if (m.get('style') or {}).get('music_dropout') and twists:
+        t0, t1 = twists[0]['start_frame'], twists[0]['end_frame']
+        if not any(t0 - int(round(0.5 * fps)) <= d['end_frame'] <= t1 for d in m.get('music_dropouts') or []):
+            r.warn('format_twist_dropout', 'No music drop-out just before the twist', frames=(t0, t1),
+                   fix='Let the music drop out before the twist (music_dropout.t at the twist)')
+    dur, ds = D / fps, cal['duration_s']
+    if not ds['min'] <= dur <= ds['max']:
+        r.warn('format_duration', f'The video runs {dur:.1f} s; this format runs {ds["min"]:g}-{ds["max"]:g} s '
+                                  f'(target {ds["target"]:g})')

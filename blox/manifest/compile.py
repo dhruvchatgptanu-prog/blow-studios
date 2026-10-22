@@ -27,6 +27,7 @@ import math
 import re
 import zlib
 
+from ..story import formats as FM
 from . import schema as S
 
 MAX_PLAN_BYTES = 400_000
@@ -482,6 +483,15 @@ def compile_plan(plan, *, fps, width, height, characters=None, pace=1.0, speech_
         'pace': {'timeline': pace, 'speech_rate': speech_rate},
         'style': plan_style(plan),
     }
+    # Story format (blox.story.formats; absent = the behaviour before formats) and the first-person story's
+    # labels. Values are kept as written (capped) so the validator can report unknown ones.
+    fmt = plan.get('format')
+    if fmt not in (None, ''):
+        m['format'] = str(fmt)[:40]
+    story = plan.get('story') if isinstance(plan.get('story'), dict) else {}
+    for k in FM.STORY_KEYS:
+        if story.get(k) not in (None, ''):
+            m['story'][k] = str(story[k])[:60]
     # Storytime: the cast id whose voice reads the narration lines (voice-over, no lip sync).
     narrator = plan.get('narrator')
     if narrator not in (None, ''):
@@ -828,9 +838,16 @@ def _music_dropouts(m, plan, F, fps, pace):
     md = plan.get('music_dropout')
     if md is False or not m['style']['music_dropout']:
         return []
+    twist = _first_beat_start(plan, 'twist') if m.get('format') == FM.FIRST_PERSON else None
     if isinstance(md, dict) and md.get('t') is not None:
         end, src = F(md['t']), 'plan'
         dur = fr(_num(md.get('duration_s'), S.MUSIC_DROPOUT_S) / pace, fps)
+    elif twist is not None:
+        # First-person story: the music cuts out for a beat just before the twist (the first line at or after
+        # the twist beat starts), so the turn lands in silence.
+        t0 = F(twist)
+        end = next((ln['start_frame'] for ln in m['lines'] if ln['start_frame'] >= t0), t0)
+        dur, src = fr(FM.TWIST_DROPOUT_S, fps), 'twist'
     elif (plan.get('payoff') or {}).get('t_start') is not None:
         p = m['payoff']['start_frame']
         end = next((ln['start_frame'] for ln in m['lines'] if ln['start_frame'] >= p), p)
@@ -841,6 +858,14 @@ def _music_dropouts(m, plan, F, fps, pace):
     if end <= 0 or end > m['duration_frames']:
         return []
     return [{'start_frame': start, 'end_frame': end, 'source': src}]
+
+
+def _first_beat_start(plan, purpose):
+    """Story second where the first authored beat with ``purpose`` starts (the whole second, as derive_beats
+    places it), else None."""
+    starts = [int(_num(b.get('start_s', b.get('t', 0)))) for b in (plan.get('beats') or [])
+              if isinstance(b, dict) and b.get('purpose') == purpose]
+    return min(starts) if starts else None
 
 
 def _effects(plan, F, N):
@@ -1039,6 +1064,49 @@ def derive_beats(m, authored):
         beat['qa'] += auto_qa(m, beat)
         beats.append(beat)
     return beats
+
+
+def beat_segments(m):
+    """The authored beats of a compiled manifest as frame spans, in order:
+    [{'purpose', 'start_frame', 'end_frame', 'described', 'beats': [beat ids]}].
+
+    Compiled beats are one story second each (split at cuts) and inherit the purpose of the authored beat
+    before them. An authored beat starts on a story-second boundary and runs until the next authored beat;
+    the second half of a second split by a cut belongs to the same authored beat."""
+    fps, D = m['fps'], m['duration_frames']
+    pace = manifest_pace(m)
+    starts, k = set(), 0
+    while True:
+        f = fr(k / pace, fps)
+        if f >= D:
+            break
+        starts.add(f)
+        k += 1
+    segs = []
+    for b in m.get('beats') or ():
+        if not segs or (not b.get('purpose_inherited') and b['start_frame'] in starts):
+            segs.append({'purpose': b['purpose'], 'start_frame': b['start_frame'], 'end_frame': b['end_frame'],
+                         'described': bool(b.get('description')), 'beats': [b['id']]})
+        else:
+            segs[-1]['end_frame'] = b['end_frame']
+            segs[-1]['beats'].append(b['id'])
+    return segs
+
+
+def purpose_runs(segments, purposes=None, split_described=False):
+    """Consecutive authored beats with the same purpose merged into one span (only ``purposes``, if given).
+    With ``split_described`` a beat that carries its own description starts a new span: a plan written one
+    beat per second describes each new step and leaves the seconds that continue it undescribed."""
+    runs = []
+    for s in segments:
+        prev = runs[-1] if runs else None
+        if prev and prev['purpose'] == s['purpose'] and prev['end_frame'] == s['start_frame'] and \
+                not (split_described and s['described']):
+            prev['end_frame'] = s['end_frame']
+            prev['beats'] += s['beats']
+            continue
+        runs.append(dict(s, beats=list(s['beats'])))
+    return [r for r in runs if purposes is None or r['purpose'] in purposes]
 
 
 def auto_qa(m, beat):

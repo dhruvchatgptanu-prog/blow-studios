@@ -70,6 +70,32 @@ fit, teleports, implausible speeds and jumps, unsupported ground, unreachable pr
 are too short or unreadable at the framing or turned away from camera, captions outside the safe area,
 and missing hooks or payoffs. `director.py` renders the beat list as a readable second-by-second script.
 
+**Story formats.** A plan may set `format`: `skit`, `storytime` or `first_person_story` (absent = the
+behaviour before formats). The manifest carries it as `m['format']`, and `story.mechanism`, `story.mode`
+(`world_scale` or `grounded`), `story.twist_type` and `story.loop_type` (`callback` or `sequel_tease`) are
+copied into `m['story']` (vocabulary in `blox/story/formats.py`, also served at `/api/vocabulary`). Beat
+purposes `mid_gag`, `twist` and `loop` mark the format's mid-video like/subscribe gag, its twist and the
+last line that runs back into the hook. `compile.beat_segments` turns the one-second beats back into the
+authored beats (an authored beat runs until the next one) for the checks below. In this format the music
+drops out for 0.5 s just before the twist unless the plan places the drop-out itself.
+
+The first-person format is checked only when `m['format'] == 'first_person_story'`, against
+`formats.calibration()`: the owner's imported numbers (store key `format_calibration`, imported from
+`calibration.json` and `pace_profile.json` on the Story backlog page, every value range-checked) laid over
+the defaults (25-45 s, narration 4.0-4.45 words/s, hook line done by 2.4 s, shots at most 3.5 s, the
+mid-video gag starting at 35-70% of the video and lasting at most 2.5 s; all finished-video time). Errors:
+a narrator; the first line is the narrator's narration from the first 0.3 s and ends by the hook limit; at
+least three escalation/climax steps; a twist beat; a payoff; a mid-video gag in its window with a narrator
+line asking for a like or a sub; every shot within the limit; mechanism, mode and twist type set; an emoji in
+the title. Warnings: title grammar ("I [did something] [one extreme thing] 😳", 3-9 words, the narrator in
+it, no hashtags), the first word "I", the hook line saying the title, a final loop beat (and shared words
+for a callback loop), estimated narration pace, line pace, other characters' line length, sentence length,
+the drop-out before the twist and the video length. The voice is never sped up to meet the pace: the plan's
+wording sets it. An IP watch warns, in every format, about well-known trademarked characters, brands and
+people in the title, description, tags, hook and lines. On the rendered video, `qa/story.py` measures the
+first narrated word, narration words per second by section (`voice/sections.py`: hook, body, end), the
+mid-gag line's voiced time and the longest shot; these records are `minor`, so they never hold or block.
+
 Coordinate system: metres, Z up, characters face −Y at facing 0°; facing is degrees about Z.
 
 ## Animation (`blox/animation`)
