@@ -170,6 +170,9 @@ DEFAULTS = {
         # backlog: always use the backlog (stories written by you or by Claude in a chat session).
         # llm: always write with the LLM API.
         'story_source': 'auto',
+        # Which format the LLM writes when a concept does not say: '' lets it choose (skit or storytime);
+        # 'first_person_story' is the owner's "I ... 😳" format (blox/story/formats.py). Backlog stories carry their own.
+        'story_format': '',
     },
     'qa': {
         'max_repairs_per_target': 2,
@@ -380,6 +383,9 @@ def validate(p):
             raise ValueError(f'Invalid model name for {k}')
     if pr.get('story_source', 'auto') not in ('auto', 'backlog', 'llm'):
         raise ValueError('story source must be auto, backlog or llm')
+    pr['story_format'] = pr.get('story_format') or ''
+    if pr['story_format'] not in ('', 'skit', 'storytime', 'first_person_story'):
+        raise ValueError('story format must be empty, skit, storytime or first_person_story')
     if pr['tts_provider'] not in TTS_PROVIDERS:
         raise ValueError('Unknown TTS provider')
     if pr['music'] not in ('generated', 'asset', 'none'):

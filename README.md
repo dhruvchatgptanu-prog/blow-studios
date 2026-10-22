@@ -160,6 +160,30 @@ hints, never as instructions.
 * **Voices.** Each cast member has a voice, pitch and rate (Piper or Kokoro by default); storytime
   narration is a voice-over kind of its own, never lip-synced.
 
+### First-person "I … 😳" stories
+
+Blox also produces the owner's first-person story format: an ordinary "I" does one outrageous thing and it
+snowballs in about 30 seconds. Choose it on **Settings → Production → story format**, or import a batch such as
+`stories/batch-2026-10-22-first-person.json` (12 original stories) into the Story backlog.
+
+* **Structure the validator enforces.** The narrator speaks the title line from the first frame, starting with "I".
+  Then come a setup, at least three escalation steps, a mid-video like/subscribe gag between 35% and 70% of the
+  runtime, a twist and a payoff, and the video ends on a loop line that runs back into the hook. Shots stay
+  under 3.5 seconds.
+* **Pace.** Narration is planned at about 4.2 words per second, a little quicker in the hook and slower at the
+  end. Voices are never time-stretched. A line that runs long is voiced again at the engine's own faster speed.
+* **Calibration.** The measurements from your analysis scripts (`calibration.json`, `pace_profile.json`) import
+  on the Story backlog page and replace the defaults. Your `reference.jsonl` imports through Trend research →
+  Notes. A title too close to another creator's video is refused; variations of your own videos are allowed.
+* **Narrator voice.** Import your `voice.json` on the Characters page to use your ElevenLabs narrator voice for
+  the character who says "I". A video that would use more than a quarter of your remaining ElevenLabs credits
+  stops and asks you first.
+* **Packaging and learning.** Descriptions follow your template (a teaser, "What would you have done? 😳",
+  then hashtags), twist types rotate so none repeats within five videos, and analytics compare views by premise
+  type.
+* **QA** reports the measured pace, the first-word time, the gag timing and the longest shot as minor checks.
+  Style measurements never block a video; the structure was already checked before production.
+
 ### Channel kit
 
 **Connections → Channel kit** builds what a new channel needs before the first upload: name and handle

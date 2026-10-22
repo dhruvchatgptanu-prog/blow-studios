@@ -70,8 +70,7 @@ def run(ck, m, line_audio, assembly, prefs, video_id=None, render_id='r', asr=No
            0.75, 'manifest+audio', frames=(0, min(D, 3 * fps)),
            repair=None if hook_ok else {'action': 'rewrite_script', 'reason': 'hook arrives late'})
     payoff_beats = [b for b in m['beats'] if b['purpose'] in ('payoff', 'button')]
-    # A loop beat (first-person story format) closes the ending after the payoff, so it counts as the ending.
-    ending = [b for b in m['beats'] if b['purpose'] in ('payoff', 'button', 'loop')]
+    ending = [b for b in m['beats'] if b['purpose'] in ending_purposes(m)]
     payoff_ok = bool(payoff_beats) and ending[-1]['end_frame'] >= 0.9 * D and bool(m['payoff']['text'])
     ck.add('payoff', 'Ending pays off the hook (structure)', 'story', 'pass' if payoff_ok else 'fail', 'major',
            {'payoff': m['payoff']['text'], 'resolves': m['payoff'].get('resolves'),
@@ -161,11 +160,7 @@ def run(ck, m, line_audio, assembly, prefs, video_id=None, render_id='r', asr=No
     _caption_pixels(ck, m, assembly, prefs)
     _hook_pixels(ck, m, assembly, prefs)
     # Continuity and contradictions as encoded in the manifest
-    rep = V.validate(m, prefs, measured=True)
-    ck.add('manifest_consistency', 'No contradictory events or continuity errors in the plan', 'story',
-           'pass' if rep['ok'] else 'fail', 'major',
-           {'errors': [e['message'] for e in rep['errors']][:8], 'warnings': [w['message'] for w in rep['warnings']][:8]},
-           0.8, 'manifest', repair={'action': 'rewrite_script'} if not rep['ok'] else None)
+    manifest_consistency(ck, m, prefs)
     # Unsupported claims screen
     text = ' '.join([m.get('title', ''), m.get('logline', '')] + [ln['text'] for ln in m['lines']] +
                     [str((m.get('metadata') or {}).get('description', ''))])
@@ -175,6 +170,29 @@ def run(ck, m, line_audio, assembly, prefs, video_id=None, render_id='r', asr=No
            'major' if hits else 'minor', {'flags': hits[:8], 'note': 'Keyword screen; a person should confirm flagged text.'},
            0.6, 'heuristic')
     first_person_checks(ck, m, line_audio)
+
+
+def ending_purposes(m):
+    """Beat purposes that close a video. A loop beat (first-person story format) runs after the payoff back into
+    the hook, so there it counts as the ending; elsewhere only payoff and button do."""
+    return ('payoff', 'button', 'loop') if m.get('format') == 'first_person_story' else ('payoff', 'button')
+
+
+def manifest_consistency(ck, m, prefs):
+    """Re-validate the voiced manifest: contradictions and continuity errors fail (major, rewrite the script)."""
+    rep = V.validate(m, prefs, measured=True)
+    # The first-person format's own rules (format_* codes) were enforced on the plan before production; on the
+    # voiced manifest they can only move by voiced timing (a hook line a little long, a gag a little late).
+    # Those are style measurements: reported as a minor record, never a reason to block or rewrite the video.
+    style = [e for e in rep['errors'] if str(e.get('code', '')).startswith('format_')]
+    hard = [e for e in rep['errors'] if e not in style]
+    ck.add('manifest_consistency', 'No contradictory events or continuity errors in the plan', 'story',
+           'fail' if hard else 'pass', 'major',
+           {'errors': [e['message'] for e in hard][:8], 'warnings': [w['message'] for w in rep['warnings']][:8]},
+           0.8, 'manifest', repair={'action': 'rewrite_script'} if hard else None)
+    if style:
+        ck.add('format_rules_voiced', 'First-person format rules on the voiced timing', 'story', 'fail', 'minor',
+               {'errors': [e['message'] for e in style][:8], 'note': FORMAT_NOTE}, 0.8, 'manifest')
 
 
 # ---------------------------------------------------------------- first-person story format (measured)
