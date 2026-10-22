@@ -4,9 +4,9 @@ session) that autopilot can produce without calling an LLM API.
 Every plan is compiled and validated on import; invalid or duplicate plans are rejected with
 reasons, and so is a title too close to another creator's imported reference title. Stories are
 claimed atomically, one per video: the oldest ready story whose twist type was not used by the last
-five produced videos, else the oldest ready story. A batch that repeats a twist type within five
-consecutive stories is accepted with a warning. At production time the plan is validated again and
-screened for originality against research references and recent own videos.
+five produced videos, else the oldest ready story. A batch that repeats a twist type or a mechanism
+within five consecutive stories is accepted with a warning (mechanism mix). At production time the plan
+is validated again and screened for originality against research references and recent own videos.
 """
 import json
 
@@ -19,6 +19,7 @@ from . import originality
 
 MAX_BATCH = 200
 TWIST_WINDOW = 5         # no twist type twice within this many consecutive stories / recent videos
+MIX_WINDOW = 5           # a batch warns on a mechanism repeated within this many consecutive stories
 TAKE_SCAN = 200          # ready stories considered by take()
 
 
@@ -38,7 +39,7 @@ def add(plans, source, p, d=None):
     from .. import production, repo
     chars = repo.characters(active_only=False, d=d)
     refs = originality.prepare_reference_titles(_reference_titles(d))
-    out, twists = [], []
+    out, accepted = [], []
     for plan in plans:
         title = str((plan or {}).get('title', 'Untitled'))[:100] if isinstance(plan, dict) else 'Untitled'
         if not isinstance(plan, dict) or len(json.dumps(plan)) > C.MAX_PLAN_BYTES:
@@ -80,8 +81,8 @@ def add(plans, source, p, d=None):
         if tc['note']:
             res['note'] = tc['note']
         out.append(res)
-        twists.append((res, fields.get('twist_type')))
-    _warn_repeated_twists(twists)
+        accepted.append((res, fields))
+    _warn_repeats(accepted)
     store.audit('stories_imported', {'source': source, 'ready': sum(1 for r in out if r['status'] == 'ready'),
                                      'rejected': sum(1 for r in out if r['status'] == 'rejected')}, d=d)
     return out
@@ -92,16 +93,27 @@ def _reference_titles(d):
     return notes.reference_titles(d)
 
 
-def _warn_repeated_twists(ready):
-    """Adds a warning to each accepted story whose twist type already appears in the previous four of the batch."""
-    for k, (res, twist) in enumerate(ready):
-        if not twist:
-            continue
-        earlier = [r for r, t in ready[max(0, k - TWIST_WINDOW + 1):k] if t == twist]
-        if earlier:
-            res.setdefault('warnings', []).append(
-                f'Twist type "{twist}" repeats within {TWIST_WINDOW} stories in a row (also in "{earlier[-1]["title"]}"). '
-                'Production spaces repeated twists apart when it can; reorder the batch to avoid it.')
+REPEAT_RULES = (
+    ('twist_type', 'Twist type', TWIST_WINDOW,
+     'Production spaces repeated twists apart when it can; reorder the batch to avoid it.'),
+    ('mechanism', 'Mechanism', MIX_WINDOW,
+     'A mix of mechanisms keeps the channel varied; reorder the batch or change one story if this was not meant.'),
+)
+
+
+def _warn_repeats(ready):
+    """Adds a warning to each accepted story whose twist type, or mechanism, already appears in the previous four
+    stories of the batch. ``ready``: [(result, story fields)] in batch order."""
+    for key, label, window, advice in REPEAT_RULES:
+        for k, (res, fields) in enumerate(ready):
+            value = fields.get(key)
+            if not value:
+                continue
+            earlier = [r for r, f in ready[max(0, k - window + 1):k] if f.get(key) == value]
+            if earlier:
+                res.setdefault('warnings', []).append(
+                    f'{label} "{value}" repeats within {window} stories in a row (also in "{earlier[-1]["title"]}"). '
+                    + advice)
 
 
 def plan_twist(plan):

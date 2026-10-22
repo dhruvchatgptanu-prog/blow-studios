@@ -14,10 +14,11 @@ story model as *pattern hints inside an untrusted block*, never as instructions.
 injection screen are dropped from the hints and counted.
 
 Capture rows (``reference.jsonl`` from the owner's capture tool: one object per studied video with an id,
-a title, a channel and a numeric view count) are also kept as ``reference_titles`` in the extracted JSON,
-validated field by field and capped, so new titles can be checked for closeness to them. Transcripts are
-never stored, and the hook and ending excerpts are kept only for the owner's own videos (rows with
-``own_channel`` true); they are removed from the stored note text for every other row.
+a title, a channel and a view count, which may be null) are also kept as ``reference_titles`` in the
+extracted JSON, validated field by field and capped, so new titles can be checked for closeness to them.
+Transcripts are never stored, and the hook and ending excerpts are kept only for the owner's own videos
+(rows with ``own_channel`` true); they are removed from the stored note text for every other row. Only
+values that carry words are removed: a number such as ``"subs": 1200000`` or timing-only segments stay.
 """
 import csv
 import io
@@ -41,9 +42,18 @@ LIMITS = {'titles': 30, 'video_ids': 60, 'urls': 60, 'numbers': 80, 'rules': 40}
 REFERENCE_ROWS_MAX = 2000          # capture rows kept per note
 REFERENCE_TITLES_MAX = 20_000      # reference titles read back across all notes
 EXCERPT_WORDS = 12
-# Keys that hold transcript text; dropped from every stored row.
-TRANSCRIPT_KEYS = {'transcript', 'transcripts', 'transcript_text', 'captions', 'caption_text', 'subtitles', 'subs',
+# Keys that hold transcript text; their values are dropped wherever they carry words (see _holds_text).
+TRANSCRIPT_KEYS = {'transcript', 'transcripts', 'transcript_text', 'captions', 'caption_text', 'subtitles',
                    'segments', 'cues', 'asr', 'asr_text', 'full_text', 'text_full', 'words_timed', 'timed_words'}
+# Fields of a caption cue object that hold its words.
+_CUE_TEXT_FIELDS = {'text', 'utf8', 'word', 'words', 'w', 'line', 'lines', 'caption', 'captions', 'transcript',
+                    'content', 'segs', 'sentence', 'phrase', 'body', 'excerpt'}
+# The capture tool's mechanism names, mapped to the format's names. Names with no counterpart (role_swap_or_debt,
+# crime_or_rulebreak, other) are left out.
+CAPTURE_MECHANISMS = {'crime_then_reversal': 'crime_reversal', 'constraint_or_curse': 'constraint_curse',
+                      'absurd_belief_or_refusal': 'absurd_belief', 'supernatural_fantasy': 'supernatural',
+                      'rescue_or_hero': 'rescue_mystery'}
+SCRUB_DEPTH = 64
 _ROW_ID = re.compile(r'^[A-Za-z0-9_-]{1,64}$')
 _HANDLE = re.compile(r'^@?[A-Za-z0-9._-]{1,100}$')
 
@@ -282,8 +292,10 @@ def extract(text, kind):
 
 
 # ---------------------------------------------------------------- capture rows (reference.jsonl)
-_RISKY_PAIR = re.compile(r'"(?:[A-Za-z_]*_excerpt|excerpts?|' + '|'.join(sorted(TRANSCRIPT_KEYS)) +
-                         r')"\s*:\s*(?:"(?:[^"\\]|\\.)*"|\[[^\]]*\])\s*,?', re.I)
+# A transcript or excerpt key in JSON text, up to the start of its value.
+_RISKY_KEY = re.compile(r'"(?:[A-Za-z_]*_excerpt|excerpts?|' + '|'.join(re.escape(k) for k in sorted(TRANSCRIPT_KEYS))
+                        + r')"\s*:\s*', re.I)
+_TRAILING_COMMA = re.compile(r'[ \t]*,?[ \t]*')
 
 
 def _num(v, lo, hi, digits=2):
@@ -298,10 +310,12 @@ def _own(o):
 
 
 def is_capture_row(o):
-    """A row from the owner's capture tool: an object with an id, a title, a channel and a numeric view count."""
+    """A row from the owner's capture tool: an object with a string id, title and channel and a ``views`` field.
+
+    ``views`` may be null (the capture tool writes null when YouTube hides the count); ``reference_row`` decides
+    whether the rest of the row is usable."""
     return (isinstance(o, dict) and isinstance(o.get('id'), str) and isinstance(o.get('title'), str)
-            and isinstance(o.get('channel'), str) and isinstance(o.get('views'), (int, float))
-            and not isinstance(o.get('views'), bool))
+            and isinstance(o.get('channel'), str) and 'views' in o)
 
 
 def _excerpt(v):
@@ -311,26 +325,38 @@ def _excerpt(v):
     return s if s and not untrusted.injection_signals(s) else None
 
 
-def reference_row(o):
-    """One validated ``reference_titles`` entry from a capture row, or None when a required field is unusable.
+def _mechanism(v):
+    if not isinstance(v, str):
+        return None
+    name = re.sub(r'[\s-]+', '_', v.strip().lower())[:40]
+    return enum_value(CAPTURE_MECHANISMS.get(name, name), MECHANISMS)
 
-    Only the listed fields are kept; numbers outside sensible ranges become None. The hook and ending excerpts
-    are kept (as at most 12 words) only for the owner's own videos."""
+
+def reference_row(o):
+    """One validated ``reference_titles`` entry from a capture row, or None when the row is unusable (a bad id, an
+    empty title or channel, or a view count that is neither null nor a sensible number).
+
+    Only the listed fields are kept; other numbers outside sensible ranges become None. A null view count is kept
+    as None, so the title still counts in the title check. A title or channel that trips the injection screen is
+    kept with ``flagged`` true: reference titles are only compared locally, and anything that sends them to a
+    model must leave flagged rows out. The hook and ending excerpts are kept (as at most 12 words) only for the
+    owner's own videos."""
     if not is_capture_row(o):
         return None
     rid = untrusted.clean(o['id'], 64)
     title = untrusted.clean(o['title'], 200)
     channel = untrusted.clean(o['channel'], 100)
-    views = _num(o['views'], 0, 1e12, 0)
-    if (not _ROW_ID.match(rid) or not title or not channel or views is None
-            or untrusted.injection_signals(title) or untrusted.injection_signals(channel)):
+    views = None if o['views'] is None else _num(o['views'], 0, 1e12, 0)
+    if not _ROW_ID.match(rid) or not title or not channel or (views is None and o['views'] is not None):
         return None
     handle = untrusted.clean(o.get('handle'), 100) if isinstance(o.get('handle'), str) else ''
     own = _own(o)
     row = {'id': rid, 'channel': channel, 'handle': handle if _HANDLE.match(handle) else '', 'own': own,
-           'title': title, 'views': int(views), 'mechanism': enum_value(o.get('mechanism'), MECHANISMS),
+           'title': title, 'views': None if views is None else int(views), 'mechanism': _mechanism(o.get('mechanism')),
            'duration_s': _num(o.get('duration_s'), 0.1, 3600), 'wps_speech': _num(o.get('wps_speech'), 0.1, 12, 3),
            'first_word_s': _num(o.get('first_word_s'), 0, 600), 'max_shot_s': _num(o.get('max_shot_s'), 0.01, 3600)}
+    if untrusted.injection_signals(title) or untrusted.injection_signals(channel):
+        row['flagged'] = True
     if own:
         for k in ('hook_excerpt', 'ending_excerpt'):
             ex = _excerpt(o.get(k))
@@ -339,19 +365,38 @@ def reference_row(o):
     return row
 
 
+def _holds_text(v, top=True, depth=0):
+    """Whether a value found under a transcript or excerpt key carries words.
+
+    Words are a non-empty string, a list holding one, an object directly under the key holding one, or (deeper
+    down) a caption cue object with a text field such as "text" or "utf8". Numbers, booleans, null and timing-only
+    objects such as {"name": "hook", "start_s": 0, "end_s": 2.2} carry none."""
+    if isinstance(v, str):
+        return bool(v.strip())
+    if depth > 16:
+        return isinstance(v, (list, dict))  # too deep to tell: treat as words
+    if isinstance(v, list):
+        return any(_holds_text(x, False, depth + 1) for x in v)
+    if isinstance(v, dict):
+        return any((top or str(k).lower() in _CUE_TEXT_FIELDS) and _holds_text(x, False, depth + 1)
+                   for k, x in v.items())
+    return False
+
+
 def _scrub(obj, depth=0):
-    """Copy of a parsed JSON value without transcripts, and without excerpts unless the object is the owner's own."""
-    if depth > 8:
+    """Copy of a parsed JSON value without transcripts, and without excerpts unless the object is the owner's own.
+
+    Only values that carry words are removed (``_holds_text``); other values under those keys are kept."""
+    if depth > SCRUB_DEPTH:
         return None
     if isinstance(obj, dict):
         own = _own(obj)
         out = {}
         for k, v in obj.items():
             kl = str(k).lower()
-            if kl in TRANSCRIPT_KEYS:
-                continue
-            if kl.endswith('_excerpt') or kl in ('excerpt', 'excerpts'):
-                ex = _excerpt(v) if own else None
+            excerpt_key = kl.endswith('_excerpt') or kl in ('excerpt', 'excerpts')
+            if (kl in TRANSCRIPT_KEYS or excerpt_key) and _holds_text(v):
+                ex = _excerpt(v) if own and excerpt_key else None
                 if ex:
                     out[k] = ex
                 continue
@@ -360,6 +405,56 @@ def _scrub(obj, depth=0):
     if isinstance(obj, list):
         return [_scrub(v, depth + 1) for v in obj]
     return obj
+
+
+def _value_end(s, i):
+    """Where the JSON value starting at ``s[i]`` ends, when it is a string, a list or an object; one that is never
+    closed runs to the end of ``s``. None for anything else (a number, true, false, null)."""
+    if i >= len(s):
+        return len(s)
+    if s[i] not in '"[{':
+        return None
+    depth, in_str, j = 0, False, i
+    while j < len(s):
+        ch = s[j]
+        if in_str:
+            if ch == '\\':
+                j += 1
+            elif ch == '"':
+                in_str = False
+                if depth == 0:
+                    return j + 1
+        elif ch == '"':
+            in_str = True
+        elif ch in '[{':
+            depth += 1
+        elif ch in ']}':
+            depth -= 1
+            if depth <= 0:
+                return j + 1
+        j += 1
+    return len(s)
+
+
+def _strip_risky(text):
+    """Text that is not valid JSON, without the values of transcript and excerpt keys.
+
+    A value that is a string, a list or an object is removed with its key, including one that is never closed
+    (it runs to the end of the text, so of the line for a .jsonl line). Numbers and other plain values stay."""
+    out, pos = [], 0
+    while True:
+        m = _RISKY_KEY.search(text, pos)
+        if not m:
+            break
+        end = _value_end(text, m.end())
+        if end is None:
+            out.append(text[pos:m.end()])
+        else:
+            out.append(text[pos:m.start()])
+            end = _TRAILING_COMMA.match(text, end).end()
+        pos = m.end() if end is None else end
+    out.append(text[pos:])
+    return ''.join(out)
 
 
 def _rows_in(doc):
@@ -377,8 +472,9 @@ def _rows_in(doc):
 def screen_structured(text, kind):
     """For .json/.jsonl notes: (text to store, reference rows or None).
 
-    The stored text drops transcripts and other creators' excerpts (re-serialising only the objects that change);
-    the reference rows are read from the whole upload, before the stored text is size-capped."""
+    The stored text drops transcripts and other creators' excerpts (re-serialising only the objects that change;
+    in lines that are not valid JSON, the values of those keys are cut out). The reference rows are read from the
+    whole upload, before the stored text is size-capped."""
     text = untrusted.clean(text, len(text or '') + 1)
     docs, out_lines, changed = [], [], False
     if kind == 'jsonl':
@@ -390,7 +486,7 @@ def screen_structured(text, kind):
             try:
                 doc = json.loads(s)
             except (ValueError, RecursionError):
-                fixed = _RISKY_PAIR.sub('', ln)
+                fixed = _strip_risky(ln)
                 changed |= fixed != ln
                 out_lines.append(fixed)
                 continue
@@ -406,7 +502,7 @@ def screen_structured(text, kind):
         try:
             doc = json.loads(text)
         except (ValueError, RecursionError):
-            return _RISKY_PAIR.sub('', text), None
+            return _strip_risky(text), None
         docs.append(doc)
         clean_doc = _scrub(doc)
         stored = json.dumps(clean_doc, ensure_ascii=False, indent=1) if clean_doc != doc else text

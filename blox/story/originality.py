@@ -165,37 +165,49 @@ def check(candidate, references, own, embed=None, inspiration_sources=None):
 # ---------------------------------------------------------------- title closeness against imported reference titles
 TITLE_BLOCK = 0.6
 TITLE_MAX_CHARS = 300
-# Small words every title in the format shares ("I ... the ...", "my ..."); left out so the shared title grammar
-# alone does not make two different stories look close.
-TITLE_STOPWORDS = frozenset('''i me my mine myself we us our you your he him his she her they them their it its
-a an the and or but so to of in on at for with by from into onto up out off as than then this that these those is was
-were be been am are'''.split())
-_TITLE_WORD = re.compile(r'[^\W_]+')
+# A word: letters and digits, with apostrophes inside it ("world's"); emoji, punctuation and spaces separate words.
+_TITLE_TOKEN = re.compile(r"[^\W_]+(?:'[^\W_]+)*")
+_APOSTROPHES = re.compile('[\u2018\u2019\u02bc\u00b4`]')
+# How the owner's capture tool (capture_analyse.py --check-title) reads a title: lower-case runs of a-z, 0-9, '.
+_TOOL_WORD = re.compile(r"[a-z0-9']+")
+
+
+def title_form(title):
+    """(words, tool_words) of a title for the closeness check.
+
+    words: lower case, emoji and punctuation removed, apostrophes folded ("World's" gives "worlds"). Every word
+    counts, the small ones (I, the, my) included. tool_words: the words as the owner's capture tool reads them."""
+    s = unicodedata.normalize('NFKC', str(title or ''))[:TITLE_MAX_CHARS].lower()
+    words = [t.replace("'", '') for t in _TITLE_TOKEN.findall(_APOSTROPHES.sub("'", s))]
+    return words, _TOOL_WORD.findall(s)
 
 
 def title_words(title):
-    """Normalised title words: lower case, emoji and punctuation removed, small shared words left out and a plural
-    "s" folded ("World's Strongest Dads" and "worlds strongest dad" give the same words)."""
-    s = unicodedata.normalize('NFKC', str(title or ''))[:TITLE_MAX_CHARS].lower()
-    s = re.sub(r"['\u2018\u2019`]", '', s)
-    out = []
-    for w in _TITLE_WORD.findall(s):
-        if w in TITLE_STOPWORDS:
-            continue
-        if len(w) > 3 and w.endswith('s') and not w.endswith('ss'):
-            w = w[:-1]
-        out.append(w)
-    return out
+    """The normalised words of a title (see ``title_form``)."""
+    return title_form(title)[0]
+
+
+def _ratio(a, b):
+    return difflib.SequenceMatcher(None, a, b, autojunk=False).ratio()
+
+
+def _jaccard(a, b):
+    sa, sb = set(a), set(b)
+    return len(sa & sb) / len(sa | sb) if sa and sb else 0.0
 
 
 def title_similarity(a, b):
-    """max(difflib ratio over the word sequences, word Jaccard) of two normalised word lists, 0..1."""
-    if not a or not b:
-        return 0.0
-    sa, sb = set(a), set(b)
-    jac = len(sa & sb) / len(sa | sb)
-    ratio = difflib.SequenceMatcher(None, a, b, autojunk=False).ratio()
-    return max(ratio, jac)
+    """How close title ``a`` is to title ``b``, 0..1: the higher of two scores.
+
+    * The brief's rule: max(difflib ratio over the normalised words, word Jaccard).
+    * The owner's capture tool's rule: max(difflib ratio over the characters of its words joined by spaces, word
+      Jaccard). A title with none of the tool's words (no a-z or 0-9) scores 0 here, not 1.
+
+    So a title is blocked whenever either rule would block it."""
+    (wa, ta), (wb, tb) = title_form(a), title_form(b)
+    brief = max(_ratio(wa, wb), _jaccard(wa, wb)) if wa and wb else 0.0
+    tool = max(_ratio(' '.join(ta), ' '.join(tb)), _jaccard(ta, tb)) if ta and tb else 0.0
+    return max(brief, tool)
 
 
 def prepare_reference_titles(refs):
@@ -207,9 +219,10 @@ def prepare_reference_titles(refs):
             continue
         if not isinstance(r, dict) or not isinstance(r.get('title'), str):
             continue
-        w = title_words(r['title'])
-        if w:
-            out.append((w, Counter(w), r))
+        w, t = title_form(r['title'])
+        if w or t:
+            text = ' '.join(t)
+            out.append((w, Counter(w), t, text, Counter(text), r))
     return out
 
 
@@ -223,25 +236,33 @@ def _refs(d, refs):
 def title_check(title, d=None, refs=None):
     """How close ``title`` is to the imported reference titles.
 
-    Returns {'score', 'closest': {'title', 'channel', 'own'} | None, 'blocked', 'note', 'reason'}. Blocked when the
-    score against another creator's title is at least 0.6; a close title of the owner's own channel only gives a
-    note. ``refs`` (rows from ``notes.reference_titles``) can be passed to check many titles at once."""
+    Returns {'score', 'closest': {'title', 'channel', 'own'} | None, 'blocked', 'note', 'reason', 'threshold'}.
+    Blocked when the score (``title_similarity``) against another creator's title is at least 0.6; a close title of
+    the owner's own channel only gives a note. ``refs`` (rows from ``notes.reference_titles``) can be passed to
+    check many titles at once."""
     prepared = _refs(d, refs)
-    words_ = title_words(title)
+    words_, tool = title_form(title)
+    text = ' '.join(tool)
     best = {True: (0.0, None), False: (0.0, None)}  # own -> (score, row)
-    if words_:
-        cw = Counter(words_)
-        for rw, rc, row in prepared:
+    if words_ or tool:
+        cw, ct = Counter(words_), Counter(text)
+        by_words = difflib.SequenceMatcher(None, autojunk=False)
+        by_words.set_seq1(words_)
+        by_text = difflib.SequenceMatcher(None, autojunk=False)
+        by_text.set_seq1(text)
+        for rw, rcw, rt, rtext, rct, row in prepared:
             own = bool(row.get('own'))
             cur = best[own][0]
-            common = sum((cw & rc).values())
-            if not common:
-                continue
-            upper = 2.0 * common / (len(words_) + len(rw))
-            jac = len(set(words_) & set(rw)) / len(set(words_) | set(rw))
-            if max(upper, jac) <= cur:
-                continue
-            sc = title_similarity(words_, rw)
+            # Exact ratios only where a cheap upper bound could beat the best so far: most titles are far apart.
+            sc = max(_jaccard(words_, rw), _jaccard(tool, rt))
+            if words_ and rw and 2.0 * sum((cw & rcw).values()) / (len(words_) + len(rw)) > max(sc, cur):
+                by_words.set_seq2(rw)
+                sc = max(sc, by_words.ratio())
+            if text and rtext:
+                n, floor = len(text) + len(rtext), max(sc, cur)
+                if 2.0 * min(len(text), len(rtext)) / n > floor and 2.0 * sum((ct & rct).values()) / n > floor:
+                    by_text.set_seq2(rtext)
+                    sc = max(sc, by_text.ratio())
             if sc > cur:
                 best[own] = (sc, row)
     other_score, other_row = best[False]

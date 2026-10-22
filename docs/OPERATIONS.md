@@ -39,10 +39,15 @@ dashboard show how many stories are left and how many days they last at your cad
 * **Titles:** a story whose title is too close to another creator's title in your imported reference
   titles (see Research notes) is rejected, with the closest title in the reason. A title close to one
   of your own videos is accepted with a note ("a variation of your own video"). Closeness is a
-  similarity score from 0 to 1 over the title's words (emoji, punctuation and small words such as
-  *I*, *the* and *my* are ignored); 0.6 or more blocks.
-* **Twist types in a batch:** a batch that uses the same twist type twice within five stories in a row
-  is still added, with a warning on those stories. Reorder the batch if you want them further apart.
+  similarity score from 0 to 1 over the whole title. Emoji and punctuation are ignored; every word
+  counts, small words such as *I*, *the* and *my* included. For titles in Latin letters it is never
+  lower than your capture tool's `--check-title` score, so a title your tool calls too close is blocked
+  here too. 0.6 or more blocks.
+  Titles in this format share a lot of grammar, so two different stories can reach 0.6 on shared words
+  alone ("I Ate The World's Biggest Burger" and "I Built The World's Biggest Lego Tower" score 0.77).
+* **Twist types and mechanisms in a batch:** a batch that uses the same twist type, or the same
+  mechanism (`story.mechanism`), twice within five stories in a row is still added, with a warning on
+  those stories. Reorder the batch if you want them further apart.
 * **Get more without API costs:** ask Claude in a normal chat with the prompt in `stories/README.md`.
 * **Reject** a story you do not want; **Restore** brings it back. A story whose video is cancelled
   before upload returns to the backlog automatically.
@@ -100,13 +105,19 @@ as untrusted data. Notes appear read-only in the research brief and reach story 
 pattern hints inside the untrusted block. Keep transcripts paraphrased; never paste full copied scripts.
 
 * **Reference titles:** upload the `reference.jsonl` from your capture tool (one row per studied video
-  with `id`, `title`, `channel` and a numeric `views`). Up to 2,000 rows per file are kept as reference
-  titles with the channel, handle, whether it is your own channel (`own_channel`), views, mechanism,
-  duration, speech words per second, first-word time and longest shot. Rows with a bad id, a missing
-  field or a flagged title are skipped and counted. The notes table shows how many were kept.
-* **Never stored:** transcripts (any `transcript`, `captions`, `subtitles`, `segments` field), and the
-  hook and ending excerpts of other creators' videos. Excerpts of your own videos are kept, cut to 12
-  words. This applies to the stored note text too.
+  with `id`, `title`, `channel` and `views`; `views` may be null when YouTube hides the count). Up to
+  2,000 rows per file are kept as reference titles with the channel, handle, whether it is your own
+  channel (`own_channel`), views, mechanism, duration, speech words per second, first-word time and
+  longest shot. The capture tool's mechanism names are mapped to the format's names (for example
+  `crime_then_reversal` becomes `crime_reversal`); `role_swap_or_debt`, `crime_or_rulebreak` and `other`
+  have no match and are left empty. Rows with a bad id, an empty title or channel, or views that are not
+  a number are skipped and counted. A title that trips the safety screen (for example one with the word
+  "password") is kept for the title check and marked as flagged. The notes table shows how many were kept.
+* **Never stored:** transcripts (any `transcript`, `captions`, `subtitles`, `segments` field that holds
+  words), and the hook and ending excerpts of other creators' videos. Excerpts of your own videos are
+  kept, cut to 12 words. This applies to the stored note text too, including lines that are not valid
+  JSON. Numbers and timing-only data under those names (a subscriber count, segment start and end
+  times) are kept.
 * The reference titles feed the title check: the Director's editor shows a one-line hint under its
   title field, the backlog rejects titles too close to another creator's, and development holds them.
 

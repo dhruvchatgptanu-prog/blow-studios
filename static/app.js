@@ -350,7 +350,12 @@ function titleField(P) {
     } catch (x) { hint.className = 'small muted'; hint.textContent = x.message; }
   };
   f.addEventListener('submit', e => e.preventDefault());
-  f.addEventListener('input', () => { P.title = f.title.value; if (P.metadata && P.metadata.title !== undefined) P.metadata.title = f.title.value; clearTimeout(titleField.h); titleField.h = setTimeout(check, 400); });
+  f.addEventListener('input', () => {
+    P.title = f.title.value; if (P.metadata && P.metadata.title !== undefined) P.metadata.title = f.title.value;
+    // Keep the Plan JSON box in step, so "Apply JSON" afterwards does not bring the old title back.
+    const box = $('#plan-json'); if (box) box.value = JSON.stringify(P, null, 1);
+    clearTimeout(titleField.h); titleField.h = setTimeout(check, 400);
+  });
   check();
 }
 
