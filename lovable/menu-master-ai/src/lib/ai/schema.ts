@@ -92,9 +92,9 @@ export type MenuRequest = {
   mode: OutputMode;
   pages: "1" | "2";
   size: OutputSize;
-  previous?: string;
+  previous?: string | undefined;
   /** data:image/...;base64,... */
-  referenceImage?: string;
+  referenceImage?: string | undefined;
 };
 
 /**

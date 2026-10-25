@@ -123,7 +123,7 @@ type ResponsesCall = {
   model: string;
   instructions: string;
   text: string;
-  image?: string;
+  image?: string | undefined;
   schemaName: string;
   schema: unknown;
   signal: AbortSignal;

@@ -61,7 +61,7 @@ function explicitCount(brief: string, nouns: RegExp) {
 
 export function verifyMenu(menu: GeneratedMenuCore, request: MenuRequest): Verification {
   const issues: string[] = [];
-  const checks: Record<string, number> = {};
+  const checks: { prices?: number; names?: number; quantities?: number; photos?: number; structure?: number; [key: string]: number | undefined } = {};
   const items = menu.sections.flatMap((section) => section.items);
   const brief = request.brief;
 
@@ -74,12 +74,12 @@ export function verifyMenu(menu: GeneratedMenuCore, request: MenuRequest): Verif
     if (missing.length) issues.push(`Prices from the brief are missing or altered: ${missing.join(", ")}.`);
     const extra = Array.from(outputPrices).filter((price) => !briefPrices.includes(price));
     if (extra.length && !request.previous) {
-      checks.prices = Math.max(0, checks.prices - Math.min(10, extra.length * 3));
+      checks.prices = Math.max(0, (checks.prices ?? 0) - Math.min(10, extra.length * 3));
       issues.push(`Prices not present in the brief were invented: ${extra.join(", ")}.`);
     }
   } else {
     checks.prices = items.every((item) => item.price.trim().length > 0) ? 40 : 25;
-    if (checks.prices < 40) issues.push("Some items have no price.");
+    if ((checks.prices ?? 0) < 40) issues.push("Some items have no price.");
   }
 
   // 2. Names (weight 20)
@@ -145,6 +145,6 @@ export function verifyMenu(menu: GeneratedMenuCore, request: MenuRequest): Verif
   }
   checks.structure = Math.max(0, structure);
 
-  const score = Math.max(0, Math.min(100, Object.values(checks).reduce((sum, value) => sum + value, 0)));
-  return { score, issues: Array.from(new Set(issues)), checks };
+  const score = Math.max(0, Math.min(100, Object.values(checks).reduce<number>((sum, value) => sum + (value ?? 0), 0)));
+  return { score, issues: Array.from(new Set(issues)), checks: checks as Record<string, number> };
 }
