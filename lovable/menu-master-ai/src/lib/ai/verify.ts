@@ -32,7 +32,10 @@ export function extractBriefNames(brief: string) {
     if (match?.[1] && match[1].length >= 4) names.add(match[1].trim());
   }
   const quoted = brief.match(/["“”]([^"“”]{3,40})["“”]/g) ?? [];
-  for (const q of quoted) if (!/^\d/.test(q.slice(1))) names.add(q.replace(/^["“”]|["“”]$/g, "").trim());
+  for (const q of quoted) {
+    const inner = q.replace(/^["“”]|["“”]$/g, "").trim();
+    if (/^[A-Za-z]/.test(inner) && !/[;$€£]/.test(inner)) names.add(inner);
+  }
   return Array.from(names).filter((name) => !/^(create|make|design|use|include|build|the|a|an|our|my|please|keep|add|redesign|poster|menu|sign|board)\b/i.test(name));
 }
 
