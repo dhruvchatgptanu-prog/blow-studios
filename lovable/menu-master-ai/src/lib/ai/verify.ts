@@ -26,9 +26,15 @@ export function extractBriefPrices(brief: string) {
 export function extractBriefNames(brief: string) {
   const names = new Set<string>();
   const cleaned = brief.replace(/\b(include|includes|including|offers?|deals?|items?)\s*:\s*/gi, ";");
-  for (const part of cleaned.split(/[;\n•]/)) {
+  const NAME_RE = /^([A-Z][\w'&]*(?:\s+(?:[A-Z][\w'&]*|of|and|&|the|de|la|al)){0,5})\s*(?:—|–|-|:|\(|\d+["”]|[$€£])/;
+  // Segments split on list separators and sentence boundaries; commas only count when the segment ends in a price.
+  const segments = cleaned.split(/[;\n•]|\.\s+(?=[A-Z])/).flatMap((part) => {
+    const commaParts = part.split(/,\s+(?=[A-Z])/);
+    return commaParts.length > 1 && commaParts.every((piece) => /[$€£]\s?\d|\d\s?(?:€|£)/.test(piece)) ? commaParts : [part];
+  });
+  for (const part of segments) {
     const segment = part.trim().replace(/^(?:and|&|plus)\s+/i, "");
-    const match = /^([A-Z][\w'&]*(?:\s+(?:[A-Z][\w'&]*|of|and|&|the|de|la|al)){0,5})\s*(?:—|–|-|:|\(|\d+["”]|[$€£])/.exec(segment);
+    const match = NAME_RE.exec(segment);
     if (match?.[1] && match[1].length >= 4) names.add(match[1].trim());
   }
   const quoted = brief.match(/["“”]([^"“”]{3,40})["“”]/g) ?? [];
@@ -36,7 +42,7 @@ export function extractBriefNames(brief: string) {
     const inner = q.replace(/^["“”]|["“”]$/g, "").trim();
     if (/^[A-Za-z]/.test(inner) && !/[;$€£]/.test(inner)) names.add(inner);
   }
-  return Array.from(names).filter((name) => !/^(create|make|design|use|include|build|the|a|an|our|my|please|keep|add|redesign|poster|menu|sign|board)\b/i.test(name));
+  return Array.from(names).filter((name) => !/^(create|make|design|use|include|build|the|a|an|our|my|please|keep|add|redesign|poster|menu|sign|board|sections?|prices?|format|style|mode|note|notes)\b/i.test(name));
 }
 
 function extractQuantityPhrases(brief: string) {
@@ -118,7 +124,7 @@ export function verifyMenu(menu: GeneratedMenuCore, request: MenuRequest): Verif
     const hit = FORBIDDEN_PHOTO_WORDS.find((word) => {
       const re = new RegExp(`\\b${word.trim()}\\b`, "i");
       if (!re.test(lower)) return false;
-      const negated = new RegExp(`\\b(?:no|without|never|not)\\b[^.;]{0,40}\\b${word.trim()}\\b`, "i");
+      const negated = new RegExp(`\\b(?:no|without|never|not)\\b[^.;]{0,90}\\b${word.trim()}\\b`, "i");
       return !negated.test(lower);
     });
     if (hit) photoPenalty += 3;

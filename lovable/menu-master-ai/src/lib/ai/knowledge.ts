@@ -47,9 +47,9 @@ export const FORMAT_RULES: Record<string, string> = {
   a5: "A5 148 × 210 mm portrait. Tighter: 3 sections, up to 12 items, shorter descriptions (max 10 words).",
   poster: "Portrait promotional poster. Headline zone on top, 2-4 stacked offer rows each with a square photo, price block bottom-left of copy.",
   wide: "Wide digital menu board 16:9. Up to 3 offers side by side; names max 3 words; descriptions max 10 words.",
-  "fascia-447": "Ultra-wide shop fascia 447 × 71.5 cm (6.25:1). Extremely shallow: brand zone left, 3-5 offers in a single row, names max 3 words, descriptions max 8 words, prices very large. Readable from across a street.",
-  "fascia-180": "Wide board 180 × 60.4 cm (3:1). Brand zone plus 2-4 clearly grouped offers, names max 4 words, descriptions max 10 words.",
-  square: "12-inch square pizza sign. One hero offer centred (usually a pizza), a very large size/offer statement, at most 3 secondary offers listed small.",
+  "fascia-447": "Ultra-wide shop fascia 447 × 71.5 cm (6.25:1), read from 15-25 m across a street or car park. Extremely shallow: brand zone left, 3-5 offers in a single row, names max 3 words, descriptions max 8 words (or none), prices very large. Signage rule of thumb: about 2.5 cm of letter height per 3 m of viewing distance, so item names need roughly 15-20 cm cap height and the brand twice that; bold sans-serif only, never script for names or prices; maximum contrast.",
+  "fascia-180": "Wide board 180 × 60.4 cm (3:1), read from 4-8 m at an ordering counter. Brand zone plus 2-4 clearly grouped offers, names max 4 words, descriptions max 10 words, item names about 5-7 cm cap height and category headers double that; bold sans-serif, high contrast.",
+  square: "12-inch square pizza sign read from 2-4 m. One hero offer centred (usually a pizza), a very large size/offer statement, at most 3 secondary offers listed small; keep total words under 25.",
 };
 
 export const DESIGN_GRAMMAR = [
@@ -68,6 +68,10 @@ export const MENU_PSYCHOLOGY = [
   "Naming: proper nouns and house names stay exactly as written; generic items get specific, appetising nouns ('charred lemon', 'hand-cut chips') only when they are plausible for the cuisine and not contradicted by the brief.",
   "Chunking: 5-7 items per section is the readability sweet spot; split larger groups into logical sub-sections.",
   "Scarcity and urgency wording ('this week only', 'limited') is allowed only when the brief states a time limit.",
+  "Serial position: guests most often order the first and last item in a section, so put the signature or best-value items there.",
+  "Descriptive labels sell: name the technique, origin or key ingredient ('charcoal-grilled', 'house-made tzatziki', 'wood-fired') instead of adjectives like 'delicious'; keep every such word plausible for the venue and never contradict the brief.",
+  "Currency and price format follow the brief exactly. Never add a currency symbol the brief did not use, never strip one it did, never round or add charm endings (.95/.99) the brief did not write.",
+  "Fewer, clearer choices beat long lists: when the brief leaves the count open, prefer 5-7 items per section and 2-4 offers per poster.",
 ] as const;
 
 export const CUISINE_PLATING_CUES: Record<string, string> = {
@@ -97,7 +101,9 @@ export const PHOTO_PROMPT_GRAMMAR = [
   "4) ANGLE & LENS — overhead, 45-degree or eye-level; 50 mm or 85 mm full-frame look; shallow but sufficient depth of field so the whole advertised meal is sharp.",
   "5) LIGHT — one large softbox key from upper left or back, soft fill, natural appetising shadows, slight specular highlights on sauce and fat.",
   "6) FINISH — true-to-life colour, visible steam only for hot dishes, no props that are not food, square composition with clean edges so the artwork can crop it.",
-  "Always describe real food texture: crust, char, melted cheese, sauce gloss, sesame seeds, herb flecks. Never use the words text, logo, watermark, price, sign, label, menu, illustration, cartoon, render, CGI, 3D, plastic.",
+  "Always describe real food texture: crust, char, melted cheese, sauce gloss, sesame seeds, herb flecks. Name the cut, cooking method and doneness where relevant (e.g. 'charcoal-grilled lamb, sliced thin with crisp edges').",
+  "Realism cues: add one or two deliberate imperfections (slightly uneven arrangement, natural colour variation, a small sauce trace on the rim). No fake steam, no floating ingredients, no non-food props, no mixed light sources.",
+  "Never use the words text, logo, watermark, price, sign, label, menu, illustration, cartoon, render, CGI, 3D, plastic.",
   "Hero photos are wide table scenes containing the signature dishes; dish photos are single complete offers. For a pizza sign the hero is a whole pie overhead.",
 ] as const;
 
@@ -134,6 +140,15 @@ export const JUDGE_SYSTEM_PROMPT = [
   block("Deal poster rules", POSTER_MODE_RULES),
   block("Format rules", Object.entries(FORMAT_RULES).map(([key, rule]) => `${key}: ${rule}`)),
   block("Menu psychology", MENU_PSYCHOLOGY),
+  block("Photo prompt grammar", PHOTO_PROMPT_GRAMMAR),
+  "Return JSON only, matching the provided schema exactly.",
+].join("\n\n");
+
+export const REPAIR_SYSTEM_PROMPT = [
+  "You are the Halftone proofreader. You receive a finished menu JSON, the original brief and a list of concrete issues found by an automated compliance check.",
+  "Fix ONLY what the issues require and keep everything else byte-for-byte identical: same items, same order, same wording unless an issue names it. Never add or remove items unless an issue says the count is wrong.",
+  "Exact names, prices, counts and wording from the brief override everything. Never introduce claims, deadlines or contact details absent from the brief.",
+  block("Brief compliance", BRIEF_COMPLIANCE_RULES),
   block("Photo prompt grammar", PHOTO_PROMPT_GRAMMAR),
   "Return JSON only, matching the provided schema exactly.",
 ].join("\n\n");

@@ -75,8 +75,15 @@ export type EngineReport = {
   strategy: "single" | "best-candidate" | "judged-merge";
   candidates: EngineCandidate[];
   judge?: { provider: ProviderId; model: string; winner: string; rationale: string; mergedFrom: string[]; ms: number };
+  /** One targeted proofreading pass, run only when the verifier still lists issues. */
+  repair?: { provider: ProviderId; model: string; before: number; after: number; applied: boolean; ms: number };
+  /** Deterministic cuisine detection used to focus plating cues and photo enrichment. */
+  cuisine: string[];
+  /** Learning memory: how many approved past designs were shown as examples, and which judge the data currently prefers. */
+  memory: { exemplars: number; totalRecorded: number; judgeRanking: ProviderId[] };
   finalScore: number;
   finalIssues: string[];
+  totalMs: number;
 };
 
 /** What the server returns to the studio. `engine` is informational only. */
@@ -95,6 +102,10 @@ export type MenuRequest = {
   previous?: string | undefined;
   /** data:image/...;base64,... */
   referenceImage?: string | undefined;
+  /** Set by the ensemble, never by the client: detected cuisine keys. */
+  cuisine?: string[] | undefined;
+  /** Set by the ensemble, never by the client: approved past outputs shown as examples. */
+  exemplars?: string | undefined;
 };
 
 /**

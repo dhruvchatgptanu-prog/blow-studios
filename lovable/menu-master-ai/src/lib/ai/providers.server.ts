@@ -2,7 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { z } from "zod/v4";
 
-import { describeFormat, JUDGE_SYSTEM_PROMPT, SYSTEM_PROMPT } from "./knowledge";
+import { cuisineCues } from "./cuisine";
+import { describeFormat, JUDGE_SYSTEM_PROMPT, REPAIR_SYSTEM_PROMPT, SYSTEM_PROMPT } from "./knowledge";
 import {
   generatedMenuSchema,
   JUDGE_JSON_SCHEMA,
@@ -32,6 +33,8 @@ export type JudgeInput = {
 
 export type JudgeOutput = z.infer<typeof judgeWireSchema>;
 
+export type RepairInput = { request: MenuRequest; menu: GeneratedMenuCore; issues: string[] };
+
 export type Provider = {
   id: ProviderId;
   label: string;
@@ -39,6 +42,7 @@ export type Provider = {
   available: () => boolean;
   generate: (request: MenuRequest, signal: AbortSignal) => Promise<GeneratedMenuCore>;
   judge: (input: JudgeInput, signal: AbortSignal) => Promise<JudgeOutput>;
+  repair: (input: RepairInput, signal: AbortSignal) => Promise<GeneratedMenuCore>;
 };
 
 const LOVABLE_GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
@@ -59,8 +63,10 @@ export function buildUserMessage(request: MenuRequest) {
     `TYPE STYLE: ${request.style}`,
     `PAGE COUNT: ${request.pages}`,
     `FORMAT: ${request.size} — ${describeFormat(request.size)}`,
+    request.cuisine?.length ? `DETECTED CUISINE: ${request.cuisine.join(" + ")}. Apply these plating cues to every photo brief:\n${cuisineCues(request.cuisine).map((line) => `- ${line}`).join("\n")}` : "",
     request.referenceImage ? "A photo or screenshot of the existing menu is attached. Transcribe it faithfully, then redesign; the written brief wins on any conflict." : "",
     request.previous ? `PREVIOUS MENU (revise it, keep everything the new brief does not change):\n${request.previous}` : "",
+    request.exemplars ? `APPROVED PAST OUTPUTS for a similar brief (match their precision and tone, never copy their content):\n${request.exemplars}` : "",
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -80,6 +86,19 @@ function buildJudgeMessage(input: JudgeInput) {
     )
     .join("\n\n");
   return `${header}\n\n## CANDIDATES\n\n${candidates}\n\nProduce the single best final menu now.`;
+}
+
+function buildRepairMessage(input: RepairInput) {
+  return [
+    buildUserMessage({ ...input.request, exemplars: undefined }),
+    "## ISSUES TO FIX",
+    input.issues.map((issue) => `- ${issue}`).join("\n"),
+    "## CURRENT MENU",
+    "```json",
+    JSON.stringify(input.menu),
+    "```",
+    "Return the corrected menu now.",
+  ].join("\n\n");
 }
 
 function parseDataUrl(dataUrl: string) {
@@ -238,6 +257,18 @@ function responsesProvider(id: "lovable" | "openai"): Provider {
       });
       return parseJudgeJson(text);
     },
+    async repair(input, signal) {
+      const text = await callResponsesApi({
+        ...base(),
+        instructions: REPAIR_SYSTEM_PROMPT,
+        text: buildRepairMessage(input),
+        image: input.request.referenceImage,
+        schemaName: "menu_design",
+        schema: MENU_JSON_SCHEMA,
+        signal,
+      });
+      return parseMenuJson(text);
+    },
   };
 }
 
@@ -298,6 +329,23 @@ const claudeProvider: Provider = {
     if (!generatedMenuSchema.safeParse(response.parsed_output.menu).success) throw new Error("Claude returned an empty judged menu.");
     return response.parsed_output;
   },
+  async repair(input, signal) {
+    const response = await anthropic().messages.parse(
+      {
+        model: MODELS.claude,
+        max_tokens: 16000,
+        system: [{ type: "text", text: REPAIR_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+        messages: [{ role: "user", content: claudeContent(buildRepairMessage(input), input.request.referenceImage) }],
+        output_config: { format: zodOutputFormat(menuWireSchema), effort: "low" },
+      },
+      { signal },
+    );
+    if (response.stop_reason === "refusal") throw new Error("Claude declined to repair this menu.");
+    if (!response.parsed_output) throw new Error("Claude returned an incomplete repair.");
+    const strict = generatedMenuSchema.safeParse(response.parsed_output);
+    if (!strict.success) throw new Error("Claude returned an empty repaired menu.");
+    return strict.data;
+  },
 };
 
 export const PROVIDERS: Provider[] = [responsesProvider("lovable"), responsesProvider("openai"), claudeProvider];
@@ -306,10 +354,13 @@ export function availableProviders() {
   return PROVIDERS.filter((provider) => provider.available());
 }
 
-/** Judge preference: Claude → ChatGPT → built-in, overridable with HALFTONE_JUDGE=lovable|openai|claude. */
-export function pickJudge(exclude: ProviderId[] = []) {
+/**
+ * Judge preference: HALFTONE_JUDGE env → learned ranking from memory (best average
+ * verified score, min 5 samples) → Claude → ChatGPT → built-in.
+ */
+export function pickJudge(exclude: ProviderId[] = [], learned: ProviderId[] = []) {
   const preferred = process.env["HALFTONE_JUDGE"] as ProviderId | undefined;
-  const order: ProviderId[] = preferred ? [preferred, "claude", "openai", "lovable"] : ["claude", "openai", "lovable"];
+  const order: ProviderId[] = [...(preferred ? [preferred] : []), ...learned, "claude", "openai", "lovable"];
   const live = availableProviders();
   for (const id of order) {
     const provider = live.find((candidate) => candidate.id === id);

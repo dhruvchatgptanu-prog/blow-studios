@@ -43,6 +43,12 @@ export function EnginePanel({ engine }: { engine: EngineReport | undefined }) {
           <p className="mt-1 text-[11px] leading-snug text-muted">{engine.judge.rationale}</p>
         </div>
       ) : null}
+      {engine.repair ? (
+        <p className="mt-2 font-mono text-[9px] font-bold uppercase text-muted">Repair pass · {LABELS[engine.repair.provider] ?? engine.repair.provider} · {engine.repair.applied ? `${engine.repair.before} → ${engine.repair.after}` : "no improvement, original kept"}</p>
+      ) : null}
+      <p className="mt-2 font-mono text-[9px] font-bold uppercase text-muted">
+        {engine.cuisine.length ? `Cuisine · ${engine.cuisine[0]}` : "Cuisine · general"} · Memory · {engine.memory.totalRecorded} designs learned{engine.memory.exemplars ? `, ${engine.memory.exemplars} shown as examples` : ""} · {(engine.totalMs / 1000).toFixed(0)}s total
+      </p>
       {engine.finalIssues.length > 0 ? (
         <div className="mt-3 border-t border-line pt-3">
           <p className="font-mono text-[9px] font-bold uppercase text-destructive">Still check</p>

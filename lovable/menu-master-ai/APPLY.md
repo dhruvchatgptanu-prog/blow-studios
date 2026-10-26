@@ -45,6 +45,8 @@ is that the text engines now write richer, more precise per-dish photo prompts
 | `src/lib/ai/ensemble.server.ts` | new — parallel run + judge |
 | `src/lib/menu.functions.ts` | **replace** (same `generateMenu` export, same input shape) |
 | `src/components/EnginePanel.tsx` | new |
+| `src/lib/ai/cuisine.ts` | new (round 2) — deterministic cuisine detection + photo-prompt enrichment |
+| `src/lib/ai/memory.server.ts` | new (round 2) — learning memory on the `halftone_generations` table |
 | `src/routes/index.tsx` | 4 small edits, see below |
 | `package.json` | add dependency `@anthropic-ai/sdk` (zod ^3.25 already satisfies its peer dep via `zod/v4`) |
 
@@ -64,6 +66,27 @@ is that the text engines now write richer, more precise per-dish photo prompts
 4. Directly after the `{menu.followed.length > 0 ? <section …Instructions followed… /section> : null}` block in the aside, add
    `<EnginePanel engine={menu.engine} />`.
 
+## Round 2 (learning + repair)
+
+* **Learning memory** — every generation is recorded in the Supabase table
+  `halftone_generations` (already created, RLS on, server-only). Past menus that
+  scored 100/100 for the same mode and cuisine are shown to the engines as
+  approved examples; the judge model with the best verified track record is
+  promoted automatically once it has 5+ samples.
+* **Repair pass** — when the verifier still lists issues after the judge, one
+  targeted proofreading call fixes only those issues; kept only if the score rises.
+* **Cuisine detection** — weighted keyword detection over 17 cuisines focuses the
+  plating cues the engines apply and selects photo defaults.
+* **Photo-prompt enrichment** — deterministic post-processing guarantees every
+  prompt has surface, angle, light, focus, realism cues (deliberate imperfection,
+  no fake steam, no non-food props) and the right composition line. The image
+  model and PHOTO_DIRECTION are still untouched.
+* **Knowledge updates from research** — signage legibility rules of thumb
+  (letter height per viewing distance, sans-serif, no script for prices), serial
+  position, descriptive labels, strict currency-format fidelity, 5-7 items per section.
+* **Eval harness** — `eval/eval.mjs` runs six briefs through detection,
+  extraction, enrichment and the verifier. All pass.
+
 ## Secrets (Lovable Cloud → Secrets)
 
 | Name | Required | Default |
@@ -75,7 +98,8 @@ is that the text engines now write richer, more precise per-dish photo prompts
 | `ANTHROPIC_MODEL` | optional | `claude-opus-5-5` |
 | `LOVABLE_TEXT_MODEL` | optional | `openai/gpt-6-astra` |
 | `HALFTONE_JUDGE` | optional | `claude` (then `openai`, then `lovable`) |
-| `HALFTONE_GENERATE_TIMEOUT_MS` / `HALFTONE_JUDGE_TIMEOUT_MS` | optional | `110000` / `90000` |
+| `HALFTONE_GENERATE_TIMEOUT_MS` / `HALFTONE_JUDGE_TIMEOUT_MS` / `HALFTONE_REPAIR_TIMEOUT_MS` | optional | `110000` / `90000` / `60000` |
+| `HALFTONE_MEMORY` | optional | set to `off` to disable the learning memory |
 
 With only `LOVABLE_API_KEY` set the app behaves exactly like before plus the
 verifier and the Engines panel. Each extra key adds an engine automatically.
