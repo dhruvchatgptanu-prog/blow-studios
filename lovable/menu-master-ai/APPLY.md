@@ -84,6 +84,9 @@ is that the text engines now write richer, more precise per-dish photo prompts
 * **Knowledge updates from research** — signage legibility rules of thumb
   (letter height per viewing distance, sans-serif, no script for prices), serial
   position, descriptive labels, strict currency-format fidelity, 5-7 items per section.
+* **Model fallback chains (round 3)** — every engine tries its configured model, then a
+  list of fallbacks, when the API says the model id is unknown, retired or not permitted.
+  Other errors are never retried. The Engines panel shows the model that actually answered.
 * **Eval harness** — `eval/eval.mjs` runs six briefs through detection,
   extraction, enrichment and the verifier. All pass.
 
@@ -100,6 +103,7 @@ is that the text engines now write richer, more precise per-dish photo prompts
 | `HALFTONE_JUDGE` | optional | `claude` (then `openai`, then `lovable`) |
 | `HALFTONE_GENERATE_TIMEOUT_MS` / `HALFTONE_JUDGE_TIMEOUT_MS` / `HALFTONE_REPAIR_TIMEOUT_MS` | optional | `110000` / `90000` / `60000` |
 | `HALFTONE_MEMORY` | optional | set to `off` to disable the learning memory |
+| `OPENAI_FALLBACK_MODELS` / `ANTHROPIC_FALLBACK_MODELS` / `LOVABLE_FALLBACK_MODELS` | optional | comma-separated model ids tried in order when the primary model id is retired or unknown (defaults: `gpt-6.1-sol,gpt-6-sol,gpt-5.6-sol,gpt-5.5` / `claude-sonnet-5-5,claude-opus-5` / `openai/gpt-6.1-sol,openai/gpt-6-sol,openai/gpt-5.6-sol`) |
 
 With only `LOVABLE_API_KEY` set the app behaves exactly like before plus the
 verifier and the Engines panel. Each extra key adds an engine automatically.

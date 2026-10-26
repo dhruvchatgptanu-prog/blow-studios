@@ -39,11 +39,11 @@ function timed<T>(ms: number, run: (signal: AbortSignal) => Promise<T>): Promise
 async function runProvider(provider: Provider, request: MenuRequest): Promise<Attempt> {
   const result = await timed(GENERATE_TIMEOUT_MS, (signal) => provider.generate(request, signal));
   if (result.value) {
-    const verification = verifyMenu(result.value, request);
+    const verification = verifyMenu(result.value.value, request);
     return {
       provider,
-      menu: result.value,
-      candidate: { provider: provider.id, model: provider.model, status: "ok", score: verification.score, issues: verification.issues, ms: result.ms },
+      menu: result.value.value,
+      candidate: { provider: provider.id, model: result.value.model, status: "ok", score: verification.score, issues: verification.issues, ms: result.ms },
     };
   }
   return { provider, candidate: { provider: provider.id, model: provider.model, status: "failed", score: 0, issues: [], error: result.error ?? "Engine failed.", ms: result.ms } };
@@ -93,19 +93,20 @@ export async function composeMenu(input: MenuRequest): Promise<GeneratedMenu> {
       ),
     );
     if (result.value) {
-      const verification = verifyMenu(result.value.menu, request);
+      const judged = result.value.value;
+      const verification = verifyMenu(judged.menu, request);
       const keep = verification.score >= score || (score < PERFECT && verification.score >= score - 5);
       report.judge = {
         provider: judge.id,
-        model: judge.model,
-        winner: result.value.winner,
-        rationale: keep ? result.value.rationale : `${result.value.rationale} (Merge scored ${verification.score}, below the best candidate at ${score}, so the best candidate was kept.)`,
-        mergedFrom: result.value.mergedFrom,
+        model: result.value.model,
+        winner: judged.winner,
+        rationale: keep ? judged.rationale : `${judged.rationale} (Merge scored ${verification.score}, below the best candidate at ${score}, so the best candidate was kept.)`,
+        mergedFrom: judged.mergedFrom,
         ms: result.ms,
       };
       if (keep) {
         report.strategy = "judged-merge";
-        menu = result.value.menu;
+        menu = judged.menu;
         score = verification.score;
         issues = verification.issues;
       }
@@ -119,11 +120,11 @@ export async function composeMenu(input: MenuRequest): Promise<GeneratedMenu> {
   if (issues.length > 0 && score < PERFECT && repairer) {
     const result = await timed(REPAIR_TIMEOUT_MS, (signal) => repairer.repair({ request, menu, issues }, signal));
     if (result.value) {
-      const verification = verifyMenu(result.value, request);
+      const verification = verifyMenu(result.value.value, request);
       const applied = verification.score > score;
-      report.repair = { provider: repairer.id, model: repairer.model, before: score, after: verification.score, applied, ms: result.ms };
+      report.repair = { provider: repairer.id, model: result.value.model, before: score, after: verification.score, applied, ms: result.ms };
       if (applied) {
-        menu = result.value;
+        menu = result.value.value;
         score = verification.score;
         issues = verification.issues;
       }

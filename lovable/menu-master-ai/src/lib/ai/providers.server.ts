@@ -35,14 +35,17 @@ export type JudgeOutput = z.infer<typeof judgeWireSchema>;
 
 export type RepairInput = { request: MenuRequest; menu: GeneratedMenuCore; issues: string[] };
 
+/** Every call reports the model that actually answered, because a fallback model may have stepped in. */
+export type Served<T> = { value: T; model: string };
+
 export type Provider = {
   id: ProviderId;
   label: string;
   model: string;
   available: () => boolean;
-  generate: (request: MenuRequest, signal: AbortSignal) => Promise<GeneratedMenuCore>;
-  judge: (input: JudgeInput, signal: AbortSignal) => Promise<JudgeOutput>;
-  repair: (input: RepairInput, signal: AbortSignal) => Promise<GeneratedMenuCore>;
+  generate: (request: MenuRequest, signal: AbortSignal) => Promise<Served<GeneratedMenuCore>>;
+  judge: (input: JudgeInput, signal: AbortSignal) => Promise<Served<JudgeOutput>>;
+  repair: (input: RepairInput, signal: AbortSignal) => Promise<Served<GeneratedMenuCore>>;
 };
 
 const LOVABLE_GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
@@ -53,6 +56,48 @@ const MODELS = {
   openai: process.env["OPENAI_MODEL"] ?? "gpt-6-astra",
   claude: process.env["ANTHROPIC_MODEL"] ?? "claude-opus-5-5",
 } as const;
+
+function list(env: string | undefined, fallback: string[]) {
+  const values = (env ?? "").split(",").map((value) => value.trim()).filter(Boolean);
+  return values.length ? values : fallback;
+}
+
+/**
+ * Model fallback chains. When the primary model is retired or renamed (OpenAI
+ * publishes shutdown dates per model id), the next id is tried automatically.
+ * Override with comma-separated env vars; the primary MODELS entry always goes first.
+ */
+const FALLBACK_MODELS: Record<ProviderId, string[]> = {
+  lovable: list(process.env["LOVABLE_FALLBACK_MODELS"], ["openai/gpt-6.1-sol", "openai/gpt-6-sol", "openai/gpt-5.6-sol"]),
+  openai: list(process.env["OPENAI_FALLBACK_MODELS"], ["gpt-6.1-sol", "gpt-6-sol", "gpt-5.6-sol", "gpt-5.5"]),
+  claude: list(process.env["ANTHROPIC_FALLBACK_MODELS"], ["claude-sonnet-5-5", "claude-opus-5"]),
+};
+
+export function modelChain(id: ProviderId) {
+  return Array.from(new Set([MODELS[id], ...FALLBACK_MODELS[id]]));
+}
+
+/** True when an error is about the model id itself (unknown, retired, not permitted), not about the request. */
+export function isModelError(message: string) {
+  const lower = message.toLowerCase();
+  if (/abort|timed out|timeout/.test(lower)) return false;
+  return /model/.test(lower) && /not[ _](found|exist|available|supported)|does not exist|unknown|invalid|deprecat|retired|decommission|shut ?down|no longer|permission|access|\b404\b/.test(lower);
+}
+
+/** Runs `attempt` for each model in the chain until one succeeds or a non-model error occurs. */
+async function withModelFallback<T>(models: string[], attempt: (model: string) => Promise<T>): Promise<Served<T>> {
+  let lastError: unknown;
+  for (const [index, model] of models.entries()) {
+    try {
+      return { value: await attempt(model), model };
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      if (index === models.length - 1 || !isModelError(message)) throw error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("No model available.");
+}
 
 // ---------- shared prompt assembly ----------
 
@@ -224,50 +269,29 @@ async function callResponsesApi(call: ResponsesCall): Promise<string> {
 function responsesProvider(id: "lovable" | "openai"): Provider {
   const isLovable = id === "lovable";
   const key = () => process.env[isLovable ? "LOVABLE_API_KEY" : "OPENAI_API_KEY"];
-  const base = () => {
+  const base = (model: string) => {
     const headers: Record<string, string> = isLovable ? { "Lovable-API-Key": key() ?? "" } : { Authorization: `Bearer ${key() ?? ""}` };
-    return { url: isLovable ? LOVABLE_GATEWAY : OPENAI_RESPONSES, headers, model: MODELS[id], stream: isLovable };
+    return { url: isLovable ? LOVABLE_GATEWAY : OPENAI_RESPONSES, headers, model, stream: isLovable };
   };
   return {
     id,
     label: isLovable ? "Halftone (built-in)" : "ChatGPT",
     model: MODELS[id],
     available: () => Boolean(key()),
-    async generate(request, signal) {
-      const text = await callResponsesApi({
-        ...base(),
-        instructions: SYSTEM_PROMPT,
-        text: buildUserMessage(request),
-        image: request.referenceImage,
-        schemaName: "menu_design",
-        schema: MENU_JSON_SCHEMA,
-        signal,
-      });
-      return parseMenuJson(text);
+    generate(request, signal) {
+      return withModelFallback(modelChain(id), async (model) =>
+        parseMenuJson(await callResponsesApi({ ...base(model), instructions: SYSTEM_PROMPT, text: buildUserMessage(request), image: request.referenceImage, schemaName: "menu_design", schema: MENU_JSON_SCHEMA, signal })),
+      );
     },
-    async judge(input, signal) {
-      const text = await callResponsesApi({
-        ...base(),
-        instructions: JUDGE_SYSTEM_PROMPT,
-        text: buildJudgeMessage(input),
-        image: input.request.referenceImage,
-        schemaName: "menu_judgement",
-        schema: JUDGE_JSON_SCHEMA,
-        signal,
-      });
-      return parseJudgeJson(text);
+    judge(input, signal) {
+      return withModelFallback(modelChain(id), async (model) =>
+        parseJudgeJson(await callResponsesApi({ ...base(model), instructions: JUDGE_SYSTEM_PROMPT, text: buildJudgeMessage(input), image: input.request.referenceImage, schemaName: "menu_judgement", schema: JUDGE_JSON_SCHEMA, signal })),
+      );
     },
-    async repair(input, signal) {
-      const text = await callResponsesApi({
-        ...base(),
-        instructions: REPAIR_SYSTEM_PROMPT,
-        text: buildRepairMessage(input),
-        image: input.request.referenceImage,
-        schemaName: "menu_design",
-        schema: MENU_JSON_SCHEMA,
-        signal,
-      });
-      return parseMenuJson(text);
+    repair(input, signal) {
+      return withModelFallback(modelChain(id), async (model) =>
+        parseMenuJson(await callResponsesApi({ ...base(model), instructions: REPAIR_SYSTEM_PROMPT, text: buildRepairMessage(input), image: input.request.referenceImage, schemaName: "menu_design", schema: MENU_JSON_SCHEMA, signal })),
+      );
     },
   };
 }
@@ -295,56 +319,62 @@ const claudeProvider: Provider = {
   label: "Claude",
   model: MODELS.claude,
   available: () => Boolean(process.env["ANTHROPIC_API_KEY"]),
-  async generate(request, signal) {
-    const response = await anthropic().messages.parse(
-      {
-        model: MODELS.claude,
-        max_tokens: 16000,
-        system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-        messages: [{ role: "user", content: claudeContent(buildUserMessage(request), request.referenceImage) }],
-        output_config: { format: zodOutputFormat(menuWireSchema), effort: "medium" },
-      },
-      { signal },
-    );
-    if (response.stop_reason === "refusal") throw new Error("Claude declined this brief.");
-    if (response.stop_reason === "max_tokens") throw new Error("Claude ran out of room; shorten the brief.");
-    if (!response.parsed_output) throw new Error("Claude returned an incomplete menu.");
-    const strict = generatedMenuSchema.safeParse(response.parsed_output);
-    if (!strict.success) throw new Error("Claude returned an empty menu.");
-    return strict.data;
+  generate(request, signal) {
+    return withModelFallback(modelChain("claude"), async (model) => {
+      const response = await anthropic().messages.parse(
+        {
+          model,
+          max_tokens: 16000,
+          system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+          messages: [{ role: "user", content: claudeContent(buildUserMessage(request), request.referenceImage) }],
+          output_config: { format: zodOutputFormat(menuWireSchema), effort: "medium" },
+        },
+        { signal },
+      );
+      if (response.stop_reason === "refusal") throw new Error("Claude declined this brief.");
+      if (response.stop_reason === "max_tokens") throw new Error("Claude ran out of room; shorten the brief.");
+      if (!response.parsed_output) throw new Error("Claude returned an incomplete menu.");
+      const strict = generatedMenuSchema.safeParse(response.parsed_output);
+      if (!strict.success) throw new Error("Claude returned an empty menu.");
+      return strict.data;
+    });
   },
-  async judge(input, signal) {
-    const response = await anthropic().messages.parse(
-      {
-        model: MODELS.claude,
-        max_tokens: 16000,
-        system: [{ type: "text", text: JUDGE_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-        messages: [{ role: "user", content: claudeContent(buildJudgeMessage(input), input.request.referenceImage) }],
-        output_config: { format: zodOutputFormat(judgeWireSchema), effort: "high" },
-      },
-      { signal },
-    );
-    if (response.stop_reason === "refusal") throw new Error("Claude declined to judge this brief.");
-    if (!response.parsed_output) throw new Error("Claude returned an incomplete judgement.");
-    if (!generatedMenuSchema.safeParse(response.parsed_output.menu).success) throw new Error("Claude returned an empty judged menu.");
-    return response.parsed_output;
+  judge(input, signal) {
+    return withModelFallback(modelChain("claude"), async (model) => {
+      const response = await anthropic().messages.parse(
+        {
+          model,
+          max_tokens: 16000,
+          system: [{ type: "text", text: JUDGE_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+          messages: [{ role: "user", content: claudeContent(buildJudgeMessage(input), input.request.referenceImage) }],
+          output_config: { format: zodOutputFormat(judgeWireSchema), effort: "high" },
+        },
+        { signal },
+      );
+      if (response.stop_reason === "refusal") throw new Error("Claude declined to judge this brief.");
+      if (!response.parsed_output) throw new Error("Claude returned an incomplete judgement.");
+      if (!generatedMenuSchema.safeParse(response.parsed_output.menu).success) throw new Error("Claude returned an empty judged menu.");
+      return response.parsed_output;
+    });
   },
-  async repair(input, signal) {
-    const response = await anthropic().messages.parse(
-      {
-        model: MODELS.claude,
-        max_tokens: 16000,
-        system: [{ type: "text", text: REPAIR_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-        messages: [{ role: "user", content: claudeContent(buildRepairMessage(input), input.request.referenceImage) }],
-        output_config: { format: zodOutputFormat(menuWireSchema), effort: "low" },
-      },
-      { signal },
-    );
-    if (response.stop_reason === "refusal") throw new Error("Claude declined to repair this menu.");
-    if (!response.parsed_output) throw new Error("Claude returned an incomplete repair.");
-    const strict = generatedMenuSchema.safeParse(response.parsed_output);
-    if (!strict.success) throw new Error("Claude returned an empty repaired menu.");
-    return strict.data;
+  repair(input, signal) {
+    return withModelFallback(modelChain("claude"), async (model) => {
+      const response = await anthropic().messages.parse(
+        {
+          model,
+          max_tokens: 16000,
+          system: [{ type: "text", text: REPAIR_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+          messages: [{ role: "user", content: claudeContent(buildRepairMessage(input), input.request.referenceImage) }],
+          output_config: { format: zodOutputFormat(menuWireSchema), effort: "low" },
+        },
+        { signal },
+      );
+      if (response.stop_reason === "refusal") throw new Error("Claude declined to repair this menu.");
+      if (!response.parsed_output) throw new Error("Claude returned an incomplete repair.");
+      const strict = generatedMenuSchema.safeParse(response.parsed_output);
+      if (!strict.success) throw new Error("Claude returned an empty repaired menu.");
+      return strict.data;
+    });
   },
 };
 
