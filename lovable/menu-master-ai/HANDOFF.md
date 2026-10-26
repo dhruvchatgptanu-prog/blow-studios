@@ -9,6 +9,23 @@ produced by exactly the same model, size, quality and photo direction as
 before, so the realistic look is unchanged; the only photo change is that the
 per-dish photo prompts are now written to a stricter, more detailed recipe.
 
+## Round 2 (added later the same day)
+Halftone now learns from every design it makes. Each generation is recorded in
+the project database with its scores; past designs that scored 100/100 for the
+same kind of menu and cuisine are shown to the engines as approved examples,
+and the judge model with the best track record is promoted automatically. When
+the verifier still finds a problem after the judge, one extra proofreading pass
+fixes exactly that problem. Cuisine is detected from the brief (17 cuisines) so
+the photo prompts get the right plating, surface and lighting defaults, and
+every photo prompt is completed deterministically with realism cues. The photo
+model and photo direction are still untouched.
+
+A daily scheduled task ("Halftone daily research and improvement") now runs in
+this Claude session: it reads the generation data, researches, improves the
+code on GitHub, and sends Lovable at most one apply message per day and only
+when the change is substantive. To stop it, tell Claude "stop the daily
+Halftone task" or disable it in your scheduled tasks list.
+
 ## What you need to do (5 minutes)
 1. Open the Lovable editor for Menu Master AI and add two Cloud secrets:
    `OPENAI_API_KEY` (from platform.openai.com) and `ANTHROPIC_API_KEY`
