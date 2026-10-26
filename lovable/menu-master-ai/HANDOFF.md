@@ -34,6 +34,18 @@ coach under the textarea tells you instantly what the brief is missing (venue,
 prices, offer names, counts, sections) before any AI runs. The whole
 orchestration is now covered by a mocked end-to-end test.
 
+## Round 5 (store setup wizard)
+A new page at `/setup` does what you asked for: describe the store and add photos,
+Halftone analyses the venue (type, cuisine, price point, brand colours, light, where
+menus are displayed) and recommends four templates with reasons. Pick one, paste the
+current menu, photograph the display, and Halftone estimates its real size from
+objects in the photo (or you type one dimension), works out how big the letters must
+be from where customers stand, and fits the menu to that board: right orientation,
+right number of items, shorter copy where needed, and a list of anything left out.
+The studio then designs with that template, size and venue profile, and prints at the
+real dimensions. Not yet applied to Lovable (no credits); ready-to-paste bundles are in
+`lovable/menu-master-ai/apply/`.
+
 ## What you need to do (5 minutes)
 1. Open the Lovable editor for Menu Master AI and add two Cloud secrets:
    `OPENAI_API_KEY` (from platform.openai.com) and `ANTHROPIC_API_KEY`

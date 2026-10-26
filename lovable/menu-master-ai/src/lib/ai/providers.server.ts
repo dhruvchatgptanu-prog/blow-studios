@@ -3,7 +3,9 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { z } from "zod/v4";
 
 import { cuisineCues } from "./cuisine";
+import { displayBriefLines } from "./display";
 import { describeFormat, JUDGE_SYSTEM_PROMPT, REPAIR_SYSTEM_PROMPT, SYSTEM_PROMPT } from "./knowledge";
+import { describeTemplate, templateById } from "./templates";
 import {
   generatedMenuSchema,
   JUDGE_JSON_SCHEMA,
@@ -107,7 +109,9 @@ export function buildUserMessage(request: MenuRequest) {
     `MODE: ${request.mode.toUpperCase()}`,
     `TYPE STYLE: ${request.style}`,
     `PAGE COUNT: ${request.pages}`,
-    `FORMAT: ${request.size} — ${describeFormat(request.size)}`,
+    request.display ? displayBriefLines(request.display).join("\n") : `FORMAT: ${request.size} — ${describeFormat(request.size)}`,
+    request.store ? `VENUE PROFILE: ${request.store.venueName || "unnamed venue"} — ${request.store.storeType.replace("-", " ")}, ${request.store.priceTier} price point${request.store.cuisine ? `, ${request.store.cuisine}` : ""}${request.store.audience ? `, audience: ${request.store.audience}` : ""}. Copy voice: ${request.store.voice}` : "",
+    request.template && templateById(request.template) ? describeTemplate(templateById(request.template)!) : "",
     request.cuisine?.length ? `DETECTED CUISINE: ${request.cuisine.join(" + ")}. Apply these plating cues to every photo brief:\n${cuisineCues(request.cuisine).map((line) => `- ${line}`).join("\n")}` : "",
     request.referenceImage ? "A photo or screenshot of the existing menu is attached. Transcribe it faithfully, then redesign; the written brief wins on any conflict." : "",
     request.previous ? `PREVIOUS MENU (revise it, keep everything the new brief does not change):\n${request.previous}` : "",
@@ -221,9 +225,14 @@ async function callResponsesApi(call: ResponsesCall): Promise<string> {
       text: { format: { type: "json_schema", name: call.schemaName, strict: true, schema: call.schema } },
     }),
   });
+  return readResponsesText(response, call.stream);
+}
+
+/** Reads a Responses API reply (JSON body or SSE stream) down to the output text, throwing on API errors. */
+async function readResponsesText(response: Response, stream: boolean): Promise<string> {
   if (!response.ok) throw new Error(await responsesError(response, `Engine request failed (${response.status}).`));
 
-  if (!call.stream) {
+  if (!stream) {
     const json = (await response.json()) as {
       status?: string;
       output?: { type: string; content?: { type: string; text?: string; refusal?: string }[] }[];
@@ -379,6 +388,88 @@ const claudeProvider: Provider = {
 };
 
 export const PROVIDERS: Provider[] = [responsesProvider("lovable"), responsesProvider("openai"), claudeProvider];
+
+export type StructuredCall = {
+  system: string;
+  text: string;
+  /** data:image/...;base64,... URLs; all engines here accept images. */
+  images?: string[] | undefined;
+  schemaName: string;
+  jsonSchema: unknown;
+  signal: AbortSignal;
+  /** Provider order; defaults to openai → lovable → claude (vision quality first, built-in second). */
+  order?: ProviderId[] | undefined;
+};
+
+function responsesInput(text: string, images: string[] | undefined) {
+  if (!images?.length) return text;
+  return [{ role: "user", content: [{ type: "input_text", text }, ...images.map((image) => ({ type: "input_image", image_url: image }))] }];
+}
+
+/**
+ * One structured-output call against any schema (used for store analysis and
+ * display measurement). Tries providers in order, each with its model chain;
+ * returns the raw JSON text and which provider/model answered.
+ */
+export async function structuredJson(call: StructuredCall): Promise<{ text: string; provider: ProviderId; model: string }> {
+  const order = call.order ?? ["openai", "lovable", "claude"];
+  const live = availableProviders();
+  const errors: string[] = [];
+  for (const id of order) {
+    const provider = live.find((candidate) => candidate.id === id);
+    if (!provider) continue;
+    try {
+      if (id === "claude") {
+        const served = await withModelFallback(modelChain("claude"), async (model) => {
+          const content: Anthropic.ContentBlockParam[] = [];
+          for (const image of call.images ?? []) {
+            const { mediaType, data } = parseDataUrl(image);
+            content.push({ type: "image", source: { type: "base64", media_type: mediaType, data } });
+          }
+          content.push({ type: "text", text: call.text });
+          const response = await anthropic().messages.create(
+            {
+              model,
+              max_tokens: 8000,
+              system: call.system,
+              messages: [{ role: "user", content }],
+              output_config: { format: { type: "json_schema", schema: call.jsonSchema as Record<string, unknown> }, effort: "low" },
+            },
+            { signal: call.signal },
+          );
+          if (response.stop_reason === "refusal") throw new Error("Claude declined this analysis.");
+          const text = response.content.map((block) => (block.type === "text" ? block.text : "")).join("");
+          if (!text) throw new Error("Claude returned an empty analysis.");
+          return text;
+        });
+        return { text: served.value, provider: id, model: served.model };
+      }
+      const isLovable = id === "lovable";
+      const key = process.env[isLovable ? "LOVABLE_API_KEY" : "OPENAI_API_KEY"] ?? "";
+      const headers: Record<string, string> = isLovable ? { "Lovable-API-Key": key } : { Authorization: `Bearer ${key}` };
+      const served = await withModelFallback(modelChain(id), async (model) => {
+        const response = await fetch(isLovable ? LOVABLE_GATEWAY : OPENAI_RESPONSES, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...headers },
+          signal: call.signal,
+          body: JSON.stringify({
+            model,
+            instructions: call.system,
+            input: responsesInput(call.text, call.images),
+            stream: isLovable,
+            reasoning: { effort: "low", summary: "auto" },
+            text: { format: { type: "json_schema", name: call.schemaName, strict: true, schema: call.jsonSchema } },
+          }),
+        });
+        return readResponsesText(response, isLovable);
+      });
+      return { text: served.value, provider: id, model: served.model };
+    } catch (error) {
+      errors.push(`${provider.label}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  throw new Error(errors.length ? `Analysis failed. ${errors.join(" · ")}` : "AI is not configured yet.");
+}
 
 export function availableProviders() {
   return PROVIDERS.filter((provider) => provider.available());

@@ -49,6 +49,17 @@ is that the text engines now write richer, more precise per-dish photo prompts
 | `src/lib/ai/memory.server.ts` | new (round 2) — learning memory on the `halftone_generations` table |
 | `src/lib/ai/coach.ts` | new (round 4) — rule-based brief coach |
 | `src/components/BriefCoach.tsx` | new (round 4) — hints under the brief textarea |
+| `src/lib/ai/store.ts` | new (round 5) — store profile schema, store-type design guide, text baseline |
+| `src/lib/ai/templates.ts` | new (round 5) — 16-template library with scoring and sheet themes |
+| `src/lib/ai/display.ts` | new (round 5) — display measurement schema, geometry, legibility budget, menu fitting |
+| `src/lib/ai/store.server.ts` | new (round 5) — vision analysis of store photos and display photos |
+| `src/lib/store.functions.ts` | new (round 5) — `analyzeStore` and `measureDisplay` server functions |
+| `src/lib/setup.ts` | new (round 5) — wizard → studio hand-off |
+| `src/components/StoreWizard.tsx`, `src/routes/setup.tsx` | new (round 5) — the three-step wizard page at `/setup` |
+| `src/components/MenuSheet.tsx` | **replace** (round 5) — template themes and custom display sizes; layouts otherwise unchanged |
+| `src/routes/index.tsx` | **replace** (round 5) — picks up the wizard result, sends template/display/store context |
+| `src/routeTree.gen.ts` | **replace** (round 5) — adds `/setup`; the router plugin regenerates it anyway |
+| `src/lib/ai/schema.ts`, `verify.ts`, `memory.server.ts`, `providers.server.ts`, `ensemble.server.ts`, `menu.functions.ts` | **replace** (round 5) |
 | `src/routes/index.tsx` | 4 small edits, see below |
 | `package.json` | add dependency `@anthropic-ai/sdk` (zod ^3.25 already satisfies its peer dep via `zod/v4`) |
 
@@ -101,6 +112,32 @@ is that the text engines now write richer, more precise per-dish photo prompts
   orchestration against a mocked gateway (judge merge, repair, model fallback, total
   failure, malformed JSON); `eval/fallback.test.mjs` and `eval/coach.test.mjs` cover
   model-error detection and the brief coach. All pass.
+
+## Round 5 (store → template → display)
+
+* **Store analysis** — `/setup` step 1: description plus up to four photos → a structured
+  StoreProfile (type, cuisine, price tier, order flow, brand colours, lighting, display
+  surfaces, signature items) from a vision engine, merged with a deterministic text baseline
+  so it works with no key at all.
+* **Templates** — 16 templates (Street Deals, Charcoal Grill, Pizzeria Classic, Kraft Café,
+  Botanical Brunch, Chalkboard Pub, Noir Fine, Sushi Slate, Spice Market, Taquería Pop,
+  Smash House, Harbour Fish, Patisserie Blush, Screen Grid, Truck Bold, Mono Modern), each
+  with a renderer style, colour theme, typography, layout grammar and photo treatment, scored
+  against the profile with plain-language reasons.
+* **Display measurement** — step 3: a photo of the board/screen/window → display type,
+  corners, physical size estimated from reference objects (doors, A4 sheets, bricks, TVs,
+  counters…), viewing distance and lighting. Deterministic geometry corrects perspective,
+  maps to the nearest known format or a custom size, and derives a legibility budget
+  (minimum letter height from viewing distance → max items/offers/sections, name and
+  description word limits, photo count). The owner can type one or both dimensions instead.
+* **Fitting** — the engines receive the display budget, template and venue profile in the
+  prompt; the verifier scores against the budget; `fitMenuToDisplay` enforces it after the
+  judge and lists what was omitted. The sheet renders custom sizes with the right layout family
+  and prints at the real size. Templates re-colour the sheet through CSS variables; the photo
+  pipeline is untouched.
+* **Database** — `halftone_stores` and `halftone_displays` tables (created, RLS on); generations
+  link to them via `store_id`, `display_id`, `template_id`.
+* **Tests** — `eval/store-display.test.mjs` (profiles, templates, geometry, budgets, fitting).
 
 ## Secrets (Lovable Cloud → Secrets)
 

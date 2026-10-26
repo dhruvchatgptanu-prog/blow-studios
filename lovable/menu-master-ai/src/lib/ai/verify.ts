@@ -149,6 +149,15 @@ export function verifyMenu(menu: GeneratedMenuCore, request: MenuRequest): Verif
   for (const item of items) {
     if (/[!]{1,}/.test(item.description)) { structure -= 1; issues.push(`Remove exclamation marks from "${item.name}".`); break; }
   }
+  if (request.display) {
+    const budget = request.display.budget;
+    const limit = request.mode === "poster" ? budget.maxOffers : budget.maxItems;
+    if (items.length > limit) { structure -= 3; issues.push(`The display fits ${limit} ${request.mode === "poster" ? "offers" : "items"} legibly; ${items.length} were produced. Keep the most important ones.`); }
+    const longNames = items.filter((item) => item.name.trim().split(/\s+/).length > budget.maxNameWords + 1);
+    if (longNames.length) { structure -= 1; issues.push(`Names longer than ${budget.maxNameWords} words will not read from ${request.display.viewingDistanceM} m: ${longNames.slice(0, 3).map((item) => item.name).join(", ")}.`); }
+    const longDescriptions = items.filter((item) => item.description.trim().split(/\s+/).filter(Boolean).length > budget.maxDescriptionWords + 2);
+    if (longDescriptions.length) { structure -= 1; issues.push(`Descriptions longer than ${budget.maxDescriptionWords} words exceed the display budget on ${longDescriptions.length} item(s).`); }
+  }
   checks.structure = Math.max(0, structure);
 
   const score = Math.max(0, Math.min(100, Object.values(checks).reduce<number>((sum, value) => sum + (value ?? 0), 0)));

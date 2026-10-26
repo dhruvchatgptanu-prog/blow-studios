@@ -38,6 +38,9 @@ type Row = {
   candidates: unknown;
   menu: GeneratedMenuCore;
   duration_ms: number | null;
+  store_id?: string | null;
+  display_id?: string | null;
+  template_id?: string | null;
 };
 
 async function db(): Promise<SupabaseClient | undefined> {
@@ -146,6 +149,9 @@ export async function recordGeneration(request: MenuRequest, cuisines: string[],
     candidates: engine.candidates,
     menu,
     duration_ms: durationMs,
+    store_id: request.storeId ?? null,
+    display_id: request.displayId ?? null,
+    template_id: request.template ?? null,
   };
   await withTimeout(client.from("halftone_generations").insert(row));
 }

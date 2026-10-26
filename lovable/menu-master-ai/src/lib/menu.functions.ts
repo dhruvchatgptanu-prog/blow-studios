@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { composeMenu } from "@/lib/ai/ensemble.server";
-import type { GeneratedMenu } from "@/lib/ai/schema";
+import type { GeneratedMenu, MenuRequest } from "@/lib/ai/schema";
 
 export type { EngineCandidate, EngineReport, GeneratedMenu, MenuItem, MenuSection, PhotoBrief } from "@/lib/ai/schema";
 export { stripEngine } from "@/lib/ai/schema";
@@ -25,6 +25,28 @@ const inputSchema = z.object({
   size: z.enum(["letter", "a5", "poster", "wide", "fascia-447", "fascia-180", "square"]),
   previous: z.string().max(60_000).optional(),
   referenceImage: referenceImageSchema.optional(),
+  template: z.string().max(60).optional(),
+  display: z
+    .object({
+      displayType: z.string(),
+      widthCm: z.number().positive(),
+      heightCm: z.number().positive(),
+      aspect: z.number().positive(),
+      orientation: z.enum(["ultra-wide", "landscape", "square", "portrait", "tall"]),
+      format: z.string(),
+      formatLabel: z.string(),
+      viewingDistanceM: z.number().positive(),
+      lighting: z.enum(["bright", "neutral", "dim", "outdoor", "backlit"]),
+      isDigital: z.boolean(),
+      sizeConfidence: z.number(),
+      budget: z.object({ minLetterHeightCm: z.number(), maxOffers: z.number(), maxItems: z.number(), maxSections: z.number(), maxNameWords: z.number(), maxDescriptionWords: z.number(), photosRecommended: z.number() }),
+      sizeSource: z.enum(["user", "model", "aspect-only"]),
+      notes: z.array(z.string()),
+    })
+    .optional(),
+  store: z.object({ storeType: z.string(), priceTier: z.string(), cuisine: z.string(), venueName: z.string(), audience: z.string(), voice: z.string() }).optional(),
+  storeId: z.string().uuid().optional(),
+  displayId: z.string().uuid().optional(),
 });
 
 /**
@@ -35,4 +57,4 @@ const inputSchema = z.object({
  */
 export const generateMenu = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => inputSchema.parse(data))
-  .handler(async ({ data }): Promise<GeneratedMenu> => composeMenu(data));
+  .handler(async ({ data }): Promise<GeneratedMenu> => composeMenu(data as MenuRequest));

@@ -1,4 +1,5 @@
 import { detectCuisine, enrichMenuPhotos } from "./cuisine";
+import { fitMenuToDisplay } from "./display";
 import { loadMemory, recordGeneration } from "./memory.server";
 import { availableProviders, pickJudge, type Provider } from "./providers.server";
 import type { EngineCandidate, EngineReport, GeneratedMenu, GeneratedMenuCore, MenuRequest } from "./schema";
@@ -136,7 +137,13 @@ export async function composeMenu(input: MenuRequest): Promise<GeneratedMenu> {
     }
   }
 
-  // 5. Final verification (every path above is already enriched; enrichment is idempotent).
+  // 5. Fit to the measured display (deterministic), then final verification.
+  if (request.display) {
+    const fit = fitMenuToDisplay(menu, request.display);
+    menu = fit.menu;
+    report.fit = { format: request.display.formatLabel, omitted: fit.omitted, trimmedDescriptions: fit.trimmedDescriptions };
+  }
+  if (request.template) report.template = request.template;
   menu = enrichMenuPhotos(menu, cuisine);
   const finalVerification = verifyMenu(menu, request);
   report.finalScore = finalVerification.score;

@@ -1,5 +1,7 @@
 import { z } from "zod/v4";
 
+import type { DisplaySpec } from "./display";
+
 /**
  * Shared menu contract used by every engine (Lovable gateway, OpenAI, Claude)
  * and by the judge. Keep this file free of server-only imports so the UI can
@@ -81,6 +83,9 @@ export type EngineReport = {
   cuisine: string[];
   /** Learning memory: how many approved past designs were shown as examples, and which judge the data currently prefers. */
   memory: { exemplars: number; totalRecorded: number; judgeRanking: ProviderId[] };
+  /** Deterministic fit to the measured display: what had to be left out or shortened. */
+  fit?: { format: string; omitted: string[]; trimmedDescriptions: number };
+  template?: string;
   finalScore: number;
   finalIssues: string[];
   totalMs: number;
@@ -106,6 +111,14 @@ export type MenuRequest = {
   cuisine?: string[] | undefined;
   /** Set by the ensemble, never by the client: approved past outputs shown as examples. */
   exemplars?: string | undefined;
+  /** Chosen template id from the store wizard (see templates.ts). */
+  template?: string | undefined;
+  /** Measured display the design must fit (see display.ts). */
+  display?: DisplaySpec | undefined;
+  /** Condensed store profile from the store wizard. */
+  store?: { storeType: string; priceTier: string; cuisine: string; venueName: string; audience: string; voice: string } | undefined;
+  storeId?: string | undefined;
+  displayId?: string | undefined;
 };
 
 /**
