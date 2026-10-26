@@ -26,6 +26,14 @@ code on GitHub, and sends Lovable at most one apply message per day and only
 when the change is substantive. To stop it, tell Claude "stop the daily
 Halftone task" or disable it in your scheduled tasks list.
 
+## Rounds 3 and 4
+Every engine now has a model fallback chain, so a retired model name cannot
+take the app down. Candidates are photo-enriched before they are scored, which
+avoids paying for judge or repair calls that only fix prompt length. A brief
+coach under the textarea tells you instantly what the brief is missing (venue,
+prices, offer names, counts, sections) before any AI runs. The whole
+orchestration is now covered by a mocked end-to-end test.
+
 ## What you need to do (5 minutes)
 1. Open the Lovable editor for Menu Master AI and add two Cloud secrets:
    `OPENAI_API_KEY` (from platform.openai.com) and `ANTHROPIC_API_KEY`

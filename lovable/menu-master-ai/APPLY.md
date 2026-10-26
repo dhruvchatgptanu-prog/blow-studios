@@ -47,6 +47,8 @@ is that the text engines now write richer, more precise per-dish photo prompts
 | `src/components/EnginePanel.tsx` | new |
 | `src/lib/ai/cuisine.ts` | new (round 2) — deterministic cuisine detection + photo-prompt enrichment |
 | `src/lib/ai/memory.server.ts` | new (round 2) — learning memory on the `halftone_generations` table |
+| `src/lib/ai/coach.ts` | new (round 4) — rule-based brief coach |
+| `src/components/BriefCoach.tsx` | new (round 4) — hints under the brief textarea |
 | `src/routes/index.tsx` | 4 small edits, see below |
 | `package.json` | add dependency `@anthropic-ai/sdk` (zod ^3.25 already satisfies its peer dep via `zod/v4`) |
 
@@ -65,6 +67,8 @@ is that the text engines now write richer, more precise per-dish photo prompts
    `"Reading and redesigning with every engine…"` / `"Composing with every engine…"`.
 4. Directly after the `{menu.followed.length > 0 ? <section …Instructions followed… /section> : null}` block in the aside, add
    `<EnginePanel engine={menu.engine} />`.
+5. (round 4) Add `import { BriefCoach } from "@/components/BriefCoach";` and place
+   `<BriefCoach brief={brief} mode={mode} />` directly after the brief `<textarea … />`.
 
 ## Round 2 (learning + repair)
 
@@ -87,8 +91,16 @@ is that the text engines now write richer, more precise per-dish photo prompts
 * **Model fallback chains (round 3)** — every engine tries its configured model, then a
   list of fallbacks, when the API says the model id is unknown, retired or not permitted.
   Other errors are never retried. The Engines panel shows the model that actually answered.
+* **Enrich before scoring (round 4)** — candidates, judge output and repair output are
+  photo-enriched before the verifier scores them, so no judge or repair call is spent on
+  prompt length that the free enrichment fixes anyway. Enrichment is idempotent.
+* **Brief coach (round 4)** — instant rule-based hints under the brief (missing venue,
+  prices, offer names, counts, sections) using the same extractors as the verifier.
 * **Eval harness** — `eval/eval.mjs` runs six briefs through detection,
-  extraction, enrichment and the verifier. All pass.
+  extraction, enrichment and the verifier; `eval/ensemble.test.mjs` runs the real
+  orchestration against a mocked gateway (judge merge, repair, model fallback, total
+  failure, malformed JSON); `eval/fallback.test.mjs` and `eval/coach.test.mjs` cover
+  model-error detection and the brief coach. All pass.
 
 ## Secrets (Lovable Cloud → Secrets)
 

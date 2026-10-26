@@ -12,7 +12,8 @@ cp -r <repo>/lovable/menu-master-ai/src/lib/ai src/lib/ai
 printf 'import { createClient } from "@supabase/supabase-js";\nexport const supabaseAdmin = createClient("https://x.supabase.co", "sb_secret_x");\n' > src/integrations/supabase/client.server.ts
 npx tsc --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --baseUrl . --paths '{"@/*":["src/*"]}' --outDir out --rootDir . src/lib/ai/*.ts
 sed -i -E 's#from "\./(schema|verify|knowledge|providers\.server|ensemble\.server|cuisine|memory\.server)"#from "./\1.js"#g' out/src/lib/ai/*.js
-cp <repo>/lovable/menu-master-ai/eval/*.mjs . && node eval.mjs && node verifier.test.mjs
+sed -i -E 's#from "@/integrations/supabase/client.server"#from "../../integrations/supabase/client.server.js"#' out/src/lib/ai/memory.server.js
+cp <repo>/lovable/menu-master-ai/eval/*.mjs . && node eval.mjs && node verifier.test.mjs && node fallback.test.mjs && node coach.test.mjs && node ensemble.test.mjs
 ```
 
 Expected: `ALL PASS`, and the sample Yiros House brief scores 100/100.

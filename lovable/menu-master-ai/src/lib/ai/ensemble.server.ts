@@ -36,13 +36,15 @@ function timed<T>(ms: number, run: (signal: AbortSignal) => Promise<T>): Promise
     .finally(() => clearTimeout(timer));
 }
 
-async function runProvider(provider: Provider, request: MenuRequest): Promise<Attempt> {
+async function runProvider(provider: Provider, request: MenuRequest, cuisine: string[]): Promise<Attempt> {
   const result = await timed(GENERATE_TIMEOUT_MS, (signal) => provider.generate(request, signal));
   if (result.value) {
-    const verification = verifyMenu(result.value.value, request);
+    // Enrich before scoring so engines are judged on content, not on prompt length the enrichment fixes for free.
+    const menu = enrichMenuPhotos(result.value.value, cuisine);
+    const verification = verifyMenu(menu, request);
     return {
       provider,
-      menu: result.value.value,
+      menu,
       candidate: { provider: provider.id, model: result.value.model, status: "ok", score: verification.score, issues: verification.issues, ms: result.ms },
     };
   }
@@ -60,7 +62,7 @@ export async function composeMenu(input: MenuRequest): Promise<GeneratedMenu> {
   const request: MenuRequest = { ...input, cuisine, exemplars: memory.exemplars || undefined };
 
   // 2. Every engine at once.
-  const attempts = await Promise.all(providers.map((provider) => runProvider(provider, request)));
+  const attempts = await Promise.all(providers.map((provider) => runProvider(provider, request, cuisine)));
   const successes = attempts.filter((attempt): attempt is Attempt & { menu: GeneratedMenuCore } => Boolean(attempt.menu));
   const candidates = attempts.map((attempt) => attempt.candidate);
   if (successes.length === 0) {
@@ -93,7 +95,7 @@ export async function composeMenu(input: MenuRequest): Promise<GeneratedMenu> {
       ),
     );
     if (result.value) {
-      const judged = result.value.value;
+      const judged = { ...result.value.value, menu: enrichMenuPhotos(result.value.value.menu, cuisine) };
       const verification = verifyMenu(judged.menu, request);
       const keep = verification.score >= score || (score < PERFECT && verification.score >= score - 5);
       report.judge = {
@@ -120,11 +122,12 @@ export async function composeMenu(input: MenuRequest): Promise<GeneratedMenu> {
   if (issues.length > 0 && score < PERFECT && repairer) {
     const result = await timed(REPAIR_TIMEOUT_MS, (signal) => repairer.repair({ request, menu, issues }, signal));
     if (result.value) {
-      const verification = verifyMenu(result.value.value, request);
+      const repaired = enrichMenuPhotos(result.value.value, cuisine);
+      const verification = verifyMenu(repaired, request);
       const applied = verification.score > score;
       report.repair = { provider: repairer.id, model: result.value.model, before: score, after: verification.score, applied, ms: result.ms };
       if (applied) {
-        menu = result.value.value;
+        menu = repaired;
         score = verification.score;
         issues = verification.issues;
       }
@@ -133,7 +136,7 @@ export async function composeMenu(input: MenuRequest): Promise<GeneratedMenu> {
     }
   }
 
-  // 5. Deterministic photo-prompt enrichment (style pipeline untouched), then final verification.
+  // 5. Final verification (every path above is already enriched; enrichment is idempotent).
   menu = enrichMenuPhotos(menu, cuisine);
   const finalVerification = verifyMenu(menu, request);
   report.finalScore = finalVerification.score;

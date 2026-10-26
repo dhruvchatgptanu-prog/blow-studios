@@ -90,7 +90,7 @@ function has(prompt: string, re: RegExp) {
   return re.test(prompt);
 }
 
-/** Ensures a prompt carries surface, angle, light, finish and realism cues without duplicating what the model already wrote. */
+/** Ensures a prompt carries surface, angle, light, finish and realism cues without duplicating what the model already wrote. Idempotent. */
 export function enrichPhotoPrompt(prompt: string, cuisines: string[], shape: "square" | "wide" = "square"): string {
   const defaults = DEFAULTS[cuisines[0] ?? ""] ?? GENERIC;
   const parts = [prompt.trim().replace(/\s+/g, " ")];
@@ -99,7 +99,7 @@ export function enrichPhotoPrompt(prompt: string, cuisines: string[], shape: "sq
   if (!has(prompt, /\b(softbox|light|lighting|lit|backlight|daylight)\b/i)) parts.push(`Lit by ${defaults.light}.`);
   if (!has(prompt, /\b(sharp|focus|depth of field)\b/i)) parts.push("Sharp focus across the whole dish with a softly blurred background.");
   if (!has(prompt, /\b(imperfect|uneven|variation|natural)\b/i) || !has(prompt, /\bno (fake )?steam\b/i)) parts.push(REALISM);
-  parts.push(shape === "wide" ? "Wide banner composition, complete scene visible, clean edges." : "Square composition, complete dish fully visible, clean edges for cropping.");
+  if (!has(prompt, /\bcomposition\b/i)) parts.push(shape === "wide" ? "Wide banner composition, complete scene visible, clean edges." : "Square composition, complete dish fully visible, clean edges for cropping.");
   return parts.join(" ");
 }
 
