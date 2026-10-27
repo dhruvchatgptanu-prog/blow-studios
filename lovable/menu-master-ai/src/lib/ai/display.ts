@@ -256,6 +256,7 @@ export function resolveDisplay(measurement: Partial<DisplayMeasurement> | undefi
     }
   }
   const budget = contentBudget(widthCm, heightCm, viewingDistanceM, orientation, digital);
+  if (sizeSource === "model" && !(measurement?.references?.length)) notes.push("The size estimate used no reference object, so it is a guess. Include a door, an A4 sheet or the counter in the photo, or type one dimension.");
   if (measurement?.notes) notes.push(measurement.notes);
   return {
     displayType: measurement?.displayType ?? "unknown",
@@ -268,7 +269,8 @@ export function resolveDisplay(measurement: Partial<DisplayMeasurement> | undefi
     viewingDistanceM,
     lighting: measurement?.lighting ?? "neutral",
     isDigital: digital,
-    sizeConfidence: sizeSource === "user" ? 1 : sizeSource === "model" ? Math.min(1, Math.max(0, measurement?.confidence ?? 0.3)) : 0.2,
+    // Vision models' centimetre estimates are not measurements; without a named reference object they are a guess.
+    sizeConfidence: sizeSource === "user" ? 1 : sizeSource === "model" ? Math.min(measurement?.references?.length ? 1 : 0.3, Math.max(0, measurement?.confidence ?? 0.3)) : 0.2,
     budget,
     sizeSource,
     notes,

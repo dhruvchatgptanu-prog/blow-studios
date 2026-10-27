@@ -138,6 +138,12 @@ is that the text engines now write richer, more precise per-dish photo prompts
 * **Database** — `halftone_stores` and `halftone_displays` tables (created, RLS on); generations
   link to them via `store_id`, `display_id`, `template_id`.
 * **Tests** — `eval/store-display.test.mjs` (profiles, templates, geometry, budgets, fitting).
+* **Contrast guard (daily run 2)** — `color.ts` converts the OKLCH theme tokens to WCAG contrast
+  ratios; every template is checked on the text/background pairs the sheet renders (ink on
+  paper and card, poster text, prices, accent labels). Failing themes are never recommended,
+  AAA themes get a bonus on distance-read surfaces and in dim rooms. Four themes were fixed.
+  A size estimate from a photo with no named reference object is capped at 30% confidence.
+  `eval/color.test.mjs`.
 
 ## Secrets (Lovable Cloud → Secrets)
 

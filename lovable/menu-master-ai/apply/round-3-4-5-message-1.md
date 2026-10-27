@@ -548,6 +548,106 @@ export function coachBrief(brief: string, mode: "menu" | "poster"): CoachReport 
 
 ```
 
+===== FILE: src/lib/ai/color.ts =====
+```tsx
+/**
+ * Colour maths for template themes: OKLCH (as written in styles.css and
+ * templates.ts) → sRGB → WCAG contrast ratio. Used to guarantee every template
+ * keeps text legible: 4.5:1 is the WCAG minimum for normal text, 7:1 the
+ * enhanced level we want for anything read from a distance.
+ */
+
+export type RGB = { r: number; g: number; b: number };
+
+/** Parses `oklch(L C H)` (L as 0-1 or percentage) or `#rrggbb`. Returns null for anything else. */
+export function parseColor(input: string): RGB | null {
+  const value = input.trim().toLowerCase();
+  const hex = /^#([0-9a-f]{6})$/.exec(value);
+  if (hex) {
+    const n = Number.parseInt(hex[1] ?? "0", 16);
+    return { r: ((n >> 16) & 255) / 255, g: ((n >> 8) & 255) / 255, b: (n & 255) / 255 };
+  }
+  const oklch = /^oklch\(\s*([\d.]+)(%?)\s+([\d.]+)\s+([\d.]+)(?:deg)?\s*(?:\/\s*[\d.]+%?)?\s*\)$/.exec(value);
+  if (!oklch) return null;
+  let L = Number(oklch[1]);
+  if (oklch[2] === "%") L /= 100;
+  const C = Number(oklch[3]);
+  const H = (Number(oklch[4]) * Math.PI) / 180;
+  const a = C * Math.cos(H);
+  const b = C * Math.sin(H);
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.291485548 * b;
+  const l = l_ ** 3, m = m_ ** 3, s = s_ ** 3;
+  const clamp = (v: number) => Math.min(1, Math.max(0, v));
+  return {
+    r: clamp(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+    g: clamp(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+    b: clamp(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s),
+  };
+}
+
+/** WCAG relative luminance from linear sRGB components. */
+export function luminance(rgb: RGB) {
+  return 0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b;
+}
+
+/** WCAG contrast ratio between two colours (1 … 21). Null when either colour cannot be parsed. */
+export function contrastRatio(foreground: string, background: string): number | null {
+  const fg = parseColor(foreground), bg = parseColor(background);
+  if (!fg || !bg) return null;
+  const a = luminance(fg), b = luminance(bg);
+  const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  return Math.round(ratio * 100) / 100;
+}
+
+/** The app's default token values (styles.css) so a theme that overrides only some tokens is checked against the rest. */
+export const DEFAULT_TOKENS: Record<string, string> = {
+  "--paper": "oklch(0.945 0.028 85)",
+  "--card": "oklch(0.975 0.018 88)",
+  "--ink": "oklch(0.23 0.03 55)",
+  "--muted": "oklch(0.55 0.035 70)",
+  "--line": "oklch(0.86 0.035 80)",
+  "--press": "oklch(0.6 0.22 34)",
+  "--press-deep": "oklch(0.47 0.19 30)",
+  "--herb": "oklch(0.52 0.14 155)",
+  "--poster": "oklch(0.57 0.24 28)",
+  "--poster-foreground": "oklch(0.985 0.01 95)",
+  "--sun": "oklch(0.84 0.18 89)",
+};
+
+export type ContrastReport = {
+  inkOnPaper: number;
+  inkOnCard: number;
+  posterText: number;
+  priceOnCard: number;
+  /** Section labels and accents (text-press) on the card. */
+  accentOnCard: number;
+  mutedOnCard: number;
+  /** Lowest of the ratios that carry reading text. */
+  weakest: number;
+  level: "AAA" | "AA" | "fail";
+};
+
+/** Checks the text/background pairs the sheet actually renders for a theme (overrides merged over the defaults). */
+export function themeContrast(theme: Record<string, string | undefined>): ContrastReport {
+  const tokens: Record<string, string> = { ...DEFAULT_TOKENS };
+  for (const [key, value] of Object.entries(theme)) if (value) tokens[key] = value;
+  const get = (key: string) => tokens[key] ?? DEFAULT_TOKENS[key] ?? "#000000";
+  const ratio = (fg: string, bg: string) => contrastRatio(get(fg), get(bg)) ?? 1;
+  const inkOnPaper = ratio("--ink", "--paper");
+  const inkOnCard = ratio("--ink", "--card");
+  const posterText = ratio("--poster-foreground", "--poster");
+  const priceOnCard = ratio("--press-deep", "--card");
+  const accentOnCard = ratio("--press", "--card");
+  const mutedOnCard = ratio("--muted", "--card");
+  // Accent labels are small but bold uppercase; treat 3:1 (large-text minimum) as their floor by weighting them up.
+  const weakest = Math.min(inkOnPaper, inkOnCard, posterText, priceOnCard, accentOnCard * 1.5);
+  return { inkOnPaper, inkOnCard, posterText, priceOnCard, accentOnCard, mutedOnCard, weakest: Math.round(weakest * 100) / 100, level: weakest >= 7 ? "AAA" : weakest >= 4.5 ? "AA" : "fail" };
+}
+
+```
+
 ===== FILE: src/lib/ai/store.ts =====
 ```tsx
 import { z } from "zod/v4";
@@ -794,6 +894,7 @@ export const STORE_ANALYSIS_PROMPT = [
 
 ===== FILE: src/lib/ai/templates.ts =====
 ```tsx
+import { themeContrast } from "./color";
 import type { StyleKey } from "./schema";
 import { STORE_TYPE_GUIDE, type StoreProfile, type StoreType } from "./store";
 
@@ -834,7 +935,7 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: "charcoal-grill", name: "Charcoal Grill", tagline: "Dark board, ember accents", style: "bold-deals", mode: "poster",
-    theme: { "--poster": "oklch(0.62 0.2 40)", "--sun": "oklch(0.78 0.15 70)", "--ink": "oklch(0.17 0.01 40)", "--card": "oklch(0.26 0.015 45)", "--poster-foreground": "oklch(0.98 0.01 90)", "--muted": "oklch(0.78 0.02 70)", "--line": "oklch(0.35 0.02 45)" },
+    theme: { "--poster": "oklch(0.5 0.19 38)", "--sun": "oklch(0.78 0.15 70)", "--paper": "oklch(0.2 0.01 40)", "--card": "oklch(0.26 0.015 45)", "--ink": "oklch(0.95 0.02 80)", "--poster-foreground": "oklch(0.98 0.01 90)", "--press": "oklch(0.8 0.16 60)", "--press-deep": "oklch(0.86 0.14 70)", "--muted": "oklch(0.78 0.02 70)", "--line": "oklch(0.35 0.02 45)" },
     palette: ["charcoal", "ember orange", "warm cream"], typography: "Heavy condensed display, warm cream text on charcoal",
     layout: "Dark stacked offers, glowing price blocks, photos with dark surrounds",
     photoTreatment: "Low-key lit grill photography, char and sear emphasised",
@@ -882,7 +983,7 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: "sushi-slate", name: "Sushi Slate", tagline: "Slate grey, vermilion, grid", style: "modern", mode: "menu",
-    theme: { "--paper": "oklch(0.3 0.01 250)", "--card": "oklch(0.34 0.012 250)", "--ink": "oklch(0.96 0.005 90)", "--press": "oklch(0.6 0.2 30)", "--press-deep": "oklch(0.5 0.18 30)", "--line": "oklch(0.45 0.01 250)", "--muted": "oklch(0.8 0.01 250)" },
+    theme: { "--paper": "oklch(0.3 0.01 250)", "--card": "oklch(0.34 0.012 250)", "--ink": "oklch(0.96 0.005 90)", "--press": "oklch(0.78 0.17 35)", "--press-deep": "oklch(0.88 0.1 75)", "--poster": "oklch(0.5 0.2 30)", "--line": "oklch(0.45 0.01 250)", "--muted": "oklch(0.8 0.01 250)" },
     palette: ["slate", "vermilion", "paper white"], typography: "Clean sans with a vermilion accent rule, numbers aligned",
     layout: "Dense but ordered grid: nigiri, rolls, hot dishes as columns; photo tiles square",
     photoTreatment: "Dark ceramic, glossy fish, overhead",
@@ -898,7 +999,7 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: "taqueria-pop", name: "Taquería Pop", tagline: "Pink, teal, lime; playful blocks", style: "bold-deals", mode: "poster",
-    theme: { "--poster": "oklch(0.62 0.22 350)", "--sun": "oklch(0.86 0.16 110)", "--herb": "oklch(0.6 0.12 190)", "--ink": "oklch(0.22 0.03 300)" },
+    theme: { "--poster": "oklch(0.5 0.22 350)", "--sun": "oklch(0.86 0.16 110)", "--herb": "oklch(0.5 0.12 190)", "--ink": "oklch(0.22 0.03 300)" },
     palette: ["hot pink", "teal", "lime"], typography: "Chunky display, tilted badges, hand-cut shapes",
     layout: "Colour-blocked offer tiles, tacos in rows, combos boxed",
     photoTreatment: "Tacos in a row on a wooden board, lime wedges",
@@ -930,7 +1031,7 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: "screen-grid", name: "Screen Grid", tagline: "Digital board, 16:9, high contrast", style: "modern", mode: "poster",
-    theme: { "--paper": "oklch(0.15 0.01 260)", "--card": "oklch(0.2 0.012 260)", "--ink": "oklch(0.97 0.005 90)", "--poster": "oklch(0.75 0.17 60)", "--poster-foreground": "oklch(0.15 0.01 260)", "--sun": "oklch(0.75 0.17 60)", "--line": "oklch(0.3 0.01 260)", "--muted": "oklch(0.75 0.01 260)" },
+    theme: { "--paper": "oklch(0.15 0.01 260)", "--card": "oklch(0.2 0.012 260)", "--ink": "oklch(0.97 0.005 90)", "--poster": "oklch(0.75 0.17 60)", "--poster-foreground": "oklch(0.15 0.01 260)", "--sun": "oklch(0.75 0.17 60)", "--press": "oklch(0.82 0.16 65)", "--press-deep": "oklch(0.86 0.15 70)", "--line": "oklch(0.3 0.01 260)", "--muted": "oklch(0.75 0.01 260)" },
     palette: ["near-black", "amber", "white"], typography: "Bold sans readable from 4-8 m, prices aligned right",
     layout: "Three columns, category headers, photo tiles for heroes only",
     photoTreatment: "Square tiles, consistent lighting across all photos",
@@ -978,6 +1079,12 @@ export function recommendTemplates(profile: StoreProfile, limit = 4): TemplateMa
     const vibeHits = template.palette.concat(template.tagline.toLowerCase().split(/\W+/)).filter((word) => profile.vibe.includes(word));
     if (vibeHits.length) { score += 5; reasons.push(`Matches the ${vibeHits[0]} feel`); }
     if (profile.palette.length && template.palette.some((name) => /dark|black|charcoal|slate|navy|blackboard|near-black/.test(name)) && profile.palette.some((hex) => isDark(hex))) { score += 6; reasons.push("Works with your dark brand colours"); }
+    // Legibility: distance-read surfaces and dim rooms need enhanced (7:1) contrast; never recommend a failing theme.
+    const contrast = themeContrast(template.theme);
+    const distanceRead = profile.displaySurfaces.some((surface) => ["fascia", "wall-board", "digital-screen", "drive-thru-board", "window", "a-frame"].includes(surface));
+    if (contrast.level === "fail") score -= 40;
+    else if (contrast.level === "AAA") { score += distanceRead || profile.lighting === "dim" ? 8 : 3; reasons.push(`${contrast.weakest}:1 text contrast (AAA)`); }
+    else if (distanceRead || profile.lighting === "dim") score -= 6;
     return { template, score, reasons: reasons.slice(0, 3) };
   });
   return matches.sort((a, b) => b.score - a.score).slice(0, limit);
@@ -1267,6 +1374,7 @@ export function resolveDisplay(measurement: Partial<DisplayMeasurement> | undefi
     }
   }
   const budget = contentBudget(widthCm, heightCm, viewingDistanceM, orientation, digital);
+  if (sizeSource === "model" && !(measurement?.references?.length)) notes.push("The size estimate used no reference object, so it is a guess. Include a door, an A4 sheet or the counter in the photo, or type one dimension.");
   if (measurement?.notes) notes.push(measurement.notes);
   return {
     displayType: measurement?.displayType ?? "unknown",
@@ -1279,7 +1387,8 @@ export function resolveDisplay(measurement: Partial<DisplayMeasurement> | undefi
     viewingDistanceM,
     lighting: measurement?.lighting ?? "neutral",
     isDigital: digital,
-    sizeConfidence: sizeSource === "user" ? 1 : sizeSource === "model" ? Math.min(1, Math.max(0, measurement?.confidence ?? 0.3)) : 0.2,
+    // Vision models' centimetre estimates are not measurements; without a named reference object they are a guess.
+    sizeConfidence: sizeSource === "user" ? 1 : sizeSource === "model" ? Math.min(measurement?.references?.length ? 1 : 0.3, Math.max(0, measurement?.confidence ?? 0.3)) : 0.2,
     budget,
     sizeSource,
     notes,

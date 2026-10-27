@@ -1,3 +1,4 @@
+import { themeContrast } from "./color";
 import type { StyleKey } from "./schema";
 import { STORE_TYPE_GUIDE, type StoreProfile, type StoreType } from "./store";
 
@@ -38,7 +39,7 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: "charcoal-grill", name: "Charcoal Grill", tagline: "Dark board, ember accents", style: "bold-deals", mode: "poster",
-    theme: { "--poster": "oklch(0.62 0.2 40)", "--sun": "oklch(0.78 0.15 70)", "--ink": "oklch(0.17 0.01 40)", "--card": "oklch(0.26 0.015 45)", "--poster-foreground": "oklch(0.98 0.01 90)", "--muted": "oklch(0.78 0.02 70)", "--line": "oklch(0.35 0.02 45)" },
+    theme: { "--poster": "oklch(0.5 0.19 38)", "--sun": "oklch(0.78 0.15 70)", "--paper": "oklch(0.2 0.01 40)", "--card": "oklch(0.26 0.015 45)", "--ink": "oklch(0.95 0.02 80)", "--poster-foreground": "oklch(0.98 0.01 90)", "--press": "oklch(0.8 0.16 60)", "--press-deep": "oklch(0.86 0.14 70)", "--muted": "oklch(0.78 0.02 70)", "--line": "oklch(0.35 0.02 45)" },
     palette: ["charcoal", "ember orange", "warm cream"], typography: "Heavy condensed display, warm cream text on charcoal",
     layout: "Dark stacked offers, glowing price blocks, photos with dark surrounds",
     photoTreatment: "Low-key lit grill photography, char and sear emphasised",
@@ -86,7 +87,7 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: "sushi-slate", name: "Sushi Slate", tagline: "Slate grey, vermilion, grid", style: "modern", mode: "menu",
-    theme: { "--paper": "oklch(0.3 0.01 250)", "--card": "oklch(0.34 0.012 250)", "--ink": "oklch(0.96 0.005 90)", "--press": "oklch(0.6 0.2 30)", "--press-deep": "oklch(0.5 0.18 30)", "--line": "oklch(0.45 0.01 250)", "--muted": "oklch(0.8 0.01 250)" },
+    theme: { "--paper": "oklch(0.3 0.01 250)", "--card": "oklch(0.34 0.012 250)", "--ink": "oklch(0.96 0.005 90)", "--press": "oklch(0.78 0.17 35)", "--press-deep": "oklch(0.88 0.1 75)", "--poster": "oklch(0.5 0.2 30)", "--line": "oklch(0.45 0.01 250)", "--muted": "oklch(0.8 0.01 250)" },
     palette: ["slate", "vermilion", "paper white"], typography: "Clean sans with a vermilion accent rule, numbers aligned",
     layout: "Dense but ordered grid: nigiri, rolls, hot dishes as columns; photo tiles square",
     photoTreatment: "Dark ceramic, glossy fish, overhead",
@@ -102,7 +103,7 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: "taqueria-pop", name: "Taquería Pop", tagline: "Pink, teal, lime; playful blocks", style: "bold-deals", mode: "poster",
-    theme: { "--poster": "oklch(0.62 0.22 350)", "--sun": "oklch(0.86 0.16 110)", "--herb": "oklch(0.6 0.12 190)", "--ink": "oklch(0.22 0.03 300)" },
+    theme: { "--poster": "oklch(0.5 0.22 350)", "--sun": "oklch(0.86 0.16 110)", "--herb": "oklch(0.5 0.12 190)", "--ink": "oklch(0.22 0.03 300)" },
     palette: ["hot pink", "teal", "lime"], typography: "Chunky display, tilted badges, hand-cut shapes",
     layout: "Colour-blocked offer tiles, tacos in rows, combos boxed",
     photoTreatment: "Tacos in a row on a wooden board, lime wedges",
@@ -134,7 +135,7 @@ export const TEMPLATES: Template[] = [
   },
   {
     id: "screen-grid", name: "Screen Grid", tagline: "Digital board, 16:9, high contrast", style: "modern", mode: "poster",
-    theme: { "--paper": "oklch(0.15 0.01 260)", "--card": "oklch(0.2 0.012 260)", "--ink": "oklch(0.97 0.005 90)", "--poster": "oklch(0.75 0.17 60)", "--poster-foreground": "oklch(0.15 0.01 260)", "--sun": "oklch(0.75 0.17 60)", "--line": "oklch(0.3 0.01 260)", "--muted": "oklch(0.75 0.01 260)" },
+    theme: { "--paper": "oklch(0.15 0.01 260)", "--card": "oklch(0.2 0.012 260)", "--ink": "oklch(0.97 0.005 90)", "--poster": "oklch(0.75 0.17 60)", "--poster-foreground": "oklch(0.15 0.01 260)", "--sun": "oklch(0.75 0.17 60)", "--press": "oklch(0.82 0.16 65)", "--press-deep": "oklch(0.86 0.15 70)", "--line": "oklch(0.3 0.01 260)", "--muted": "oklch(0.75 0.01 260)" },
     palette: ["near-black", "amber", "white"], typography: "Bold sans readable from 4-8 m, prices aligned right",
     layout: "Three columns, category headers, photo tiles for heroes only",
     photoTreatment: "Square tiles, consistent lighting across all photos",
@@ -182,6 +183,12 @@ export function recommendTemplates(profile: StoreProfile, limit = 4): TemplateMa
     const vibeHits = template.palette.concat(template.tagline.toLowerCase().split(/\W+/)).filter((word) => profile.vibe.includes(word));
     if (vibeHits.length) { score += 5; reasons.push(`Matches the ${vibeHits[0]} feel`); }
     if (profile.palette.length && template.palette.some((name) => /dark|black|charcoal|slate|navy|blackboard|near-black/.test(name)) && profile.palette.some((hex) => isDark(hex))) { score += 6; reasons.push("Works with your dark brand colours"); }
+    // Legibility: distance-read surfaces and dim rooms need enhanced (7:1) contrast; never recommend a failing theme.
+    const contrast = themeContrast(template.theme);
+    const distanceRead = profile.displaySurfaces.some((surface) => ["fascia", "wall-board", "digital-screen", "drive-thru-board", "window", "a-frame"].includes(surface));
+    if (contrast.level === "fail") score -= 40;
+    else if (contrast.level === "AAA") { score += distanceRead || profile.lighting === "dim" ? 8 : 3; reasons.push(`${contrast.weakest}:1 text contrast (AAA)`); }
+    else if (distanceRead || profile.lighting === "dim") score -= 6;
     return { template, score, reasons: reasons.slice(0, 3) };
   });
   return matches.sort((a, b) => b.score - a.score).slice(0, limit);
