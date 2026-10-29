@@ -110,7 +110,7 @@ export function buildUserMessage(request: MenuRequest) {
     `TYPE STYLE: ${request.style}`,
     `PAGE COUNT: ${request.pages}`,
     request.display ? displayBriefLines(request.display).join("\n") : `FORMAT: ${request.size} — ${describeFormat(request.size)}`,
-    request.store ? `VENUE PROFILE: ${request.store.venueName || "unnamed venue"} — ${request.store.storeType.replace("-", " ")}, ${request.store.priceTier} price point${request.store.cuisine ? `, ${request.store.cuisine}` : ""}${request.store.audience ? `, audience: ${request.store.audience}` : ""}. Copy voice: ${request.store.voice}` : "",
+    request.store ? `VENUE PROFILE: ${request.store.venueName || "unnamed venue"} — ${request.store.storeType.replace("-", " ")}, ${request.store.priceTier} price point${request.store.cuisine ? `, ${request.store.cuisine}` : ""}${request.store.audience ? `, audience: ${request.store.audience}` : ""}. Copy voice: ${request.store.voice}${request.store.signatureItems?.length ? ` Signature items (keep them, give them the hero spots): ${request.store.signatureItems.join(", ")}.` : ""}` : "",
     request.template && templateById(request.template) ? describeTemplate(templateById(request.template)!) : "",
     request.cuisine?.length ? `DETECTED CUISINE: ${request.cuisine.join(" + ")}. Apply these plating cues to every photo brief:\n${cuisineCues(request.cuisine).map((line) => `- ${line}`).join("\n")}` : "",
     request.referenceImage ? "A photo or screenshot of the existing menu is attached. Transcribe it faithfully, then redesign; the written brief wins on any conflict." : "",

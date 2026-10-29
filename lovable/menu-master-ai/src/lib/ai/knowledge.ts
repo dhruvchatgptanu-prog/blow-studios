@@ -60,10 +60,17 @@ export const DESIGN_GRAMMAR = [
   "Reference boards and photos the owner uploads are composition references only. Never copy their brands, logos, phone numbers, prices or claims.",
 ] as const;
 
+export const DIGITAL_BOARD_RULES = [
+  "A digital screen is read in a 15-30 s decision window: at most 9 items per screen; split larger menus across screens or dayparts rather than shrinking type.",
+  "Thick-stroke sans-serif only; text/background contrast 7:1 or better; no thin rules, hairlines or fine textures (they shimmer on screen); no large pure-white fields (glare).",
+  "Prices sit on the same line as the item name, same weight; descriptions are optional and never more than one short line.",
+  "One hero photo per screen at most, placed where the layout puts the first offer; busy photo grids reduce legibility of the prices.",
+] as const;
+
 export const MENU_PSYCHOLOGY = [
   "Anchor: place the highest-priced or highest-margin item first or second in its section so later items read as value.",
   "Decoy: in a deals poster the largest bundle justifies the mid bundle; make the mid bundle's badge the most inviting (e.g. 'MOST POPULAR' only if the brief says so, otherwise 'FAMILY FAVOURITE').",
-  "Golden triangle: readers look centre → top-right → top-left; put the signature offer where the layout puts the first photo.",
+  "Eye path: there is no evidence for a 'golden triangle' or a magic top-right corner. Eye-tracking shows guests read a menu like a book and spend most time on the first and last items of each section, so give the signature offer the first position and the first photo.",
   "Price presentation: keep the brief's currency format. Do not add '.00' if the brief wrote whole numbers. Never align prices in a column on a classic menu's description line; the renderer handles dotted leaders.",
   "Naming: proper nouns and house names stay exactly as written; generic items get specific, appetising nouns ('charred lemon', 'hand-cut chips') only when they are plausible for the cuisine and not contradicted by the brief.",
   "Chunking: 5-7 items per section is the readability sweet spot; split larger groups into logical sub-sections.",
@@ -123,6 +130,7 @@ export const SYSTEM_PROMPT = [
   block("Format rules", Object.entries(FORMAT_RULES).map(([key, rule]) => `${key}: ${rule}`)),
   block("Design grammar", DESIGN_GRAMMAR),
   block("Menu psychology", MENU_PSYCHOLOGY),
+  block("Digital screen rules (when the display is a screen)", DIGITAL_BOARD_RULES),
   block("Cuisine plating cues for photo briefs", Object.entries(CUISINE_PLATING_CUES).map(([key, cue]) => `${key}: ${cue}`)),
   block("Photo prompt grammar", PHOTO_PROMPT_GRAMMAR),
   block("Self-check", SELF_CHECK),

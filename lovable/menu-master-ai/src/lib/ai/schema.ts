@@ -116,7 +116,7 @@ export type MenuRequest = {
   /** Measured display the design must fit (see display.ts). */
   display?: DisplaySpec | undefined;
   /** Condensed store profile from the store wizard. */
-  store?: { storeType: string; priceTier: string; cuisine: string; venueName: string; audience: string; voice: string } | undefined;
+  store?: { storeType: string; priceTier: string; cuisine: string; venueName: string; audience: string; voice: string; signatureItems?: string[] | undefined } | undefined;
   storeId?: string | undefined;
   displayId?: string | undefined;
 };

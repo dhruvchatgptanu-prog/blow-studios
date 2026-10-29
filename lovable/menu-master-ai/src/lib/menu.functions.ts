@@ -44,7 +44,7 @@ const inputSchema = z.object({
       notes: z.array(z.string()),
     })
     .optional(),
-  store: z.object({ storeType: z.string(), priceTier: z.string(), cuisine: z.string(), venueName: z.string(), audience: z.string(), voice: z.string() }).optional(),
+  store: z.object({ storeType: z.string(), priceTier: z.string(), cuisine: z.string(), venueName: z.string(), audience: z.string(), voice: z.string(), signatureItems: z.array(z.string().max(80)).max(12).optional() }).optional(),
   storeId: z.string().uuid().optional(),
   displayId: z.string().uuid().optional(),
 });

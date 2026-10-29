@@ -57,6 +57,7 @@ export function storeContext(profile: StoreProfile) {
     venueName: profile.venueName,
     audience: profile.audience,
     voice: STORE_TYPE_GUIDE[profile.storeType].voice,
+    signatureItems: profile.signatureItems.slice(0, 12),
   };
 }
 

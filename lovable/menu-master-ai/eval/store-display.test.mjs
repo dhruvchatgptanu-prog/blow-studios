@@ -1,6 +1,6 @@
 import { profileFromText, mergeProfiles } from "./out/src/lib/ai/store.js";
 import { recommendTemplates, TEMPLATES } from "./out/src/lib/ai/templates.js";
-import { aspectFromCorners, resolveDisplay, contentBudget, fitMenuToDisplay, minLetterHeightCm, orientationOf } from "./out/src/lib/ai/display.js";
+import { aspectFromCorners, resolveDisplay, contentBudget, fitMenuToDisplay, itemPriority, minLetterHeightCm, orientationOf, DIGITAL_ITEMS_PER_SCREEN } from "./out/src/lib/ai/display.js";
 
 let f = 0; const t = (l, c, d = "") => { if (!c) { f++; console.log("FAIL", l, d); } else console.log("PASS", l); };
 
@@ -64,5 +64,31 @@ t("fit trims to 4 offers and lists omitted", fit.menu.sections[0].items.length =
 t("fit shortens descriptions", fit.menu.sections[0].items[0].description.split(" ").length === 5 && fit.trimmedDescriptions === 4);
 const noChange = fitMenuToDisplay(menu, { ...user, budget: { ...user.budget, maxOffers: 10, maxDescriptionWords: 20 } });
 t("fit leaves fitting menus untouched", noChange.changed === false && noChange.menu === menu);
+
+// ---- priority-aware fit (daily run 3) ----
+const brief = "Yiros House. Our signature Lamb Yiros is the best seller. Also Chicken Yiros, Haloumi Chips, Greek Salad, Baklava. Drinks: Coke, Water.";
+const ctx = { brief, signatureItems: ["Haloumi chips"] };
+t("brief-marked signature outranks plain mention", itemPriority({ name: "Lamb Yiros" }, ctx) > itemPriority({ name: "Greek Salad" }, ctx));
+t("profile signature item ranks highest", itemPriority({ name: "Haloumi Chips" }, ctx) >= itemPriority({ name: "Lamb Yiros" }, ctx));
+t("engine filler ranks lowest", itemPriority({ name: "Pita Bread" }, ctx) === 0 && itemPriority({ name: "Pita Bread", badge: "NEW" }, ctx) === 1);
+const item = (name, badge = "") => ({ name, description: "", price: "$1", badge, photoPrompt: "p" });
+const classic = { ...menu, mode: "menu", sections: [
+  { title: "Mains", note: null, items: [item("Chicken Yiros"), item("Pita Bread"), item("Lamb Yiros")] },
+  { title: "Sides", note: null, items: [item("Chips"), item("Haloumi Chips")] },
+  { title: "Drinks", note: null, items: [item("Coke"), item("Water")] },
+] };
+const tight = fitMenuToDisplay(classic, { ...user, budget: { ...user.budget, maxItems: 4, maxSections: 2, maxDescriptionWords: 20 } }, ctx);
+const keptNames = tight.menu.sections.flatMap((s) => s.items.map((i) => i.name));
+t("keeps the most important items across sections", keptNames.includes("Lamb Yiros") && keptNames.includes("Haloumi Chips") && keptNames.includes("Chicken Yiros") && !keptNames.includes("Pita Bread"), JSON.stringify(keptNames));
+t("drops the lowest-priority section, keeps order", tight.menu.sections.map((s) => s.title).join(",") === "Mains,Sides" && tight.omitted.includes("Coke") && tight.omitted.includes("Water"), JSON.stringify(tight.omitted));
+t("section order preserved inside sections", tight.menu.sections[0].items.map((i) => i.name).join(",") === "Chicken Yiros,Lamb Yiros", JSON.stringify(tight.menu.sections[0].items.map((i) => i.name)));
+const plain = fitMenuToDisplay(classic, { ...user, budget: { ...user.budget, maxItems: 5, maxSections: 3, maxDescriptionWords: 20 } });
+t("without context, first items of each section survive first", plain.menu.sections.every((s) => s.items.length >= 1) && plain.omitted.length === 2, JSON.stringify(plain.omitted));
+
+// ---- digital dwell-time cap ----
+const screen = contentBudget(165, 93, 4, "landscape", true), board = contentBudget(165, 93, 4, "landscape", false);
+t("digital screen capped by dwell time", screen.maxItems <= DIGITAL_ITEMS_PER_SCREEN && screen.maxSections <= 3 && board.maxItems >= screen.maxItems, JSON.stringify({ screen, board }));
+const digitalSpec = resolveDisplay({ displayType: "digital-screen", isDigital: true, estimatedWidthCm: 165, estimatedHeightCm: 93, references: [{ object: "tv", knownSizeCm: 165, pixelSpan: 10, confidence: 0.9 }], viewingDistanceM: 4, lighting: "bright", confidence: 0.8 }, {});
+t("digital spec carries screen rules in the prompt", digitalSpec.isDigital && (await import("./out/src/lib/ai/display.js")).displayBriefLines(digitalSpec).some((l) => l.startsWith("DIGITAL SCREEN RULES")));
 
 console.log(f ? `FAILURES: ${f}` : "ALL PASS"); process.exit(f ? 1 : 0);

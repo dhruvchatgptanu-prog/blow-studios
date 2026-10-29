@@ -46,6 +46,14 @@ The studio then designs with that template, size and venue profile, and prints a
 real dimensions. Not yet applied to Lovable (no credits); ready-to-paste bundles are in
 `lovable/menu-master-ai/apply/`.
 
+## Daily runs so far
+Run 2 added a colour-contrast guard so no template can recommend unreadable text. Run 3 made the
+display fitter choose what to cut intelligently (your signature dishes and anything you call a
+best seller or special always survive; filler goes first), taught the engines the rules for
+digital screens (at most nine items per screen, thick type, high contrast) and corrected a menu
+"psychology" rule that research does not support. Nothing has gone to Lovable since round 2
+because the workspace has no credits; the apply bundles in `apply/` stay current automatically.
+
 ## What you need to do (5 minutes)
 1. Open the Lovable editor for Menu Master AI and add two Cloud secrets:
    `OPENAI_API_KEY` (from platform.openai.com) and `ANTHROPIC_API_KEY`

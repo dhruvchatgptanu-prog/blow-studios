@@ -123,7 +123,7 @@ export type MenuRequest = {
   /** Measured display the design must fit (see display.ts). */
   display?: DisplaySpec | undefined;
   /** Condensed store profile from the store wizard. */
-  store?: { storeType: string; priceTier: string; cuisine: string; venueName: string; audience: string; voice: string } | undefined;
+  store?: { storeType: string; priceTier: string; cuisine: string; venueName: string; audience: string; voice: string; signatureItems?: string[] | undefined } | undefined;
   storeId?: string | undefined;
   displayId?: string | undefined;
 };
@@ -207,7 +207,6 @@ export function stripEngine(menu: GeneratedMenu): GeneratedMenuCore {
   const { engine: _engine, ...core } = menu;
   return core;
 }
-
 ```
 
 ===== FILE: src/lib/ai/cuisine.ts =====
@@ -329,7 +328,6 @@ export function enrichMenuPhotos(menu: GeneratedMenuCore, cuisines: string[]): G
     })),
   };
 }
-
 ```
 
 ===== FILE: src/lib/ai/verify.ts =====
@@ -499,7 +497,6 @@ export function verifyMenu(menu: GeneratedMenuCore, request: MenuRequest): Verif
   const score = Math.max(0, Math.min(100, Object.values(checks).reduce<number>((sum, value) => sum + (value ?? 0), 0)));
   return { score, issues: Array.from(new Set(issues)), checks: checks as Record<string, number> };
 }
-
 ```
 
 ===== FILE: src/lib/ai/coach.ts =====
@@ -545,7 +542,6 @@ export function coachBrief(brief: string, mode: "menu" | "poster"): CoachReport 
 
   return { score: Math.max(0, score), hints: hints.slice(0, 4) };
 }
-
 ```
 
 ===== FILE: src/lib/ai/color.ts =====
@@ -645,7 +641,6 @@ export function themeContrast(theme: Record<string, string | undefined>): Contra
   const weakest = Math.min(inkOnPaper, inkOnCard, posterText, priceOnCard, accentOnCard * 1.5);
   return { inkOnPaper, inkOnCard, posterText, priceOnCard, accentOnCard, mutedOnCard, weakest: Math.round(weakest * 100) / 100, level: weakest >= 7 ? "AAA" : weakest >= 4.5 ? "AA" : "fail" };
 }
-
 ```
 
 ===== FILE: src/lib/ai/store.ts =====
@@ -889,7 +884,6 @@ export const STORE_ANALYSIS_PROMPT = [
   "notes: 2-4 sentences on what a menu for this venue must get right (reading distance, light, audience, tone).",
   "Return JSON only.",
 ].join("\n");
-
 ```
 
 ===== FILE: src/lib/ai/templates.ts =====
@@ -1111,7 +1105,6 @@ export function describeTemplate(template: Template) {
     "Write copy, badges, taglines and photo briefs that belong to this template. Never change exact names, prices or counts to fit it.",
   ].join("\n");
 }
-
 ```
 
 ===== FILE: src/lib/ai/display.ts =====
@@ -1295,6 +1288,9 @@ export function minLetterHeightCm(viewingDistanceM: number) {
   return Math.max(0.3, Math.round((viewingDistanceM / 3) * 2.5 * 10) / 10);
 }
 
+/** Items one digital screen can carry inside a 15-30 s read window (rotate dayparts or screens for more). */
+export const DIGITAL_ITEMS_PER_SCREEN = 9;
+
 export function contentBudget(widthCm: number, heightCm: number, viewingDistanceM: number, orientation: Orientation, digital: boolean): ContentBudget {
   const letter = minLetterHeightCm(viewingDistanceM);
   // A text line needs roughly 2.2× the cap height (ascenders, descenders, leading).
@@ -1311,12 +1307,15 @@ export function contentBudget(widthCm: number, heightCm: number, viewingDistance
   // Lines per item: name plus a short description, less on ultra-wide where descriptions are rare.
   const linesPerItem = orientation === "ultra-wide" ? 1.2 : 1.6;
   const linesPerOffer = orientation === "ultra-wide" ? 2.5 : 5; // photo-led offer row
-  const maxItems = Math.max(2, Math.min(40, Math.floor(rows / linesPerItem) * textColumns));
+  const maxItemsBySpace = Math.max(2, Math.min(40, Math.floor(rows / linesPerItem) * textColumns));
   const offerColumns = orientation === "ultra-wide" ? Math.min(5, Math.max(2, Math.floor(widthCm / (letter * 14)))) : orientation === "landscape" ? Math.min(3, Math.max(1, Math.floor(widthCm / (letter * 30)))) : 1;
   const maxOffers = Math.max(1, Math.min(6, Math.max(1, Math.floor(rows / linesPerOffer)) * offerColumns));
   const maxNameWords = Math.max(2, Math.min(6, Math.floor(charsPerLine / (textColumns * 9))));
   const maxDescriptionWords = orientation === "ultra-wide" ? Math.min(8, Math.max(0, Math.floor(charsPerLine / (textColumns * 7)))) : Math.min(14, Math.max(4, Math.floor(charsPerLine / (textColumns * 6))));
-  const maxSections = Math.max(1, Math.min(8, Math.floor(maxItems / 4)));
+  // Digital boards are read in a 15-30 s decision window (QSR signage guidance), roughly 2-3 s per
+  // item, so a single screen should not carry more than DIGITAL_ITEMS_PER_SCREEN items however large it is.
+  const maxItems = digital ? Math.min(maxItemsBySpace, DIGITAL_ITEMS_PER_SCREEN) : maxItemsBySpace;
+  const maxSections = Math.max(1, Math.min(digital ? 3 : 8, Math.floor(maxItems / 4)));
   const photosRecommended = digital || orientation === "ultra-wide" ? Math.min(maxOffers, 4) : Math.min(maxOffers, 3);
   return { minLetterHeightCm: letter, maxOffers, maxItems, maxSections, maxNameWords, maxDescriptionWords, photosRecommended };
 }
@@ -1415,41 +1414,103 @@ export function displayBriefLines(spec: DisplaySpec) {
   return [
     `DISPLAY: ${spec.displayType.replace("-", " ")}, ${spec.widthCm} × ${spec.heightCm} cm (${spec.orientation}, aspect ${spec.aspect}), ${spec.isDigital ? "digital screen" : "printed"}, read from about ${spec.viewingDistanceM} m in ${spec.lighting} light.`,
     `LEGIBILITY BUDGET: item names need ≥ ${b.minLetterHeightCm} cm cap height, so the design may hold at most ${b.maxItems} items (${b.maxOffers} photo-led offers) across ≤ ${b.maxSections} sections; names ≤ ${b.maxNameWords} words, descriptions ≤ ${b.maxDescriptionWords} words${b.maxDescriptionWords === 0 ? " (no descriptions)" : ""}; ${b.photosRecommended} photos at most.`,
-    "If the supplied menu has more items than fit, keep the exact items the brief marks as priorities, then the first items of each section, and list what you left out in 'followed' as 'Omitted for legibility: …'. Never shrink type below the budget to squeeze items in.",
-  ];
+    spec.isDigital ? `DIGITAL SCREEN RULES: viewers decide within 15-30 s, so one screen carries at most ${DIGITAL_ITEMS_PER_SCREEN} items; thick-stroke sans-serif only, text/background contrast 7:1 or better, no thin rules or fine textures (they shimmer on screen), no large pure-white fields (glare), prices on the same line as names.` : "",
+    "If the supplied menu has more items than fit, keep the exact items the brief marks as priorities (signature, best seller, special, hero), then the first items of each section, and list what you left out in 'followed' as 'Omitted for legibility: …'. Never shrink type below the budget to squeeze items in.",
+  ].filter(Boolean);
 }
 
 export type FitResult = { menu: GeneratedMenuCore; omitted: string[]; trimmedDescriptions: number; changed: boolean };
 
+/** What the fitter knows about which items matter most: the owner's brief and the store profile's signature dishes. */
+export type FitContext = { brief?: string | undefined; signatureItems?: readonly string[] | undefined };
+
+const PRIORITY_WORDS = /\b(signature|best[ -]?seller|best[ -]?selling|most popular|popular|favou?rite|hero|special|chef'?s|house|must[ -]?have|featured|top seller|star)\b/i;
+
+function normalise(text: string) {
+  return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Priority of an item when the display cannot hold everything. Higher keeps.
+ *  +4 named as a signature item in the store profile
+ *  +3 the brief marks it (signature / best seller / special …) within a short distance of its name
+ *  +2 its name appears in the brief at all (owner's own item beats an engine's filler)
+ *  +1 it carries a badge
+ */
+export function itemPriority(item: { name: string; badge?: string }, context: FitContext = {}): number {
+  const name = normalise(item.name);
+  if (!name) return 0;
+  let score = 0;
+  if (context.signatureItems?.some((signature) => { const s = normalise(signature); return s.length > 2 && (name.includes(s) || s.includes(name)); })) score += 4;
+  if (context.brief) {
+    // Sentence by sentence, so "our signature X is the best seller. Also Y, Z" marks X but not Y or Z.
+    for (const sentence of context.brief.split(/[.!?;\n]+/)) {
+      const text = normalise(sentence);
+      const at = text.indexOf(name);
+      if (at < 0) continue;
+      score += 2;
+      if (PRIORITY_WORDS.test(text.slice(Math.max(0, at - 60), at + name.length + 60))) score += 3;
+      break;
+    }
+  }
+  if (item.badge?.trim()) score += 1;
+  return score;
+}
+
 /**
  * Deterministic last-mile fit: enforces the budget on a finished menu so the
- * rendered design is legible even if an engine ignored the numbers.
+ * rendered design is legible even if an engine ignored the numbers. When items
+ * must go, the lowest-priority ones go first (see itemPriority); sections keep
+ * their original order and never lose their first item before lower-priority
+ * items elsewhere have gone.
  */
-export function fitMenuToDisplay(menu: GeneratedMenuCore, spec: DisplaySpec): FitResult {
+export function fitMenuToDisplay(menu: GeneratedMenuCore, spec: DisplaySpec, context: FitContext = {}): FitResult {
   const b = spec.budget;
   const omitted: string[] = [];
   let trimmed = 0;
-  let changed = false;
-  const limit = menu.mode === "poster" ? b.maxOffers : b.maxItems;
-  let remaining = limit;
-  const sections = menu.sections.slice(0, Math.max(1, b.maxSections)).map((section) => {
-    const keep = section.items.slice(0, Math.max(0, remaining));
-    const drop = section.items.slice(keep.length);
-    remaining -= keep.length;
-    omitted.push(...drop.map((item) => item.name));
-    const items = keep.map((item) => {
-      const words = item.description.trim().split(/\s+/).filter(Boolean);
-      if (b.maxDescriptionWords === 0 && item.description) { trimmed++; return { ...item, description: "" }; }
-      if (words.length > b.maxDescriptionWords) { trimmed++; return { ...item, description: `${words.slice(0, b.maxDescriptionWords).join(" ").replace(/[,;:]$/, "")}` }; }
-      return item;
-    });
-    return { ...section, items };
-  });
-  for (const section of menu.sections.slice(sections.length)) omitted.push(...section.items.map((item) => item.name));
-  const kept = sections.filter((section) => section.items.length > 0);
-  changed = omitted.length > 0 || trimmed > 0 || kept.length !== menu.sections.length;
-  const followed = omitted.length ? [...menu.followed.filter((line) => !line.startsWith("Omitted for legibility")), `Omitted for legibility: ${omitted.join(", ")}`] : menu.followed;
-  return { menu: changed ? { ...menu, sections: kept.length ? kept : menu.sections, followed } : menu, omitted, trimmedDescriptions: trimmed, changed };
-}
+  const limit = Math.max(1, menu.mode === "poster" ? b.maxOffers : b.maxItems);
+  const maxSections = Math.max(1, b.maxSections);
 
+  // Choose which sections survive: the ones holding the most important items, rendered in original order.
+  const sectionRank = menu.sections.map((section, index) => ({ index, best: Math.max(0, ...section.items.map((item) => itemPriority(item, context))) }));
+  const keptSectionIndexes = new Set(
+    sectionRank.length <= maxSections
+      ? sectionRank.map((entry) => entry.index)
+      : [...sectionRank].sort((a, c) => c.best - a.best || a.index - c.index).slice(0, maxSections).map((entry) => entry.index),
+  );
+
+  // Rank every item of the surviving sections: priority first, then the first item of each section, then original order.
+  type Ranked = { section: number; position: number; priority: number; name: string };
+  const ranked: Ranked[] = [];
+  menu.sections.forEach((section, sectionIndex) => {
+    if (!keptSectionIndexes.has(sectionIndex)) { omitted.push(...section.items.map((item) => item.name)); return; }
+    section.items.forEach((item, position) => ranked.push({ section: sectionIndex, position, priority: itemPriority(item, context) + (position === 0 ? 0.5 : 0), name: item.name }));
+  });
+  const keepers = new Set(
+    [...ranked]
+      .sort((a, c) => c.priority - a.priority || a.section - c.section || a.position - c.position)
+      .slice(0, limit)
+      .map((entry) => `${entry.section}:${entry.position}`),
+  );
+  for (const entry of ranked) if (!keepers.has(`${entry.section}:${entry.position}`)) omitted.push(entry.name);
+
+  const sections = menu.sections
+    .map((section, sectionIndex) => {
+      if (!keptSectionIndexes.has(sectionIndex)) return null;
+      const items = section.items
+        .filter((_, position) => keepers.has(`${sectionIndex}:${position}`))
+        .map((item) => {
+          const words = item.description.trim().split(/\s+/).filter(Boolean);
+          if (b.maxDescriptionWords === 0 && item.description) { trimmed++; return { ...item, description: "" }; }
+          if (words.length > b.maxDescriptionWords) { trimmed++; return { ...item, description: `${words.slice(0, b.maxDescriptionWords).join(" ").replace(/[,;:]$/, "")}` }; }
+          return item;
+        });
+      return { ...section, items };
+    })
+    .filter((section): section is NonNullable<typeof section> => section !== null && section.items.length > 0);
+
+  const changed = omitted.length > 0 || trimmed > 0 || sections.length !== menu.sections.length;
+  const followed = omitted.length ? [...menu.followed.filter((line) => !line.startsWith("Omitted for legibility")), `Omitted for legibility: ${omitted.join(", ")}`] : menu.followed;
+  return { menu: changed ? { ...menu, sections: sections.length ? sections : menu.sections, followed } : menu, omitted, trimmedDescriptions: trimmed, changed };
+}
 ```

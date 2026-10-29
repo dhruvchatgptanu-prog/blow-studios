@@ -8,3 +8,6 @@ is expected to fail between message 1 and message 3; the Lovable agent is told n
 
 Free alternative: connect the Lovable project to GitHub (Settings → GitHub) and copy the
 `src/` tree from `lovable/menu-master-ai/src/` into that repository; Lovable syncs it.
+
+Keep the bundles current: `node apply/regenerate.mjs` (from `lovable/menu-master-ai`) rewrites
+every file block from the repo files and prints each message's size against the 100k limit.

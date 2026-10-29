@@ -51,7 +51,7 @@ const inputSchema = z.object({
       notes: z.array(z.string()),
     })
     .optional(),
-  store: z.object({ storeType: z.string(), priceTier: z.string(), cuisine: z.string(), venueName: z.string(), audience: z.string(), voice: z.string() }).optional(),
+  store: z.object({ storeType: z.string(), priceTier: z.string(), cuisine: z.string(), venueName: z.string(), audience: z.string(), voice: z.string(), signatureItems: z.array(z.string().max(80)).max(12).optional() }).optional(),
   storeId: z.string().uuid().optional(),
   displayId: z.string().uuid().optional(),
 });
@@ -65,7 +65,6 @@ const inputSchema = z.object({
 export const generateMenu = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => inputSchema.parse(data))
   .handler(async ({ data }): Promise<GeneratedMenu> => composeMenu(data as MenuRequest));
-
 ```
 
 ===== FILE: src/lib/store.functions.ts =====
@@ -112,7 +111,6 @@ export const analyzeStore = createServerFn({ method: "POST" })
 export const measureDisplay = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => measureInput.parse(data))
   .handler(async ({ data }): Promise<MeasureDisplayResult> => measureDisplayOnServer(data));
-
 ```
 
 ===== FILE: src/lib/setup.ts =====
@@ -176,6 +174,7 @@ export function storeContext(profile: StoreProfile) {
     venueName: profile.venueName,
     audience: profile.audience,
     voice: STORE_TYPE_GUIDE[profile.storeType].voice,
+    signatureItems: profile.signatureItems.slice(0, 12),
   };
 }
 
@@ -203,7 +202,6 @@ export function rendererSizeFor(display: DisplaySpec | undefined, mode: "menu" |
     default: return mode === "poster" ? "poster" : "letter";
   }
 }
-
 ```
 
 ===== FILE: src/components/BriefCoach.tsx =====
@@ -232,7 +230,6 @@ export function BriefCoach({ brief, mode }: { brief: string; mode: "menu" | "pos
     </div>
   );
 }
-
 ```
 
 ===== FILE: src/components/MenuSheet.tsx =====
@@ -368,7 +365,6 @@ export function MenuSheet({ menu, styleKey, size, hero, dishes = [], theme, disp
     </div>,
   );
 }
-
 ```
 
 ===== FILE: src/components/StoreWizard.tsx =====
@@ -607,7 +603,6 @@ export function StoreWizard() {
     </div>
   );
 }
-
 ```
 
 ===== FILE: src/routes/setup.tsx =====
@@ -637,7 +632,6 @@ function SetupPage() {
     </div>
   );
 }
-
 ```
 
 ===== FILE: src/routes/index.tsx =====
@@ -881,7 +875,6 @@ function Studio() {
     </main>
   </div>;
 }
-
 ```
 
 ===== FILE: src/routeTree.gen.ts =====
@@ -1009,5 +1002,4 @@ declare module '@tanstack/react-start' {
     config: Awaited<ReturnType<typeof startInstance.getOptions>>
   }
 }
-
 ```

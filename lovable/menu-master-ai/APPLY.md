@@ -144,6 +144,17 @@ is that the text engines now write richer, more precise per-dish photo prompts
   AAA themes get a bonus on distance-read surfaces and in dim rooms. Four themes were fixed.
   A size estimate from a photo with no named reference object is capped at 30% confidence.
   `eval/color.test.mjs`.
+* **Priority-aware fitting + digital board rules (daily run 3)** — when a display cannot hold
+  every item, `fitMenuToDisplay` now drops the least important items first instead of the last
+  ones: store-profile signature dishes, items the brief marks as signature/best seller/special,
+  items the owner named at all, badged items, then the first item of each section. Sections are
+  kept by the importance of their best item and rendered in original order. The store wizard now
+  passes the profile's `signatureItems` to the engines ("keep them, give them the hero spots") and
+  to the fitter. Digital screens get a dwell-time budget (max 9 items and 3 sections per screen,
+  from the 15-30 s QSR decision window) and a `DIGITAL SCREEN RULES` prompt block (thick-stroke
+  sans, 7:1 contrast, no hairlines or fine textures, no large white fields). The unsupported
+  "golden triangle" rule was replaced by the evidence-backed book-order / first-and-last-item rule.
+  Tests added to `eval/store-display.test.mjs`; `apply/regenerate.mjs` refreshes the bundles.
 
 ## Secrets (Lovable Cloud → Secrets)
 

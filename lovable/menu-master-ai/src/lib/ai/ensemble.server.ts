@@ -139,7 +139,7 @@ export async function composeMenu(input: MenuRequest): Promise<GeneratedMenu> {
 
   // 5. Fit to the measured display (deterministic), then final verification.
   if (request.display) {
-    const fit = fitMenuToDisplay(menu, request.display);
+    const fit = fitMenuToDisplay(menu, request.display, { brief: request.brief, signatureItems: request.store?.signatureItems });
     menu = fit.menu;
     report.fit = { format: request.display.formatLabel, omitted: fit.omitted, trimmedDescriptions: fit.trimmedDescriptions };
   }
