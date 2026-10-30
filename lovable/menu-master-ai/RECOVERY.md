@@ -1,6 +1,22 @@
-# Recovery: finish the round 3+4 apply (Lovable ran out of credits mid-way)
+# Recovery status
 
-## What happened
+**Resolved on 2026-10-30.** The two missing files (`src/lib/ai/coach.ts`,
+`src/components/BriefCoach.tsx`) were written to Lovable verbatim in one message
+(0.6 credits). Lovable's typecheck and preview build are clean again. The Lovable
+project is now at: round 2 engines + round 3/4 `cuisine.ts` patch + brief coach.
+Rounds 3-5 proper (model fallback chains, store wizard, templates, display fitting,
+contrast guard, dietary compliance) are still only on GitHub.
+
+## Getting the rest in without credits
+The three bundles in `apply/` would cost roughly 20+ credits (round 1 cost 11.5,
+round 2 cost 5.2). Connect the project to GitHub instead (free, permanent):
+
+1. Lovable editor → project Settings → GitHub → Connect / Transfer to GitHub.
+2. Tell Claude the repository name. Claude pushes the whole `src/` tree from
+   `lovable/menu-master-ai/src/` plus the `@anthropic-ai/sdk` dependency; Lovable
+   syncs the commit automatically and every future daily improvement is free.
+
+## Original incident (for the record)
 On 2026-10-26 the Lovable agent applied the two small edits of the round 3+4
 message (`src/lib/ai/cuisine.ts` and `src/routes/index.tsx`) but stopped before
 writing the four new files, then the workspace ran out of credits. The editor
@@ -11,29 +27,3 @@ The **published** site is a separate deployment and is only updated when you
 press Publish, so it should still be serving the previous working build.
 Do not press Publish/Update until the preview builds again.
 
-## Fix option A (needs a few credits, 1 message)
-Add credits, open the project chat and send exactly:
-
-    continue — write the 4 PART A files exactly as given in my previous message
-    (src/lib/ai/providers.server.ts, src/lib/ai/ensemble.server.ts,
-    src/lib/ai/coach.ts, src/components/BriefCoach.tsx), verbatim, no changes.
-    Then run the type check and confirm the build is clean.
-
-The agent still has the file contents in its thread.
-
-## Fix option B (free, no credits): connect GitHub
-1. In the Lovable editor: project Settings → GitHub → Connect / Transfer to GitHub.
-   Lovable creates a repository that mirrors the project and syncs both ways.
-2. Tell Claude the repository name. Claude pushes these four files into it:
-   - `lovable/menu-master-ai/src/lib/ai/providers.server.ts`
-   - `lovable/menu-master-ai/src/lib/ai/ensemble.server.ts`
-   - `lovable/menu-master-ai/src/lib/ai/coach.ts`
-   - `lovable/menu-master-ai/src/components/BriefCoach.tsx`
-   at the same paths (without the `lovable/menu-master-ai/` prefix), and Lovable
-   picks them up automatically. Every future improvement then costs no credits.
-
-## Fix option C (free, quickest to unbreak): revert in the editor
-In the editor's version history, restore the version before
-"Round 3+4" (the one titled around "Round 2 upgrade"). That removes the
-BriefCoach import and the preview builds again; rounds 3 and 4 can be applied
-later with option A or B.

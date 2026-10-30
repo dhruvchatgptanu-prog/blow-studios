@@ -55,7 +55,8 @@ digital screens (at most nine items per screen, thick type, high contrast) and c
 legally safe: markers like (V), (GF) stay on the dish they belong to, no diet or allergen promise
 is ever invented, and an allergen statement in your brief is always printed in the footer. Photo
 prompts also drop "8k / ultra-realistic / flawless" wording, which makes AI food look like plastic.
-Nothing has gone to Lovable since round 2
+On 30 Oct the broken Lovable preview was repaired with one 0.6-credit message
+(the two missing brief-coach files). Nothing else has gone to Lovable since round 2
 because the workspace has no credits; the apply bundles in `apply/` stay current automatically.
 
 ## What you need to do (5 minutes)
