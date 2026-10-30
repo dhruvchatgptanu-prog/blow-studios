@@ -297,7 +297,10 @@ const DEFAULTS: Record<string, PhotoDefaults> = {
 
 const GENERIC: PhotoDefaults = { surface: "on a dark round timber board over a neutral surface", angle: "45-degree angle with a 50 mm full-frame look", light: "one large softbox key from upper left with soft white-card fill" };
 
-const REALISM = "Natural imperfections: slightly uneven arrangement, natural colour variation, a small sauce or crumb trace on the rim. No fake steam, no non-food props, no text, no logo, no watermark, no illustration, no CGI, no plastic-looking food.";
+const REALISM = "Natural imperfections: slightly uneven arrangement, natural colour variation, a small sauce or crumb trace on the rim; true-to-life saturation and natural highlights. No fake steam, no non-food props, no text, no logo, no watermark, no illustration, no CGI, no plastic-looking food, no waxy sheen.";
+
+/** Quality buzzwords ("8k", "hyper-detailed", "flawless") push image models toward glossy CGI; they are removed, never added. */
+const BUZZWORDS = /\b(?:8k|4k|uhd|ultra[- ]?realistic|hyper[- ]?realistic|hyper[- ]?detailed|photorealistic render|octane(?: render)?|unreal engine|flawless|perfect(?:ly)?|award[- ]winning photo(?:graph)?|masterpiece|trending on artstation)\b[,;]?\s*/gi;
 
 function has(prompt: string, re: RegExp) {
   return re.test(prompt);
@@ -306,7 +309,7 @@ function has(prompt: string, re: RegExp) {
 /** Ensures a prompt carries surface, angle, light, finish and realism cues without duplicating what the model already wrote. Idempotent. */
 export function enrichPhotoPrompt(prompt: string, cuisines: string[], shape: "square" | "wide" = "square"): string {
   const defaults = DEFAULTS[cuisines[0] ?? ""] ?? GENERIC;
-  const parts = [prompt.trim().replace(/\s+/g, " ")];
+  const parts = [prompt.replace(BUZZWORDS, "").replace(/\s+([,.;])/g, "$1").replace(/\s+/g, " ").trim()];
   if (!has(prompt, /\b(board|plate|platter|tray|marble|paper|table|counter|slate|skillet|bowl|surface|peel|linen)\b/i)) parts.push(`Served ${defaults.surface}.`);
   if (!has(prompt, /\b(overhead|top-down|45|eye-level|three-quarter|angle|macro|mm)\b/i)) parts.push(`Shot from a ${defaults.angle}.`);
   if (!has(prompt, /\b(softbox|light|lighting|lit|backlight|daylight)\b/i)) parts.push(`Lit by ${defaults.light}.`);
@@ -344,6 +347,40 @@ export type Verification = { score: number; issues: string[]; checks: Record<str
 
 const PRICE_RE = /(?:[$€£¥]\s?\d{1,5}(?:[.,]\d{1,2})?|\b\d{1,5}(?:[.,]\d{1,2})?\s?(?:€|£|kr|chf|aud|usd|nzd|cad|gbp|eur|rs|₹|aed|r)\b)/gi;
 const FORBIDDEN_PHOTO_WORDS = ["text", "logo", "logos", "watermark", "price", "prices", "signage", "labels?", "menu board", "illustration", "illustrated", "cartoon", "render", "rendered", "cgi", "3d", "plastic", "typography", "lettering", "caption", "writing"];
+/** Quality buzzwords that push image models toward glossy CGI instead of a photograph. */
+export const CGI_BUZZWORDS = /\b(?:8k|4k|uhd|ultra[- ]?realistic|hyper[- ]?realistic|hyper[- ]?detailed|photorealistic render|octane(?: render)?|unreal engine|flawless|perfect(?:ly)?|award[- ]winning photo(?:graph)?|masterpiece|trending on artstation)\b/gi;
+
+/** Dietary / allergen vocabulary. Markers are legal information: never invented, never dropped. */
+const DIETARY: { key: string; re: RegExp }[] = [
+  { key: "vegan", re: /\bvegan\b|\((?:VG|VE|Vg|Ve)\)/ },
+  { key: "vegetarian", re: /\bvegetarian\b|\(V\)/ },
+  { key: "gluten-free", re: /\bgluten[- ]?free\b|\(GF\)/i },
+  { key: "dairy-free", re: /\bdairy[- ]?free\b|\(DF\)/i },
+  { key: "nut-free", re: /\bnut[- ]?free\b|\(NF\)/i },
+  { key: "halal", re: /\bhalal\b|\(H\)/i },
+  { key: "kosher", re: /\bkosher\b|\(K\)/i },
+  { key: "organic", re: /\borganic\b/i },
+  { key: "sugar-free", re: /\bsugar[- ]?free\b|\bno added sugar\b/i },
+];
+
+/** Dietary claims a text makes (by canonical key). */
+export function dietaryClaims(text: string) {
+  return DIETARY.filter((entry) => entry.re.test(text)).map((entry) => entry.key);
+}
+
+/** "Lamb Yiros (GF)" / "Falafel Wrap (V)(VG)" in the brief → the markers each named item must keep. */
+export function extractDietaryMarkers(brief: string) {
+  const markers: { name: string; marker: string }[] = [];
+  const re = /([A-Z][\w'&-]*(?:\s+[\w'&-]+){0,4}?)\s*((?:\((?:V|VG|VE|GF|DF|NF|H|K)\)\s*){1,3})/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(brief)) !== null) {
+    const name = (match[1] ?? "").trim();
+    if (name.length < 3) continue;
+    for (const marker of (match[2] ?? "").match(/\((?:V|VG|VE|GF|DF|NF|H|K)\)/g) ?? []) markers.push({ name, marker });
+  }
+  return markers;
+}
+
 const COUNT_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, twelve: 12 };
 
 function normalisePrice(raw: string) {
@@ -376,7 +413,8 @@ export function extractBriefNames(brief: string) {
     const inner = q.replace(/^["“”]|["“”]$/g, "").trim();
     if (/^[A-Za-z]/.test(inner) && !/[;$€£]/.test(inner)) names.add(inner);
   }
-  return Array.from(names).filter((name) => !/^(create|make|design|use|include|build|the|a|an|our|my|please|keep|add|redesign|poster|menu|sign|board|sections?|prices?|format|style|mode|note|notes)\b/i.test(name));
+  // Section headers, legal lines and instruction words are not dish names.
+  return Array.from(names).filter((name) => !/^(create|make|design|use|include|build|the|a|an|our|my|please|keep|add|redesign|poster|menu|sign|board|sections?|prices?|format|style|mode|note|notes|mains?|starters?|entr[ée]es?|sides?|desserts?|drinks?|beverages?|salads?|kids|specials?|extras?|allergens?|allergy|dietary|hours|contact|address|phone|footer|header|tagline)\b/i.test(name));
 }
 
 function extractQuantityPhrases(brief: string) {
@@ -453,6 +491,7 @@ export function verifyMenu(menu: GeneratedMenuCore, request: MenuRequest): Verif
   // 4. Photo prompt hygiene (weight 15)
   const prompts = [menu.heroPhoto.prompt, ...menu.dishPhotos.map((photo) => photo.prompt), ...items.map((item) => item.photoPrompt)];
   let photoPenalty = 0;
+  let buzzwords = 0;
   for (const prompt of prompts) {
     const lower = prompt.toLowerCase();
     const hit = FORBIDDEN_PHOTO_WORDS.find((word) => {
@@ -463,9 +502,12 @@ export function verifyMenu(menu: GeneratedMenuCore, request: MenuRequest): Verif
     });
     if (hit) photoPenalty += 3;
     if (prompt.split(/\s+/).length < 18) photoPenalty += 2;
+    if (CGI_BUZZWORDS.test(prompt)) { buzzwords++; }
+    CGI_BUZZWORDS.lastIndex = 0;
   }
-  checks.photos = Math.max(0, 15 - photoPenalty);
+  checks.photos = Math.max(0, 15 - photoPenalty - Math.min(3, buzzwords));
   if (photoPenalty > 0) issues.push("Some photo prompts are too short or mention text/logo/price/illustration words; rewrite them with the photo prompt grammar.");
+  if (buzzwords > 0) issues.push("Photo prompts use CGI-style quality words ('8k', 'hyper-detailed', 'flawless', 'perfect'); describe a real lens, one light source and small imperfections instead.");
 
   // 5. Structure (weight 15)
   let structure = 15;
@@ -483,6 +525,23 @@ export function verifyMenu(menu: GeneratedMenuCore, request: MenuRequest): Verif
   for (const item of items) {
     if (/[!]{1,}/.test(item.description)) { structure -= 1; issues.push(`Remove exclamation marks from "${item.name}".`); break; }
   }
+
+  // 6. Dietary markers and allergen statements (legal information; part of structure).
+  const outputText = [menu.tagline, menu.eyebrow, menu.footerLeft, menu.footerRight, ...menu.features, ...items.map((item) => `${item.name} ${item.description} ${item.badge}`)].join(" \n ");
+  const briefClaims = new Set(dietaryClaims(brief));
+  const invented = dietaryClaims(outputText).filter((claim) => !briefClaims.has(claim));
+  if (invented.length) { structure -= 3; issues.push(`Dietary claims the brief does not make were added: ${invented.join(", ")}. Remove them; never infer a diet or allergen promise.`); }
+  const markers = extractDietaryMarkers(brief);
+  const lostMarkers: string[] = [];
+  for (const { name, marker } of markers) {
+    const item = items.find((candidate) => candidate.name.toLowerCase().includes(name.toLowerCase()) || name.toLowerCase().includes(candidate.name.toLowerCase()));
+    if (!item) continue;
+    const text = `${item.name} ${item.description} ${item.badge}`;
+    const key = dietaryClaims(marker)[0];
+    if (!text.includes(marker) && !(key && dietaryClaims(text).includes(key))) lostMarkers.push(`${item.name} ${marker}`);
+  }
+  if (lostMarkers.length) { structure -= 3; issues.push(`Dietary markers from the brief were dropped: ${Array.from(new Set(lostMarkers)).join(", ")}. Keep each marker exactly as written, after the item name.`); }
+  if (/\ballerg(?:en|ens|y|ies)\b/i.test(brief) && !/\ballerg/i.test(`${menu.footerLeft} ${menu.footerRight} ${menu.features.join(" ")}`)) { structure -= 2; issues.push("The brief gives an allergen statement; carry it in the footer verbatim."); }
   if (request.display) {
     const budget = request.display.budget;
     const limit = request.mode === "poster" ? budget.maxOffers : budget.maxItems;
@@ -537,6 +596,7 @@ export function coachBrief(brief: string, mode: "menu" | "poster"): CoachReport 
   if (mode === "poster" && !hasCount && names.length === 0) { score -= 5; hints.push({ level: "tip", text: "Say how many offers you want (2-4 works best)." }); }
   if (mode === "menu" && !/\b(section|sections|starters?|mains?|sides?|desserts?|drinks?|breakfast|lunch|dinner)\b/i.test(text)) { score -= 10; hints.push({ level: "tip", text: "List the sections you want (e.g. starters, mains, sides) in the order they should appear." }); }
   if (mode === "poster" && /\b(\d{1,2})\s+[a-z]/i.test(text) === false && prices.length > 0) { score -= 5; hints.push({ level: "tip", text: "Spell out what each deal includes with quantities (e.g. '3 lamb yiros and large chips')." }); }
+  if (/\((?:V|VG|VE|GF|DF|NF|H|K)\)/.test(text) && !/\b(?:V|VG|GF|DF|NF|H)\s*=\s*|\bkey\b|\blegend\b/i.test(text)) hints.push({ level: "tip", text: "Dietary markers found. They will be kept exactly as written; add a key line (e.g. 'V = vegetarian, GF = gluten free') if you want one printed." });
   if (!hasPhone) hints.push({ level: "tip", text: "No phone number given, so none will be printed. Add one if you want it on the design." });
   if (!hasNegatives && text.length < 160) hints.push({ level: "tip", text: "Mention anything to avoid (e.g. 'no descriptions', 'no red') and any colours or fonts you want." });
 

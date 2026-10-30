@@ -34,6 +34,7 @@ export function coachBrief(brief: string, mode: "menu" | "poster"): CoachReport 
   if (mode === "poster" && !hasCount && names.length === 0) { score -= 5; hints.push({ level: "tip", text: "Say how many offers you want (2-4 works best)." }); }
   if (mode === "menu" && !/\b(section|sections|starters?|mains?|sides?|desserts?|drinks?|breakfast|lunch|dinner)\b/i.test(text)) { score -= 10; hints.push({ level: "tip", text: "List the sections you want (e.g. starters, mains, sides) in the order they should appear." }); }
   if (mode === "poster" && /\b(\d{1,2})\s+[a-z]/i.test(text) === false && prices.length > 0) { score -= 5; hints.push({ level: "tip", text: "Spell out what each deal includes with quantities (e.g. '3 lamb yiros and large chips')." }); }
+  if (/\((?:V|VG|VE|GF|DF|NF|H|K)\)/.test(text) && !/\b(?:V|VG|GF|DF|NF|H)\s*=\s*|\bkey\b|\blegend\b/i.test(text)) hints.push({ level: "tip", text: "Dietary markers found. They will be kept exactly as written; add a key line (e.g. 'V = vegetarian, GF = gluten free') if you want one printed." });
   if (!hasPhone) hints.push({ level: "tip", text: "No phone number given, so none will be printed. Add one if you want it on the design." });
   if (!hasNegatives && text.length < 160) hints.push({ level: "tip", text: "Mention anything to avoid (e.g. 'no descriptions', 'no red') and any colours or fonts you want." });
 

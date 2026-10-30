@@ -192,6 +192,7 @@ export const BRIEF_COMPLIANCE_RULES = [
   "Quantities inside a deal (e.g. '3 lamb yiros and large chips') must be restated in the item description so the customer sees exactly what is included.",
   "'followed' lists 3-6 specific instructions you actually followed, quoting the brief. Never claim to follow something the brief did not say.",
   "'features' holds only selling points the brief supports. If none are supported return an empty array.",
+  "Dietary markers ((V), (VG), (GF), (DF), (NF), (H)) and allergen statements are legal information, not copy: reproduce each marker exactly as the brief attaches it, directly after the item name, and never add, infer, expand or drop one. If the brief gives an allergen statement ('allergens: ask staff', 'contains nuts'), carry it word for word in a footer line.",
 ] as const;
 
 export const MENU_MODE_RULES = [
@@ -278,6 +279,7 @@ export const PHOTO_PROMPT_GRAMMAR = [
   "6) FINISH — true-to-life colour, visible steam only for hot dishes, no props that are not food, square composition with clean edges so the artwork can crop it.",
   "Always describe real food texture: crust, char, melted cheese, sauce gloss, sesame seeds, herb flecks. Name the cut, cooking method and doneness where relevant (e.g. 'charcoal-grilled lamb, sliced thin with crisp edges').",
   "Realism cues: add one or two deliberate imperfections (slightly uneven arrangement, natural colour variation, a small sauce trace on the rim). No fake steam, no floating ingredients, no non-food props, no mixed light sources.",
+  "Never use quality buzzwords ('8k', 'ultra-realistic', 'hyper-detailed', 'flawless', 'perfect', 'masterpiece'): they push the image model toward glossy CGI. Realism comes from a named lens, one light source, true-to-life saturation and small imperfections.",
   "Never use the words text, logo, watermark, price, sign, label, menu, illustration, cartoon, render, CGI, 3D, plastic.",
   "Hero photos are wide table scenes containing the signature dishes; dish photos are single complete offers. For a pizza sign the hero is a whole pie overhead.",
 ] as const;

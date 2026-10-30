@@ -155,6 +155,16 @@ is that the text engines now write richer, more precise per-dish photo prompts
   sans, 7:1 contrast, no hairlines or fine textures, no large white fields). The unsupported
   "golden triangle" rule was replaced by the evidence-backed book-order / first-and-last-item rule.
   Tests added to `eval/store-display.test.mjs`; `apply/regenerate.mjs` refreshes the bundles.
+* **Dietary markers, allergen statements and anti-CGI photo prompts (daily run 4)** — the verifier
+  now treats dietary information as legal text: markers the brief attaches to an item ((V), (VG),
+  (GF), (DF), (NF), (H), (K)) must survive on that item, dietary claims the brief never makes
+  (vegan, gluten-free, halal, organic…) are flagged as invented, and a brief that gives an allergen
+  statement must see it carried in the footer. Section headers and legal lines ("Mains:",
+  "Allergens:") are no longer mistaken for dish names. Photo prompts lose CGI buzzwords ("8k",
+  "ultra-realistic", "hyper-detailed", "flawless", "masterpiece") deterministically in enrichment
+  and are penalised by the verifier when an engine writes them; the realism cue gains "true-to-life
+  saturation, natural highlights, no waxy sheen". The brief coach notes dietary markers. Tests in
+  `eval/verifier.test.mjs`.
 
 ## Secrets (Lovable Cloud → Secrets)
 

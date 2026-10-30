@@ -84,7 +84,10 @@ const DEFAULTS: Record<string, PhotoDefaults> = {
 
 const GENERIC: PhotoDefaults = { surface: "on a dark round timber board over a neutral surface", angle: "45-degree angle with a 50 mm full-frame look", light: "one large softbox key from upper left with soft white-card fill" };
 
-const REALISM = "Natural imperfections: slightly uneven arrangement, natural colour variation, a small sauce or crumb trace on the rim. No fake steam, no non-food props, no text, no logo, no watermark, no illustration, no CGI, no plastic-looking food.";
+const REALISM = "Natural imperfections: slightly uneven arrangement, natural colour variation, a small sauce or crumb trace on the rim; true-to-life saturation and natural highlights. No fake steam, no non-food props, no text, no logo, no watermark, no illustration, no CGI, no plastic-looking food, no waxy sheen.";
+
+/** Quality buzzwords ("8k", "hyper-detailed", "flawless") push image models toward glossy CGI; they are removed, never added. */
+const BUZZWORDS = /\b(?:8k|4k|uhd|ultra[- ]?realistic|hyper[- ]?realistic|hyper[- ]?detailed|photorealistic render|octane(?: render)?|unreal engine|flawless|perfect(?:ly)?|award[- ]winning photo(?:graph)?|masterpiece|trending on artstation)\b[,;]?\s*/gi;
 
 function has(prompt: string, re: RegExp) {
   return re.test(prompt);
@@ -93,7 +96,7 @@ function has(prompt: string, re: RegExp) {
 /** Ensures a prompt carries surface, angle, light, finish and realism cues without duplicating what the model already wrote. Idempotent. */
 export function enrichPhotoPrompt(prompt: string, cuisines: string[], shape: "square" | "wide" = "square"): string {
   const defaults = DEFAULTS[cuisines[0] ?? ""] ?? GENERIC;
-  const parts = [prompt.trim().replace(/\s+/g, " ")];
+  const parts = [prompt.replace(BUZZWORDS, "").replace(/\s+([,.;])/g, "$1").replace(/\s+/g, " ").trim()];
   if (!has(prompt, /\b(board|plate|platter|tray|marble|paper|table|counter|slate|skillet|bowl|surface|peel|linen)\b/i)) parts.push(`Served ${defaults.surface}.`);
   if (!has(prompt, /\b(overhead|top-down|45|eye-level|three-quarter|angle|macro|mm)\b/i)) parts.push(`Shot from a ${defaults.angle}.`);
   if (!has(prompt, /\b(softbox|light|lighting|lit|backlight|daylight)\b/i)) parts.push(`Lit by ${defaults.light}.`);

@@ -51,7 +51,11 @@ Run 2 added a colour-contrast guard so no template can recommend unreadable text
 display fitter choose what to cut intelligently (your signature dishes and anything you call a
 best seller or special always survive; filler goes first), taught the engines the rules for
 digital screens (at most nine items per screen, thick type, high contrast) and corrected a menu
-"psychology" rule that research does not support. Nothing has gone to Lovable since round 2
+"psychology" rule that research does not support. Run 4 made dietary markers and allergen lines
+legally safe: markers like (V), (GF) stay on the dish they belong to, no diet or allergen promise
+is ever invented, and an allergen statement in your brief is always printed in the footer. Photo
+prompts also drop "8k / ultra-realistic / flawless" wording, which makes AI food look like plastic.
+Nothing has gone to Lovable since round 2
 because the workspace has no credits; the apply bundles in `apply/` stay current automatically.
 
 ## What you need to do (5 minutes)
