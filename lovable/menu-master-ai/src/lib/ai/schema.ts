@@ -82,7 +82,14 @@ export type EngineReport = {
   /** Deterministic cuisine detection used to focus plating cues and photo enrichment. */
   cuisine: string[];
   /** Learning memory: how many approved past designs were shown as examples, and which judge the data currently prefers. */
-  memory: { exemplars: number; totalRecorded: number; judgeRanking: ProviderId[] };
+  memory: {
+    exemplars: number;
+    totalRecorded: number;
+    judgeRanking: ProviderId[];
+    /** "recorded" when this generation was saved; otherwise why not (off, unavailable, timeout, failed). */
+    status?: "recorded" | "off" | "unavailable" | "timeout" | "failed" | undefined;
+    detail?: string | undefined;
+  };
   /** Deterministic fit to the measured display: what had to be left out or shortened. */
   fit?: { format: string; omitted: string[]; trimmedDescriptions: number };
   template?: string;

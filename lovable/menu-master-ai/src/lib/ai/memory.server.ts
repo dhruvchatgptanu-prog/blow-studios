@@ -43,24 +43,32 @@ type Row = {
   template_id?: string | null;
 };
 
-async function db(): Promise<SupabaseClient | undefined> {
-  if (process.env["HALFTONE_MEMORY"] === "off") return undefined;
-  if (!process.env["SUPABASE_URL"] || !process.env["SUPABASE_SERVICE_ROLE_KEY"]) return undefined;
+/** Why the memory is (not) in use. Shown in the Engines panel so a silent failure is never silent. */
+export type MemoryStatus = "recorded" | "off" | "unavailable" | "timeout" | "failed";
+
+type Db = { client: SupabaseClient } | { client: undefined; status: "off" | "unavailable"; detail: string };
+
+async function db(): Promise<Db> {
+  if (process.env["HALFTONE_MEMORY"] === "off") return { client: undefined, status: "off", detail: "HALFTONE_MEMORY=off" };
+  const missing = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"].filter((key) => !process.env[key]);
+  if (missing.length) return { client: undefined, status: "unavailable", detail: `missing ${missing.join(", ")}` };
   try {
     const mod = await import("@/integrations/supabase/client.server");
-    return mod.supabaseAdmin as unknown as SupabaseClient;
-  } catch {
-    return undefined;
+    return { client: mod.supabaseAdmin as unknown as SupabaseClient };
+  } catch (error) {
+    return { client: undefined, status: "unavailable", detail: error instanceof Error ? error.message : "supabase client failed to load" };
   }
 }
 
-/** Resolves to undefined on timeout or error so memory can never break a generation. */
-function withTimeout<T>(promise: PromiseLike<T>): Promise<T | undefined> {
-  return new Promise<T | undefined>((resolve) => {
-    const timer = setTimeout(() => resolve(undefined), TIMEOUT_MS);
+type Outcome<T> = { value: T; status: "ok" } | { value: undefined; status: "timeout" | "failed"; detail: string };
+
+/** Resolves on timeout or error instead of throwing so memory can never break a generation; the outcome says what happened. */
+function withTimeout<T>(promise: PromiseLike<T>): Promise<Outcome<T>> {
+  return new Promise<Outcome<T>>((resolve) => {
+    const timer = setTimeout(() => resolve({ value: undefined, status: "timeout", detail: `no answer within ${TIMEOUT_MS} ms` }), TIMEOUT_MS);
     Promise.resolve(promise).then(
-      (value) => { clearTimeout(timer); resolve(value); },
-      () => { clearTimeout(timer); resolve(undefined); },
+      (value) => { clearTimeout(timer); resolve({ value, status: "ok" }); },
+      (error: unknown) => { clearTimeout(timer); resolve({ value: undefined, status: "failed", detail: error instanceof Error ? error.message : String(error) }); },
     );
   });
 }
@@ -70,14 +78,18 @@ export type MemoryContext = {
   exemplarCount: number;
   judgeRanking: ProviderId[];
   totalRecorded: number;
+  /** Whether the memory could be read; "recorded" here means readable. */
+  status: MemoryStatus;
+  detail?: string | undefined;
 };
 
-const EMPTY: MemoryContext = { exemplars: "", exemplarCount: 0, judgeRanking: [], totalRecorded: 0 };
+const EMPTY: Omit<MemoryContext, "status" | "detail"> = { exemplars: "", exemplarCount: 0, judgeRanking: [], totalRecorded: 0 };
 
 /** Loads exemplars and the judge ranking for this request. Never throws. */
 export async function loadMemory(request: MenuRequest, cuisines: string[]): Promise<MemoryContext> {
-  const client = await db();
-  if (!client) return EMPTY;
+  const handle = await db();
+  if (!handle.client) return { ...EMPTY, status: handle.status, detail: handle.detail };
+  const client = handle.client;
   const cuisine = cuisines[0] ?? null;
 
   const exemplarQuery = client
@@ -93,7 +105,10 @@ export async function loadMemory(request: MenuRequest, cuisines: string[]): Prom
   );
   const countPromise = withTimeout(client.from("halftone_generations").select("id", { count: "exact", head: true }));
 
-  const [exemplars, stats, total] = await Promise.all([exemplarsPromise, statsPromise, countPromise]);
+  const [exemplarsOutcome, statsOutcome, totalOutcome] = await Promise.all([exemplarsPromise, statsPromise, countPromise]);
+  const exemplars = exemplarsOutcome.value, stats = statsOutcome.value, total = totalOutcome.value;
+  const broken = [exemplarsOutcome, statsOutcome, totalOutcome].find((outcome): outcome is Extract<typeof outcome, { status: "timeout" | "failed" }> => outcome.status !== "ok");
+  const dbError = [exemplars, stats, total].find((result) => result && typeof result === "object" && "error" in result && result.error)?.error as { message?: string } | undefined;
 
   const rows = ((exemplars?.data ?? []) as Pick<Row, "brief" | "menu" | "final_score" | "created_at">[]).filter((row) => row.brief.trim() !== request.brief.trim());
   const exemplarText = rows.length
@@ -115,7 +130,14 @@ export async function loadMemory(request: MenuRequest, cuisines: string[]): Prom
     .sort((a, b) => b[1].sum / b[1].n - a[1].sum / a[1].n)
     .map(([key]) => key as ProviderId);
 
-  return { exemplars: exemplarText, exemplarCount: rows.length, judgeRanking: ranking, totalRecorded: total?.count ?? 0 };
+  return {
+    exemplars: exemplarText,
+    exemplarCount: rows.length,
+    judgeRanking: ranking,
+    totalRecorded: total?.count ?? 0,
+    status: broken ? broken.status : dbError ? "failed" : "recorded",
+    detail: broken ? broken.detail : dbError?.message,
+  };
 }
 
 function stripForExemplar(menu: GeneratedMenuCore) {
@@ -128,10 +150,13 @@ function stripForExemplar(menu: GeneratedMenuCore) {
   };
 }
 
-/** Records a finished generation. Fire-and-forget; never throws. */
-export async function recordGeneration(request: MenuRequest, cuisines: string[], menu: GeneratedMenuCore, engine: EngineReport, durationMs: number): Promise<void> {
-  const client = await db();
-  if (!client) return;
+export type RecordResult = { status: MemoryStatus; detail?: string | undefined };
+
+/** Records a finished generation. Never throws; the result says whether the row was saved and, if not, why. */
+export async function recordGeneration(request: MenuRequest, cuisines: string[], menu: GeneratedMenuCore, engine: EngineReport, durationMs: number): Promise<RecordResult> {
+  const handle = await db();
+  if (!handle.client) return { status: handle.status, detail: handle.detail };
+  const client = handle.client;
   const row: Row = {
     brief: request.brief,
     mode: request.mode,
@@ -153,5 +178,8 @@ export async function recordGeneration(request: MenuRequest, cuisines: string[],
     display_id: request.displayId ?? null,
     template_id: request.template ?? null,
   };
-  await withTimeout(client.from("halftone_generations").insert(row));
+  const outcome = await withTimeout(client.from("halftone_generations").insert(row));
+  if (outcome.status !== "ok") return { status: outcome.status, detail: outcome.detail };
+  const error = (outcome.value as { error?: { message?: string } | null } | undefined)?.error;
+  return error ? { status: "failed", detail: error.message ?? "insert rejected" } : { status: "recorded" };
 }

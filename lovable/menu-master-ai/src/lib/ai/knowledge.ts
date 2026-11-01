@@ -77,7 +77,7 @@ export const MENU_PSYCHOLOGY = [
   "Chunking: 5-7 items per section is the readability sweet spot; split larger groups into logical sub-sections.",
   "Scarcity and urgency wording ('this week only', 'limited') is allowed only when the brief states a time limit.",
   "Serial position: guests most often order the first and last item in a section, so put the signature or best-value items there.",
-  "Descriptive labels sell: name the technique, origin or key ingredient ('charcoal-grilled', 'house-made tzatziki', 'wood-fired') instead of adjectives like 'delicious'; keep every such word plausible for the venue and never contradict the brief.",
+  "Descriptive labels sell (Wansink, Painter & Van Ittersum 2001: +27% sales for labelled items): give each item ONE label of a proven type — geographic ('Tuscan'), sensory ('charcoal-grilled', 'slow-roasted'), nostalgic ('Grandma's', 'the original 1987 recipe' only if the brief says so) or named ingredient ('San Marzano tomatoes') — instead of adjectives like 'delicious'. The effect comes from the label, not from length: keep descriptions short and keep every word plausible for the venue, never contradicting the brief.",
   "Currency and price format follow the brief exactly. Never add a currency symbol the brief did not use, never strip one it did, never round or add charm endings (.95/.99) the brief did not write.",
   "Fewer, clearer choices beat long lists: when the brief leaves the count open, prefer 5-7 items per section and 2-4 offers per poster.",
 ] as const;

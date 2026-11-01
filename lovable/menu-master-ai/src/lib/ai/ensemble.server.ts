@@ -151,7 +151,9 @@ export async function composeMenu(input: MenuRequest): Promise<GeneratedMenu> {
   report.totalMs = Date.now() - startedAt;
 
   // 6. Learn from it (never blocks the response on failure).
-  await recordGeneration(input, cuisine, menu, report, report.totalMs);
+  const recorded = await recordGeneration(input, cuisine, menu, report, report.totalMs);
+  report.memory.status = recorded.status;
+  report.memory.detail = recorded.status === "recorded" ? undefined : recorded.detail ?? memory.detail;
 
   return { ...menu, engine: report };
 }

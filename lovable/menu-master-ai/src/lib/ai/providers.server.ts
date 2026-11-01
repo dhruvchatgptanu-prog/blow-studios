@@ -70,8 +70,8 @@ function list(env: string | undefined, fallback: string[]) {
  * Override with comma-separated env vars; the primary MODELS entry always goes first.
  */
 const FALLBACK_MODELS: Record<ProviderId, string[]> = {
-  lovable: list(process.env["LOVABLE_FALLBACK_MODELS"], ["openai/gpt-6.1-sol", "openai/gpt-6-sol", "openai/gpt-5.6-sol"]),
-  openai: list(process.env["OPENAI_FALLBACK_MODELS"], ["gpt-6.1-sol", "gpt-6-sol", "gpt-5.6-sol", "gpt-5.5"]),
+  lovable: list(process.env["LOVABLE_FALLBACK_MODELS"], ["openai/gpt-6.1-sol", "openai/gpt-6-sol", "openai/gpt-6-luna", "openai/gpt-5.6-sol"]),
+  openai: list(process.env["OPENAI_FALLBACK_MODELS"], ["gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.5"]),
   claude: list(process.env["ANTHROPIC_FALLBACK_MODELS"], ["claude-sonnet-5-5", "claude-opus-5"]),
 };
 

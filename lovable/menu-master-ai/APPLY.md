@@ -165,6 +165,13 @@ is that the text engines now write richer, more precise per-dish photo prompts
   and are penalised by the verifier when an engine writes them; the realism cue gains "true-to-life
   saturation, natural highlights, no waxy sheen". The brief coach notes dietary markers. Tests in
   `eval/verifier.test.mjs`.
+* **Memory status, wider fallback chains, evidence-based label rule (daily run 6)** — the learning
+  memory no longer fails silently: every generation reports whether it was saved and, if not, why
+  (`off`, `unavailable: missing SUPABASE_…`, `timeout`, `failed: <database error>`), and the Engines
+  panel shows "Memory · not saved (reason)". The OpenAI and gateway fallback chains gain the
+  `gpt-6-luna` and `gpt-5.6-terra` ids OpenAI now names as replacements. The descriptive-label rule
+  now cites the Wansink field study and asks for one label of a proven type (geographic, sensory,
+  nostalgic, named ingredient) rather than longer copy. Tests in `eval/ensemble.test.mjs`.
 
 ## Secrets (Lovable Cloud → Secrets)
 
@@ -179,7 +186,7 @@ is that the text engines now write richer, more precise per-dish photo prompts
 | `HALFTONE_JUDGE` | optional | `claude` (then `openai`, then `lovable`) |
 | `HALFTONE_GENERATE_TIMEOUT_MS` / `HALFTONE_JUDGE_TIMEOUT_MS` / `HALFTONE_REPAIR_TIMEOUT_MS` | optional | `110000` / `90000` / `60000` |
 | `HALFTONE_MEMORY` | optional | set to `off` to disable the learning memory |
-| `OPENAI_FALLBACK_MODELS` / `ANTHROPIC_FALLBACK_MODELS` / `LOVABLE_FALLBACK_MODELS` | optional | comma-separated model ids tried in order when the primary model id is retired or unknown (defaults: `gpt-6.1-sol,gpt-6-sol,gpt-5.6-sol,gpt-5.5` / `claude-sonnet-5-5,claude-opus-5` / `openai/gpt-6.1-sol,openai/gpt-6-sol,openai/gpt-5.6-sol`) |
+| `OPENAI_FALLBACK_MODELS` / `ANTHROPIC_FALLBACK_MODELS` / `LOVABLE_FALLBACK_MODELS` | optional | comma-separated model ids tried in order when the primary model id is retired or unknown (defaults: `gpt-6.1-sol,gpt-6-sol,gpt-6-luna,gpt-5.6-sol,gpt-5.6-terra,gpt-5.5` / `claude-sonnet-5-5,claude-opus-5` / `openai/gpt-6.1-sol,openai/gpt-6-sol,openai/gpt-6-luna,openai/gpt-5.6-sol`) |
 
 With only `LOVABLE_API_KEY` set the app behaves exactly like before plus the
 verifier and the Engines panel. Each extra key adds an engine automatically.

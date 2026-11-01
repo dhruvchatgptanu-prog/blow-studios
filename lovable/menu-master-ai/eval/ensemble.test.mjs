@@ -100,5 +100,13 @@ scenario = { "lovable.generate": sse("{not json"), "openai.generate": good, "ope
 result = await composeMenu(request);
 check("s5 malformed engine marked failed, run succeeds", result.engine.candidates.find((c) => c.provider === "lovable")?.status === "failed" && result.engine.finalScore === 100);
 
+// ---- memory status is surfaced (daily run 6) ----
+scenario = { "lovable.generate": good, "openai.generate": good, "openai.judge": { menu: good, winner: "openai", rationale: "same", mergedFrom: ["openai"] } };
+const memRun = await composeMenu(request);
+check("memory unavailable is reported, not silent", memRun.engine.memory.status === "unavailable" && /SUPABASE_URL/.test(memRun.engine.memory.detail ?? ""), JSON.stringify(memRun.engine.memory));
+process.env.HALFTONE_MEMORY = "off";
+const offRun = await composeMenu(request);
+check("memory off is reported as off", offRun.engine.memory.status === "off", JSON.stringify(offRun.engine.memory));
+delete process.env.HALFTONE_MEMORY;
 console.log(failures ? `FAILURES: ${failures}` : "ALL PASS");
 process.exit(failures ? 1 : 0);
