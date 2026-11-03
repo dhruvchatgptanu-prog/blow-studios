@@ -240,7 +240,11 @@ const KEYWORDS: Record<string, string[]> = {
   burgers: ["burger", "burgers", "cheeseburger", "smash", "patty", "brioche"],
   "fish & chips / seafood": ["fish", "chips", "calamari", "prawn", "prawns", "seafood", "oyster", "oysters", "barramundi", "flake", "tartare", "scallop"],
   "indian / curry": ["curry", "indian", "tandoori", "naan", "biryani", "masala", "tikka", "dal", "paneer", "samosa"],
-  "chinese / asian": ["chinese", "dumpling", "dumplings", "wok", "fried rice", "noodle", "noodles", "dim sum", "bao", "pho", "thai", "pad thai", "laksa", "korean", "bibimbap"],
+  "chinese / asian": ["chinese", "dumpling", "dumplings", "wok", "fried rice", "noodle", "noodles", "dim sum", "bao", "laksa", "korean", "bibimbap", "malaysian", "cantonese", "szechuan", "sichuan"],
+  thai: ["thai", "pad thai", "green curry", "red curry", "massaman", "tom yum", "satay", "larb", "pad see ew", "panang", "som tum"],
+  vietnamese: ["vietnamese", "pho", "banh mi", "bánh mì", "bun cha", "vermicelli", "rice paper rolls", "goi cuon", "com tam", "broken rice"],
+  "charcoal chicken / portuguese": ["charcoal chicken", "peri peri", "peri-peri", "piri piri", "piri-piri", "portuguese", "frango", "rotisserie", "half chicken", "whole chicken", "quarter chicken", "chicken shop", "chicken and chips"],
+  "pub / bistro classics": ["pub", "bistro", "parma", "parmi", "parmigiana", "schnitzel", "meat pie", "bangers", "sunday roast", "roast of the day", "pub classics", "counter meal", "chicken parmigiana"],
   "japanese / sushi": ["sushi", "sashimi", "ramen", "japanese", "nigiri", "teriyaki", "katsu", "udon", "bento", "poke"],
   mexican: ["taco", "tacos", "burrito", "burritos", "mexican", "quesadilla", "nachos", "salsa", "guacamole", "enchilada"],
   "cafe / breakfast / brunch": ["cafe", "café", "brunch", "breakfast", "coffee", "latte", "avocado", "eggs", "pancakes", "toast", "granola", "croissant"],
@@ -254,7 +258,7 @@ const KEYWORDS: Record<string, string[]> = {
 };
 
 /** Generic ingredient words that appear across cuisines count less than cuisine-defining words. */
-const GENERIC_WORDS = new Set(["chips", "fish", "chicken", "eggs", "toast", "salad", "salads", "bowl", "bowls", "wrap", "wraps", "grill", "grilled", "slice", "coffee", "iced", "juice", "juices", "bbq", "crust", "prawn", "prawns", "healthy"]);
+const GENERIC_WORDS = new Set(["chips", "fish", "chicken", "eggs", "toast", "salad", "salads", "bowl", "bowls", "wrap", "wraps", "grill", "grilled", "slice", "coffee", "iced", "juice", "juices", "bbq", "crust", "prawn", "prawns", "healthy", "pub", "roast", "vermicelli", "rotisserie"]);
 
 /** Returns matching cuisine keys, strongest first. Empty when nothing matched. */
 export function detectCuisine(brief: string): string[] {
@@ -300,6 +304,10 @@ const DEFAULTS: Record<string, PhotoDefaults> = {
   "italian / pasta": { surface: "in a shallow wide ceramic bowl on a linen-covered table", angle: "45-degree angle, 50 mm look", light: "soft daylight-style key from the side, gentle fill" },
   "salads / healthy": { surface: "in a wide stoneware bowl on a light timber table", angle: "overhead, 50 mm look", light: "bright soft daylight-style key, airy fill" },
   "drinks / bubble tea / smoothies": { surface: "on a clean light counter with a soft neutral backdrop", angle: "eye-level, 85 mm look", light: "controlled backlight glowing through the drink, soft front fill" },
+  thai: { surface: "on a banana leaf over a dark timber table (green curry on dark, red curry on a pale surface)", angle: "overhead flat lay, 50 mm look", light: "bright soft daylight-style key from the side, light fill, even highlights on the sauce" },
+  vietnamese: { surface: "in a white bowl on a dark timber table, herbs, lime and chilli on the rim", angle: "overhead for bowls, eye-level for a cut banh mi, 50 mm look", light: "soft daylight-style key from the back-left, gentle fill, broth sheen visible" },
+  "charcoal chicken / portuguese": { surface: "on a kraft-lined metal tray over a dark counter, chips and salad beside", angle: "45-degree angle, 50 mm look", light: "warm softbox key from the back-left so the char and glaze catch highlights, soft fill" },
+  "pub / bistro classics": { surface: "on a white plate over a dark timber pub table", angle: "45-degree angle, 50 mm look", light: "warm tungsten-balanced softbox key from the side, gentle fill, cosy shadows" },
 };
 
 const GENERIC: PhotoDefaults = { surface: "on a dark round timber board over a neutral surface", angle: "45-degree angle with a 50 mm full-frame look", light: "one large softbox key from upper left with soft white-card fill" };
@@ -614,6 +622,7 @@ export function coachBrief(brief: string, mode: "menu" | "poster"): CoachReport 
 ===== FILE: src/lib/ai/store.ts =====
 ```tsx
 import { z } from "zod/v4";
+import { detectCuisine } from "./cuisine";
 
 /**
  * Store analysis: turns a description plus storefront / interior / display
@@ -810,7 +819,8 @@ export function profileFromText(description: string, venueName = ""): StoreProfi
   const languages = Array.from(new Set(["english", ...(lower.match(/\b(greek|italian|chinese|japanese|korean|vietnamese|thai|arabic|turkish|hindi|spanish|french|german|portuguese)\b/g) ?? [])]));
   return {
     storeType,
-    cuisine: "",
+    // Free, deterministic cuisine guess so templates can be recommended with no API key at all.
+    cuisine: detectCuisine(description)[0] ?? "",
     venueName,
     priceTier,
     orderFlow,
@@ -901,7 +911,7 @@ export const TEMPLATES: Template[] = [
     palette: ["charcoal", "ember orange", "warm cream"], typography: "Heavy condensed display, warm cream text on charcoal",
     layout: "Dark stacked offers, glowing price blocks, photos with dark surrounds",
     photoTreatment: "Low-key lit grill photography, char and sear emphasised",
-    suits: { storeTypes: ["takeaway", "casual-dining", "bar-pub", "food-truck"], priceTiers: ["mid", "premium"], cuisines: ["steak", "kebab", "greek", "burgers", "bbq", "fried chicken"], lighting: ["dim", "neutral"], surfaces: ["wall-board", "digital-screen", "fascia"] },
+    suits: { storeTypes: ["takeaway", "casual-dining", "bar-pub", "food-truck"], priceTiers: ["mid", "premium"], cuisines: ["steak", "kebab", "greek", "burgers", "bbq", "fried chicken", "charcoal chicken", "portuguese"], lighting: ["dim", "neutral"], surfaces: ["wall-board", "digital-screen", "fascia"] },
   },
   {
     id: "pizzeria-classic", name: "Pizzeria Classic", tagline: "Red, green, cream and a whole pie", style: "bold-deals", mode: "poster",
@@ -933,7 +943,7 @@ export const TEMPLATES: Template[] = [
     palette: ["blackboard", "chalk white", "mustard"], typography: "Slab and mono labels, italic serif item names",
     layout: "Drinks grid with size columns, food in three sections, specials panel",
     photoTreatment: "Minimal photos; one hero at most",
-    suits: { storeTypes: ["bar-pub", "casual-dining", "cafe"], priceTiers: ["budget", "mid"], cuisines: ["pub", "burgers", "steak", "drinks", "bar"], lighting: ["dim", "neutral"], surfaces: ["wall-board", "a-frame", "digital-screen", "table-menu"] },
+    suits: { storeTypes: ["bar-pub", "casual-dining", "cafe"], priceTiers: ["budget", "mid"], cuisines: ["pub", "bistro", "burgers", "steak", "drinks", "bar"], lighting: ["dim", "neutral"], surfaces: ["wall-board", "a-frame", "digital-screen", "table-menu"] },
   },
   {
     id: "noir-fine", name: "Noir Fine", tagline: "Ivory, hairlines and silence", style: "editorial", mode: "menu",
@@ -949,7 +959,7 @@ export const TEMPLATES: Template[] = [
     palette: ["slate", "vermilion", "paper white"], typography: "Clean sans with a vermilion accent rule, numbers aligned",
     layout: "Dense but ordered grid: nigiri, rolls, hot dishes as columns; photo tiles square",
     photoTreatment: "Dark ceramic, glossy fish, overhead",
-    suits: { storeTypes: ["casual-dining", "takeaway", "fast-casual"], priceTiers: ["mid", "premium"], cuisines: ["japanese", "sushi", "ramen", "korean", "asian"], lighting: ["neutral", "dim"], surfaces: ["wall-board", "digital-screen", "table-menu"] },
+    suits: { storeTypes: ["casual-dining", "takeaway", "fast-casual"], priceTiers: ["mid", "premium"], cuisines: ["japanese", "sushi", "ramen", "korean", "asian", "vietnamese"], lighting: ["neutral", "dim"], surfaces: ["wall-board", "digital-screen", "table-menu"] },
   },
   {
     id: "spice-market", name: "Spice Market", tagline: "Saffron, deep red, brass", style: "rustic", mode: "menu",
@@ -957,7 +967,7 @@ export const TEMPLATES: Template[] = [
     palette: ["saffron", "deep red", "brass"], typography: "Mono section labels, serif item names, ornamental rule",
     layout: "Sections per course with heat markers only if supplied, curries in a two-column grid",
     photoTreatment: "Copper serveware, overhead with slight tilt",
-    suits: { storeTypes: ["casual-dining", "takeaway", "fast-casual"], priceTiers: ["budget", "mid"], cuisines: ["indian", "curry", "middle eastern", "kebab", "thai"], lighting: ["neutral", "dim", "bright"], surfaces: ["wall-board", "table-menu", "window", "handout"] },
+    suits: { storeTypes: ["casual-dining", "takeaway", "fast-casual"], priceTiers: ["budget", "mid"], cuisines: ["indian", "curry", "middle eastern", "kebab", "thai", "malaysian"], lighting: ["neutral", "dim", "bright"], surfaces: ["wall-board", "table-menu", "window", "handout"] },
   },
   {
     id: "taqueria-pop", name: "Taquería Pop", tagline: "Pink, teal, lime; playful blocks", style: "bold-deals", mode: "poster",

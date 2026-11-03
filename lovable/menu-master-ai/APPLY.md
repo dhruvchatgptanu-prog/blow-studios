@@ -172,6 +172,14 @@ is that the text engines now write richer, more precise per-dish photo prompts
   `gpt-6-luna` and `gpt-5.6-terra` ids OpenAI now names as replacements. The descriptive-label rule
   now cites the Wansink field study and asks for one label of a proven type (geographic, sensory,
   nostalgic, named ingredient) rather than longer copy. Tests in `eval/ensemble.test.mjs`.
+* **Four more cuisines (daily run 7)** — Thai, Vietnamese, charcoal chicken / Portuguese and pub /
+  bistro classics now have their own detection keywords, plating cues (overhead flat lay and
+  banana leaf for Thai; the cut face of a banh mi and herbs on the pho rim; char lines and glossy
+  peri peri glaze on a kraft-lined tray; parmigiana with chips and salad on one white plate) and
+  photo defaults, and the matching templates list them. Thai and pho no longer fall under the
+  generic "chinese / asian" bucket. The no-key store profile now guesses the cuisine from the
+  description so template recommendations work before any engine runs. Four briefs added to
+  `eval/eval.mjs`, one check to `eval/store-display.test.mjs`.
 
 ## Secrets (Lovable Cloud → Secrets)
 

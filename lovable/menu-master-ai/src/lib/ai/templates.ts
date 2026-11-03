@@ -43,7 +43,7 @@ export const TEMPLATES: Template[] = [
     palette: ["charcoal", "ember orange", "warm cream"], typography: "Heavy condensed display, warm cream text on charcoal",
     layout: "Dark stacked offers, glowing price blocks, photos with dark surrounds",
     photoTreatment: "Low-key lit grill photography, char and sear emphasised",
-    suits: { storeTypes: ["takeaway", "casual-dining", "bar-pub", "food-truck"], priceTiers: ["mid", "premium"], cuisines: ["steak", "kebab", "greek", "burgers", "bbq", "fried chicken"], lighting: ["dim", "neutral"], surfaces: ["wall-board", "digital-screen", "fascia"] },
+    suits: { storeTypes: ["takeaway", "casual-dining", "bar-pub", "food-truck"], priceTiers: ["mid", "premium"], cuisines: ["steak", "kebab", "greek", "burgers", "bbq", "fried chicken", "charcoal chicken", "portuguese"], lighting: ["dim", "neutral"], surfaces: ["wall-board", "digital-screen", "fascia"] },
   },
   {
     id: "pizzeria-classic", name: "Pizzeria Classic", tagline: "Red, green, cream and a whole pie", style: "bold-deals", mode: "poster",
@@ -75,7 +75,7 @@ export const TEMPLATES: Template[] = [
     palette: ["blackboard", "chalk white", "mustard"], typography: "Slab and mono labels, italic serif item names",
     layout: "Drinks grid with size columns, food in three sections, specials panel",
     photoTreatment: "Minimal photos; one hero at most",
-    suits: { storeTypes: ["bar-pub", "casual-dining", "cafe"], priceTiers: ["budget", "mid"], cuisines: ["pub", "burgers", "steak", "drinks", "bar"], lighting: ["dim", "neutral"], surfaces: ["wall-board", "a-frame", "digital-screen", "table-menu"] },
+    suits: { storeTypes: ["bar-pub", "casual-dining", "cafe"], priceTiers: ["budget", "mid"], cuisines: ["pub", "bistro", "burgers", "steak", "drinks", "bar"], lighting: ["dim", "neutral"], surfaces: ["wall-board", "a-frame", "digital-screen", "table-menu"] },
   },
   {
     id: "noir-fine", name: "Noir Fine", tagline: "Ivory, hairlines and silence", style: "editorial", mode: "menu",
@@ -91,7 +91,7 @@ export const TEMPLATES: Template[] = [
     palette: ["slate", "vermilion", "paper white"], typography: "Clean sans with a vermilion accent rule, numbers aligned",
     layout: "Dense but ordered grid: nigiri, rolls, hot dishes as columns; photo tiles square",
     photoTreatment: "Dark ceramic, glossy fish, overhead",
-    suits: { storeTypes: ["casual-dining", "takeaway", "fast-casual"], priceTiers: ["mid", "premium"], cuisines: ["japanese", "sushi", "ramen", "korean", "asian"], lighting: ["neutral", "dim"], surfaces: ["wall-board", "digital-screen", "table-menu"] },
+    suits: { storeTypes: ["casual-dining", "takeaway", "fast-casual"], priceTiers: ["mid", "premium"], cuisines: ["japanese", "sushi", "ramen", "korean", "asian", "vietnamese"], lighting: ["neutral", "dim"], surfaces: ["wall-board", "digital-screen", "table-menu"] },
   },
   {
     id: "spice-market", name: "Spice Market", tagline: "Saffron, deep red, brass", style: "rustic", mode: "menu",
@@ -99,7 +99,7 @@ export const TEMPLATES: Template[] = [
     palette: ["saffron", "deep red", "brass"], typography: "Mono section labels, serif item names, ornamental rule",
     layout: "Sections per course with heat markers only if supplied, curries in a two-column grid",
     photoTreatment: "Copper serveware, overhead with slight tilt",
-    suits: { storeTypes: ["casual-dining", "takeaway", "fast-casual"], priceTiers: ["budget", "mid"], cuisines: ["indian", "curry", "middle eastern", "kebab", "thai"], lighting: ["neutral", "dim", "bright"], surfaces: ["wall-board", "table-menu", "window", "handout"] },
+    suits: { storeTypes: ["casual-dining", "takeaway", "fast-casual"], priceTiers: ["budget", "mid"], cuisines: ["indian", "curry", "middle eastern", "kebab", "thai", "malaysian"], lighting: ["neutral", "dim", "bright"], surfaces: ["wall-board", "table-menu", "window", "handout"] },
   },
   {
     id: "taqueria-pop", name: "Taquería Pop", tagline: "Pink, teal, lime; playful blocks", style: "bold-deals", mode: "poster",

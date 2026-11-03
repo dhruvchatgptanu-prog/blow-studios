@@ -9,6 +9,10 @@ const briefs = [
   { name: "indian 2-page", mode: "menu", size: "letter", brief: "Two-page menu for Saffron Palace, Indian restaurant. Sections: Starters, Curries, Tandoori, Breads, Rice, Desserts. Butter Chicken $22, Lamb Rogan Josh $24, Garlic Naan $5. No phone number.", expectCuisine: "indian / curry", prices: 3, names: 3 },
   { name: "burger wide board", mode: "poster", size: "wide", brief: "Wide board for Smash Bros Burgers: 3 offers. Double Smash — 2 patties, cheese, pickles £8.50; Chicken Crunch — crispy chicken burger £7.90; Combo — any burger, fries and drink £11.", expectCuisine: "burgers", prices: 3, names: 3 },
   { name: "kebab fascia", mode: "poster", size: "fascia-447", brief: "Fascia for Istanbul Kebabs. Chicken kebab $14, lamb kebab $15, HSP $16, falafel wrap $12. Halal.", expectCuisine: "kebab / middle eastern", prices: 4, names: 0 },
+  { name: "charcoal chicken board", mode: "poster", size: "fascia-180", brief: "Board for Frango's Charcoal Chicken. Half chicken and chips $18, whole chicken $24, peri peri wings $12. Portuguese rice $6.", expectCuisine: "charcoal chicken / portuguese", prices: 4, names: 0 },
+  { name: "vietnamese menu", mode: "menu", size: "a5", brief: "A5 menu for Saigon Street. Sections: pho, banh mi, rice paper rolls, drinks. Beef pho $16, pork banh mi $9, vermicelli bowl $15.", expectCuisine: "vietnamese", prices: 3, names: 0 },
+  { name: "thai takeaway", mode: "menu", size: "letter", brief: "One-page menu for Bangkok Bites, Thai takeaway. Pad Thai $17, Green Curry $18, Massaman Beef $19, Tom Yum Soup $14. Sections: noodles, curries, soups.", expectCuisine: "thai", prices: 4, names: 3 },
+  { name: "pub classics", mode: "menu", size: "letter", brief: "Pub menu for The Royal Oak. Sections: pub classics, burgers, sides. Chicken Parmigiana $26, Steak Sandwich $22, Beef and Guinness Pie $24, Sunday Roast $28.", expectCuisine: "pub / bistro classics", prices: 4, names: 3 },
 ];
 
 let failures = 0;

@@ -10,6 +10,7 @@ t("takeaway detected", greek.storeType === "takeaway", greek.storeType);
 t("palette parsed", greek.palette.length === 2 && greek.palette[0] === "#f5c400");
 t("surfaces from text", greek.displaySurfaces.includes("wall-board") && greek.displaySurfaces.includes("window"), JSON.stringify(greek.displaySurfaces));
 t("counter flow", greek.orderFlow === "counter");
+t("baseline profile guesses the cuisine without a key", greek.cuisine.includes("greek") && profileFromText("Peri peri charcoal chicken shop on the main road, chips and Portuguese rice").cuisine.includes("charcoal chicken"), greek.cuisine);
 const fine = profileFromText("Fine dining degustation restaurant, 8-course tasting menu, sommelier, dim candle-lit room, table service.", "Aster");
 t("fine dining luxury dim", fine.storeType === "fine-dining" && fine.priceTier === "luxury" && fine.lighting === "dim" && fine.orderFlow === "table-service", JSON.stringify([fine.storeType, fine.priceTier, fine.lighting, fine.orderFlow]));
 const truck = profileFromText("Taco food truck at festivals, bright outdoor, 3 m fascia", "Taco Loco");

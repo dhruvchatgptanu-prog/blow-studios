@@ -20,7 +20,11 @@ const KEYWORDS: Record<string, string[]> = {
   burgers: ["burger", "burgers", "cheeseburger", "smash", "patty", "brioche"],
   "fish & chips / seafood": ["fish", "chips", "calamari", "prawn", "prawns", "seafood", "oyster", "oysters", "barramundi", "flake", "tartare", "scallop"],
   "indian / curry": ["curry", "indian", "tandoori", "naan", "biryani", "masala", "tikka", "dal", "paneer", "samosa"],
-  "chinese / asian": ["chinese", "dumpling", "dumplings", "wok", "fried rice", "noodle", "noodles", "dim sum", "bao", "pho", "thai", "pad thai", "laksa", "korean", "bibimbap"],
+  "chinese / asian": ["chinese", "dumpling", "dumplings", "wok", "fried rice", "noodle", "noodles", "dim sum", "bao", "laksa", "korean", "bibimbap", "malaysian", "cantonese", "szechuan", "sichuan"],
+  thai: ["thai", "pad thai", "green curry", "red curry", "massaman", "tom yum", "satay", "larb", "pad see ew", "panang", "som tum"],
+  vietnamese: ["vietnamese", "pho", "banh mi", "bánh mì", "bun cha", "vermicelli", "rice paper rolls", "goi cuon", "com tam", "broken rice"],
+  "charcoal chicken / portuguese": ["charcoal chicken", "peri peri", "peri-peri", "piri piri", "piri-piri", "portuguese", "frango", "rotisserie", "half chicken", "whole chicken", "quarter chicken", "chicken shop", "chicken and chips"],
+  "pub / bistro classics": ["pub", "bistro", "parma", "parmi", "parmigiana", "schnitzel", "meat pie", "bangers", "sunday roast", "roast of the day", "pub classics", "counter meal", "chicken parmigiana"],
   "japanese / sushi": ["sushi", "sashimi", "ramen", "japanese", "nigiri", "teriyaki", "katsu", "udon", "bento", "poke"],
   mexican: ["taco", "tacos", "burrito", "burritos", "mexican", "quesadilla", "nachos", "salsa", "guacamole", "enchilada"],
   "cafe / breakfast / brunch": ["cafe", "café", "brunch", "breakfast", "coffee", "latte", "avocado", "eggs", "pancakes", "toast", "granola", "croissant"],
@@ -34,7 +38,7 @@ const KEYWORDS: Record<string, string[]> = {
 };
 
 /** Generic ingredient words that appear across cuisines count less than cuisine-defining words. */
-const GENERIC_WORDS = new Set(["chips", "fish", "chicken", "eggs", "toast", "salad", "salads", "bowl", "bowls", "wrap", "wraps", "grill", "grilled", "slice", "coffee", "iced", "juice", "juices", "bbq", "crust", "prawn", "prawns", "healthy"]);
+const GENERIC_WORDS = new Set(["chips", "fish", "chicken", "eggs", "toast", "salad", "salads", "bowl", "bowls", "wrap", "wraps", "grill", "grilled", "slice", "coffee", "iced", "juice", "juices", "bbq", "crust", "prawn", "prawns", "healthy", "pub", "roast", "vermicelli", "rotisserie"]);
 
 /** Returns matching cuisine keys, strongest first. Empty when nothing matched. */
 export function detectCuisine(brief: string): string[] {
@@ -80,6 +84,10 @@ const DEFAULTS: Record<string, PhotoDefaults> = {
   "italian / pasta": { surface: "in a shallow wide ceramic bowl on a linen-covered table", angle: "45-degree angle, 50 mm look", light: "soft daylight-style key from the side, gentle fill" },
   "salads / healthy": { surface: "in a wide stoneware bowl on a light timber table", angle: "overhead, 50 mm look", light: "bright soft daylight-style key, airy fill" },
   "drinks / bubble tea / smoothies": { surface: "on a clean light counter with a soft neutral backdrop", angle: "eye-level, 85 mm look", light: "controlled backlight glowing through the drink, soft front fill" },
+  thai: { surface: "on a banana leaf over a dark timber table (green curry on dark, red curry on a pale surface)", angle: "overhead flat lay, 50 mm look", light: "bright soft daylight-style key from the side, light fill, even highlights on the sauce" },
+  vietnamese: { surface: "in a white bowl on a dark timber table, herbs, lime and chilli on the rim", angle: "overhead for bowls, eye-level for a cut banh mi, 50 mm look", light: "soft daylight-style key from the back-left, gentle fill, broth sheen visible" },
+  "charcoal chicken / portuguese": { surface: "on a kraft-lined metal tray over a dark counter, chips and salad beside", angle: "45-degree angle, 50 mm look", light: "warm softbox key from the back-left so the char and glaze catch highlights, soft fill" },
+  "pub / bistro classics": { surface: "on a white plate over a dark timber pub table", angle: "45-degree angle, 50 mm look", light: "warm tungsten-balanced softbox key from the side, gentle fill, cosy shadows" },
 };
 
 const GENERIC: PhotoDefaults = { surface: "on a dark round timber board over a neutral surface", angle: "45-degree angle with a 50 mm full-frame look", light: "one large softbox key from upper left with soft white-card fill" };

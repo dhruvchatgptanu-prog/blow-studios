@@ -1,4 +1,5 @@
 import { z } from "zod/v4";
+import { detectCuisine } from "./cuisine";
 
 /**
  * Store analysis: turns a description plus storefront / interior / display
@@ -195,7 +196,8 @@ export function profileFromText(description: string, venueName = ""): StoreProfi
   const languages = Array.from(new Set(["english", ...(lower.match(/\b(greek|italian|chinese|japanese|korean|vietnamese|thai|arabic|turkish|hindi|spanish|french|german|portuguese)\b/g) ?? [])]));
   return {
     storeType,
-    cuisine: "",
+    // Free, deterministic cuisine guess so templates can be recommended with no API key at all.
+    cuisine: detectCuisine(description)[0] ?? "",
     venueName,
     priceTier,
     orderFlow,

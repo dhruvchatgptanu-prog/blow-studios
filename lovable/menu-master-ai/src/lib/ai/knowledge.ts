@@ -99,6 +99,10 @@ export const CUISINE_PLATING_CUES: Record<string, string> = {
   "italian / pasta": "Twirled pasta nest with glossy sauce, parmesan shavings, cracked pepper, shallow wide bowl, linen napkin.",
   "salads / healthy": "Overhead shot in a wide bowl, visible distinct ingredients, dressing drizzle lines, bright but natural colour.",
   "drinks / bubble tea / smoothies": "Condensation on the glass, visible layers or pearls, straw, controlled backlight to glow through the drink.",
+  "thai": "Overhead flat lay; green curry in a dark bowl on a dark surface, red curry on a pale surface so the colour pops; pad thai with lime wedge, crushed peanuts, bean sprouts and chilli flakes on the side; banana leaf or dark timber; jasmine rice mound.",
+  "vietnamese": "Pho in a white bowl with fresh herbs, bean sprouts, lime and chilli on the rim and broth sheen visible; banh mi always photographed from the cut face showing the layered filling, pickled carrot and daikon, coriander and crusty baguette; rice paper rolls with visible prawn through the wrapper.",
+  "charcoal chicken / portuguese": "Charcoal-grilled chicken with visible char lines and glossy peri peri glaze, chilli flecks in the sauce, cut into quarters or halves on a kraft-lined metal tray; chips, Portuguese rice, grilled corn or a bright salad beside for colour; lemon half.",
+  "pub / bistro classics": "Parmigiana with melted cheese edge and napoli visible, chips and dressed salad on the same white plate; pies with a cut edge showing the filling and gravy pour; roasts with sliced meat, crisp potatoes and gravy; dark timber pub table, warm light.",
 };
 
 export const PHOTO_PROMPT_GRAMMAR = [
