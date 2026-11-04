@@ -17,13 +17,17 @@ export function coachBrief(brief: string, mode: "menu" | "poster"): CoachReport 
 
   const prices = extractBriefPrices(text);
   const names = extractBriefNames(text);
-  const hasVenue = /\b(for|at|called|named)\s+[A-Z][\w'&]+(?:\s+[A-Z][\w'&]+)*/.test(text) || /^[A-Z][\w'&]+(?:\s+[A-Z][\w'&]+)*\s*[:—-]/.test(text);
+  const hasVenue = /\b([Ff]or|[Aa]t|[Cc]alled|[Nn]amed)\s+[A-Z][\w'&]+(?:\s+[A-Z][\w'&]+)*/.test(text) || /^[A-Z][\w'&]+(?:\s+[A-Z][\w'&]+)*\s*[:—-]/.test(text);
   const hasCount = /\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|twelve)\s+(offers?|deals?|items?|dishes|sections?)\b/i.test(text);
   const hasPhone = /\d{2,}[\s-]?\d{3,}[\s-]?\d{3,}/.test(text);
   const hasNegatives = /\b(no|without|don't|do not|never)\b/i.test(text);
   const mentionsCurrencyWord = /\b(dollars?|euros?|pounds?|aud|usd|gbp|eur|nzd|cad)\b/i.test(text);
 
+  const venueMatch = /\b(?:[Ff]or|[Aa]t|[Cc]alled|[Nn]amed)\s+([A-Z][\w'&]*(?:\s+(?!(?:name|create|make|design|menu|poster|with|include|and|the|a|an|our|sections?|sign|board)\b)[\w'&]+){0,3})/.exec(text);
+  const venueName = venueMatch?.[1]?.trim() ?? "";
+
   let score = 100;
+  if (venueName && venueName.split(/\s+/).some((word, index) => index > 0 && /^[a-z]/.test(word))) hints.push({ level: "tip", text: `The venue will print exactly as "${venueName}". Fix capitals, spelling or apostrophes here if that is not the brand spelling.` });
   if (!hasVenue) { score -= 20; hints.push({ level: "fix", text: "Name the venue (e.g. 'for Yiros House') so the brand zone is exact." }); }
   if (prices.length === 0) {
     if (mode === "poster") { score -= 35; hints.push({ level: "fix", text: "Give every offer its exact price (e.g. $49.90). Posters without prices get invented ones." }); }

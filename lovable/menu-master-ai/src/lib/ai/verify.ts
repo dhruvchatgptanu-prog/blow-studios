@@ -168,6 +168,15 @@ export function verifyMenu(menu: GeneratedMenuCore, request: MenuRequest): Verif
     if (CGI_BUZZWORDS.test(prompt)) { buzzwords++; }
     CGI_BUZZWORDS.lastIndex = 0;
   }
+  // A prompt that never names the dish (empty prompt padded with defaults, or a generic "food on a board") cannot produce the right photo.
+  const NAME_STOP = /^(the|and|with|deal|pack|meal|combo|family|large|small|special|classic|house|plate|bowl|wrap|size)$/i;
+  const nameless = items.filter((item) => {
+    const words = item.name.toLowerCase().replace(/[^a-z0-9\s'-]/g, " ").split(/\s+/).filter((word) => word.length >= 4 && !NAME_STOP.test(word));
+    if (words.length === 0) return false;
+    const prompt = item.photoPrompt.toLowerCase();
+    return !words.some((word) => prompt.includes(word.replace(/(es|s)$/, "")));
+  });
+  if (nameless.length) { photoPenalty += Math.min(6, nameless.length * 2); issues.push(`Photo prompts do not name the dish for: ${nameless.slice(0, 3).map((item) => item.name).join(", ")}. Start every prompt with the exact dish and its components.`); }
   checks.photos = Math.max(0, 15 - photoPenalty - Math.min(3, buzzwords));
   if (photoPenalty > 0) issues.push("Some photo prompts are too short or mention text/logo/price/illustration words; rewrite them with the photo prompt grammar.");
   if (buzzwords > 0) issues.push("Photo prompts use CGI-style quality words ('8k', 'hyper-detailed', 'flawless', 'perfect'); describe a real lens, one light source and small imperfections instead.");

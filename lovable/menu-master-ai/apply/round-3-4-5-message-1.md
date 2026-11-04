@@ -321,10 +321,16 @@ function has(prompt: string, re: RegExp) {
   return re.test(prompt);
 }
 
-/** Ensures a prompt carries surface, angle, light, finish and realism cues without duplicating what the model already wrote. Idempotent. */
-export function enrichPhotoPrompt(prompt: string, cuisines: string[], shape: "square" | "wide" = "square"): string {
+/**
+ * Ensures a prompt carries surface, angle, light, finish and realism cues without duplicating what the model already wrote. Idempotent.
+ * `subject` (dish name and description) is used when the engine left the prompt empty or too short to name the dish,
+ * so no photo is ever briefed without a subject.
+ */
+export function enrichPhotoPrompt(prompt: string, cuisines: string[], shape: "square" | "wide" = "square", subject = ""): string {
   const defaults = DEFAULTS[cuisines[0] ?? ""] ?? GENERIC;
-  const parts = [prompt.replace(BUZZWORDS, "").replace(/\s+([,.;])/g, "$1").replace(/\s+/g, " ").trim()];
+  let base = prompt.replace(BUZZWORDS, "").replace(/\s+([,.;])/g, "$1").replace(/\s+/g, " ").trim();
+  if (base.split(/\s+/).filter(Boolean).length < 3 && subject.trim()) base = `${subject.trim().replace(/[.\s]+$/, "")}${base ? `. ${base}` : "."}`;
+  const parts = [base];
   if (!has(prompt, /\b(board|plate|platter|tray|marble|paper|table|counter|slate|skillet|bowl|surface|peel|linen)\b/i)) parts.push(`Served ${defaults.surface}.`);
   if (!has(prompt, /\b(overhead|top-down|45|eye-level|three-quarter|angle|macro|mm)\b/i)) parts.push(`Shot from a ${defaults.angle}.`);
   if (!has(prompt, /\b(softbox|light|lighting|lit|backlight|daylight)\b/i)) parts.push(`Lit by ${defaults.light}.`);
@@ -338,11 +344,11 @@ export function enrichPhotoPrompt(prompt: string, cuisines: string[], shape: "sq
 export function enrichMenuPhotos(menu: GeneratedMenuCore, cuisines: string[]): GeneratedMenuCore {
   return {
     ...menu,
-    heroPhoto: { ...menu.heroPhoto, prompt: enrichPhotoPrompt(menu.heroPhoto.prompt, cuisines, "wide") },
-    dishPhotos: menu.dishPhotos.map((photo) => ({ ...photo, prompt: enrichPhotoPrompt(photo.prompt, cuisines) })),
+    heroPhoto: { ...menu.heroPhoto, prompt: enrichPhotoPrompt(menu.heroPhoto.prompt, cuisines, "wide", `${menu.heroPhoto.label || menu.restaurantName} signature dishes`) },
+    dishPhotos: menu.dishPhotos.map((photo) => ({ ...photo, prompt: enrichPhotoPrompt(photo.prompt, cuisines, "square", photo.label) })),
     sections: menu.sections.map((section) => ({
       ...section,
-      items: section.items.map((item) => ({ ...item, photoPrompt: enrichPhotoPrompt(item.photoPrompt, cuisines) })),
+      items: section.items.map((item) => ({ ...item, photoPrompt: enrichPhotoPrompt(item.photoPrompt, cuisines, "square", item.description ? `${item.name}: ${item.description}` : item.name) })),
     })),
   };
 }
@@ -520,6 +526,15 @@ export function verifyMenu(menu: GeneratedMenuCore, request: MenuRequest): Verif
     if (CGI_BUZZWORDS.test(prompt)) { buzzwords++; }
     CGI_BUZZWORDS.lastIndex = 0;
   }
+  // A prompt that never names the dish (empty prompt padded with defaults, or a generic "food on a board") cannot produce the right photo.
+  const NAME_STOP = /^(the|and|with|deal|pack|meal|combo|family|large|small|special|classic|house|plate|bowl|wrap|size)$/i;
+  const nameless = items.filter((item) => {
+    const words = item.name.toLowerCase().replace(/[^a-z0-9\s'-]/g, " ").split(/\s+/).filter((word) => word.length >= 4 && !NAME_STOP.test(word));
+    if (words.length === 0) return false;
+    const prompt = item.photoPrompt.toLowerCase();
+    return !words.some((word) => prompt.includes(word.replace(/(es|s)$/, "")));
+  });
+  if (nameless.length) { photoPenalty += Math.min(6, nameless.length * 2); issues.push(`Photo prompts do not name the dish for: ${nameless.slice(0, 3).map((item) => item.name).join(", ")}. Start every prompt with the exact dish and its components.`); }
   checks.photos = Math.max(0, 15 - photoPenalty - Math.min(3, buzzwords));
   if (photoPenalty > 0) issues.push("Some photo prompts are too short or mention text/logo/price/illustration words; rewrite them with the photo prompt grammar.");
   if (buzzwords > 0) issues.push("Photo prompts use CGI-style quality words ('8k', 'hyper-detailed', 'flawless', 'perfect'); describe a real lens, one light source and small imperfections instead.");
@@ -594,13 +609,17 @@ export function coachBrief(brief: string, mode: "menu" | "poster"): CoachReport 
 
   const prices = extractBriefPrices(text);
   const names = extractBriefNames(text);
-  const hasVenue = /\b(for|at|called|named)\s+[A-Z][\w'&]+(?:\s+[A-Z][\w'&]+)*/.test(text) || /^[A-Z][\w'&]+(?:\s+[A-Z][\w'&]+)*\s*[:—-]/.test(text);
+  const hasVenue = /\b([Ff]or|[Aa]t|[Cc]alled|[Nn]amed)\s+[A-Z][\w'&]+(?:\s+[A-Z][\w'&]+)*/.test(text) || /^[A-Z][\w'&]+(?:\s+[A-Z][\w'&]+)*\s*[:—-]/.test(text);
   const hasCount = /\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|twelve)\s+(offers?|deals?|items?|dishes|sections?)\b/i.test(text);
   const hasPhone = /\d{2,}[\s-]?\d{3,}[\s-]?\d{3,}/.test(text);
   const hasNegatives = /\b(no|without|don't|do not|never)\b/i.test(text);
   const mentionsCurrencyWord = /\b(dollars?|euros?|pounds?|aud|usd|gbp|eur|nzd|cad)\b/i.test(text);
 
+  const venueMatch = /\b(?:[Ff]or|[Aa]t|[Cc]alled|[Nn]amed)\s+([A-Z][\w'&]*(?:\s+(?!(?:name|create|make|design|menu|poster|with|include|and|the|a|an|our|sections?|sign|board)\b)[\w'&]+){0,3})/.exec(text);
+  const venueName = venueMatch?.[1]?.trim() ?? "";
+
   let score = 100;
+  if (venueName && venueName.split(/\s+/).some((word, index) => index > 0 && /^[a-z]/.test(word))) hints.push({ level: "tip", text: `The venue will print exactly as "${venueName}". Fix capitals, spelling or apostrophes here if that is not the brand spelling.` });
   if (!hasVenue) { score -= 20; hints.push({ level: "fix", text: "Name the venue (e.g. 'for Yiros House') so the brand zone is exact." }); }
   if (prices.length === 0) {
     if (mode === "poster") { score -= 35; hints.push({ level: "fix", text: "Give every offer its exact price (e.g. $49.90). Posters without prices get invented ones." }); }

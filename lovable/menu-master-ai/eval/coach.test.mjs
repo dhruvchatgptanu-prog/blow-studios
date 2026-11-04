@@ -9,4 +9,8 @@ const menu = coachBrief("A5 menu for Nook Cafe with coffee, breakfast and toasti
 t("menu brief ok without prices when currency given", menu.score >= 70, JSON.stringify(menu));
 const once = enrichPhotoPrompt("Three lamb yiros and chips.", ["greek / yiros / gyros / souvlaki"]);
 t("enrichment idempotent", enrichPhotoPrompt(once, ["greek / yiros / gyros / souvlaki"]) === once);
+const typo = coachBrief("For Burger oclock name of resturant Create a burger shop menu design. You can use random prices", "menu");
+t("venue typed with lowercase word gets an exact-print warning", typo.hints.some((h) => h.text.includes('"Burger oclock"')), JSON.stringify(typo.hints));
+const clean = coachBrief("Create a one-page menu for Yiros House with sections for yiros, grill plates and sides. Prices in dollars.", "menu");
+t("clean venue name gets no warning", !clean.hints.some((h) => h.text.includes("will print exactly")), JSON.stringify(clean.hints));
 console.log(f ? `FAILURES: ${f}` : "ALL PASS"); process.exit(f ? 1 : 0);

@@ -101,10 +101,16 @@ function has(prompt: string, re: RegExp) {
   return re.test(prompt);
 }
 
-/** Ensures a prompt carries surface, angle, light, finish and realism cues without duplicating what the model already wrote. Idempotent. */
-export function enrichPhotoPrompt(prompt: string, cuisines: string[], shape: "square" | "wide" = "square"): string {
+/**
+ * Ensures a prompt carries surface, angle, light, finish and realism cues without duplicating what the model already wrote. Idempotent.
+ * `subject` (dish name and description) is used when the engine left the prompt empty or too short to name the dish,
+ * so no photo is ever briefed without a subject.
+ */
+export function enrichPhotoPrompt(prompt: string, cuisines: string[], shape: "square" | "wide" = "square", subject = ""): string {
   const defaults = DEFAULTS[cuisines[0] ?? ""] ?? GENERIC;
-  const parts = [prompt.replace(BUZZWORDS, "").replace(/\s+([,.;])/g, "$1").replace(/\s+/g, " ").trim()];
+  let base = prompt.replace(BUZZWORDS, "").replace(/\s+([,.;])/g, "$1").replace(/\s+/g, " ").trim();
+  if (base.split(/\s+/).filter(Boolean).length < 3 && subject.trim()) base = `${subject.trim().replace(/[.\s]+$/, "")}${base ? `. ${base}` : "."}`;
+  const parts = [base];
   if (!has(prompt, /\b(board|plate|platter|tray|marble|paper|table|counter|slate|skillet|bowl|surface|peel|linen)\b/i)) parts.push(`Served ${defaults.surface}.`);
   if (!has(prompt, /\b(overhead|top-down|45|eye-level|three-quarter|angle|macro|mm)\b/i)) parts.push(`Shot from a ${defaults.angle}.`);
   if (!has(prompt, /\b(softbox|light|lighting|lit|backlight|daylight)\b/i)) parts.push(`Lit by ${defaults.light}.`);
@@ -118,11 +124,11 @@ export function enrichPhotoPrompt(prompt: string, cuisines: string[], shape: "sq
 export function enrichMenuPhotos(menu: GeneratedMenuCore, cuisines: string[]): GeneratedMenuCore {
   return {
     ...menu,
-    heroPhoto: { ...menu.heroPhoto, prompt: enrichPhotoPrompt(menu.heroPhoto.prompt, cuisines, "wide") },
-    dishPhotos: menu.dishPhotos.map((photo) => ({ ...photo, prompt: enrichPhotoPrompt(photo.prompt, cuisines) })),
+    heroPhoto: { ...menu.heroPhoto, prompt: enrichPhotoPrompt(menu.heroPhoto.prompt, cuisines, "wide", `${menu.heroPhoto.label || menu.restaurantName} signature dishes`) },
+    dishPhotos: menu.dishPhotos.map((photo) => ({ ...photo, prompt: enrichPhotoPrompt(photo.prompt, cuisines, "square", photo.label) })),
     sections: menu.sections.map((section) => ({
       ...section,
-      items: section.items.map((item) => ({ ...item, photoPrompt: enrichPhotoPrompt(item.photoPrompt, cuisines) })),
+      items: section.items.map((item) => ({ ...item, photoPrompt: enrichPhotoPrompt(item.photoPrompt, cuisines, "square", item.description ? `${item.name}: ${item.description}` : item.name) })),
     })),
   };
 }

@@ -55,7 +55,9 @@ digital screens (at most nine items per screen, thick type, high contrast) and c
 legally safe: markers like (V), (GF) stay on the dish they belong to, no diet or allergen promise
 is ever invented, and an allergen statement in your brief is always printed in the footer. Photo
 prompts also drop "8k / ultra-realistic / flawless" wording, which makes AI food look like plastic.
-Run 7 taught Halftone four more cuisines (Thai, Vietnamese, charcoal chicken, pub classics) with
+Run 8 used your first three real designs: it removed a wasted repair call from every generation
+on Lovable, made sure no photo is ever briefed without naming the dish, and added a warning when
+a venue name will print with odd capitals (it prints exactly what you type). Run 7 taught Halftone four more cuisines (Thai, Vietnamese, charcoal chicken, pub classics) with
 their own photo styling, and made the store wizard guess the cuisine even with no API key. Run 6 made the learning memory report whether each design was saved (and why not), so an empty
 database can never hide a silent failure again; it also widened the model fallback lists with the
 replacement ids OpenAI now publishes. On 30 Oct the broken Lovable preview was repaired with one 0.6-credit message

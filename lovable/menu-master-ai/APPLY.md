@@ -180,6 +180,14 @@ is that the text engines now write richer, more precise per-dish photo prompts
   generic "chinese / asian" bucket. The no-key store profile now guesses the cuisine from the
   description so template recommendations work before any engine runs. Four briefs added to
   `eval/eval.mjs`, one check to `eval/store-display.test.mjs`.
+* **First live data (daily run 8)** — three real generations showed two defects. (1) Lovable still
+  scored candidates before enrichment, so every generation paid a repair call (~10 s) that only
+  fixed prompt length; a FIND/REPLACE patch brought enrich-before-scoring to Lovable. (2) Classic
+  menus leave item photo prompts empty and enrichment padded them into subjectless prompts; the
+  enricher now starts an empty or too-short prompt with the dish name and description (menu level:
+  item name + description, dish photos: label, hero: venue signature dishes) and the verifier
+  flags any item prompt that never names the dish. The brief coach now warns when the venue name
+  will print with odd capitals ("Burger oclock") because names are reproduced exactly as typed.
 
 ## Secrets (Lovable Cloud → Secrets)
 

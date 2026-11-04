@@ -44,4 +44,15 @@ t("CGI buzzwords penalised", buzzResult.score < 100 && buzzResult.issues.some((i
 const cleaned = enrichPhotoPrompt(buzz.sections[0].items[0].photoPrompt, ["greek / yiros / gyros / souvlaki"]);
 t("enrichment strips buzzwords", !/8k|ultra-realistic|flawless|masterpiece/i.test(cleaned) && verifyMenu({ ...buzz, sections: [{ ...buzz.sections[0], items: [{ ...buzz.sections[0].items[0], photoPrompt: cleaned }, ...buzz.sections[0].items.slice(1)] }] }, req).score === 100, cleaned.slice(-120));
 t("enrichment idempotent after stripping", enrichPhotoPrompt(cleaned, ["greek / yiros / gyros / souvlaki"]) === cleaned);
+// ---- subjectless photo prompts (daily run 8, from live data) ----
+const blank = JSON.parse(JSON.stringify(good)); blank.sections[0].items[2].photoPrompt = "";
+const blankEnriched = enrichPhotoPrompt("", ["greek / yiros / gyros / souvlaki"]);
+const blankResult = verifyMenu({ ...blank, sections: [{ ...blank.sections[0], items: blank.sections[0].items.map((i) => ({ ...i, photoPrompt: i.photoPrompt || blankEnriched })) }] }, req);
+t("padded empty prompt is flagged as nameless", blankResult.score < 100 && blankResult.issues.some((i) => i.includes("do not name the dish for: Big Family Yiros")), JSON.stringify(blankResult.issues));
+const withSubject = enrichPhotoPrompt("", ["greek / yiros / gyros / souvlaki"], "square", "Big Family Yiros: 5 chicken yiros with salad and garlic sauce, plus a family serve of chips.");
+t("subject fallback names the dish first", withSubject.startsWith("Big Family Yiros: 5 chicken yiros"), withSubject.slice(0, 80));
+t("subject fallback is idempotent", enrichPhotoPrompt(withSubject, ["greek / yiros / gyros / souvlaki"], "square", "Big Family Yiros") === withSubject);
+const { enrichMenuPhotos } = await import("./out/src/lib/ai/cuisine.js");
+const fixed = verifyMenu(enrichMenuPhotos(blank, ["greek / yiros / gyros / souvlaki"]), req);
+t("menu-level enrichment fills subjects → 100", fixed.score === 100, JSON.stringify(fixed.issues));
 console.log(f ? `FAILURES: ${f}` : "ALL PASS"); process.exit(f ? 1 : 0);
