@@ -3,7 +3,9 @@
 **Resolved on 2026-10-30.** The two missing files (`src/lib/ai/coach.ts`,
 `src/components/BriefCoach.tsx`) were written to Lovable verbatim in one message
 (0.6 credits). Lovable's typecheck and preview build are clean again. The Lovable
-project is now at: round 2 engines + round 3/4 `cuisine.ts` patch + brief coach.
+project is now at: round 2 engines + round 3/4 `cuisine.ts` patch + brief coach, plus the 4 Nov
+patch (0.6 credits): enrich-before-scoring in `ensemble.server.ts` and the subject fallback in
+`cuisine.ts`.
 Rounds 3-5 proper (model fallback chains, store wizard, templates, display fitting,
 contrast guard, dietary compliance) are still only on GitHub.
 

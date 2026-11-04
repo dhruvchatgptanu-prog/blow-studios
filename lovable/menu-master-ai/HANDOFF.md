@@ -61,7 +61,8 @@ a venue name will print with odd capitals (it prints exactly what you type). Run
 their own photo styling, and made the store wizard guess the cuisine even with no API key. Run 6 made the learning memory report whether each design was saved (and why not), so an empty
 database can never hide a silent failure again; it also widened the model fallback lists with the
 replacement ids OpenAI now publishes. On 30 Oct the broken Lovable preview was repaired with one 0.6-credit message
-(the two missing brief-coach files). Nothing else has gone to Lovable since round 2
+(the two missing brief-coach files). On 4 Nov a second 0.6-credit patch removed the wasted repair call and the subjectless photo
+prompts on Lovable itself. Nothing else has gone to Lovable since round 2
 because the workspace has no credits; the apply bundles in `apply/` stay current automatically.
 
 ## What you need to do (5 minutes)
