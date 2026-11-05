@@ -1,17 +1,13 @@
 # Recovery status
 
-**Resolved on 2026-10-30.** The two missing files (`src/lib/ai/coach.ts`,
-`src/components/BriefCoach.tsx`) were written to Lovable verbatim in one message
-(0.6 credits). Lovable's typecheck and preview build are clean again. The Lovable
-project is now at: round 2 engines + round 3/4 `cuisine.ts` patch + brief coach, plus the 4 Nov
-patch (0.6 credits): enrich-before-scoring in `ensemble.server.ts` and the subject fallback in
-`cuisine.ts`.
-Rounds 3-5 proper (model fallback chains, store wizard, templates, display fitting,
-contrast guard, dietary compliance) are still only on GitHub.
+**Lovable is at parity with GitHub commit `b1c594b` (5 Nov 2026).** The whole upgrade (rounds
+3-6, including the chat home page) was pulled into Lovable with one message that ran
+`apply/fetch-from-github.sh` (1 credit; typecheck clean). Future daily runs can use the same
+script with a newer `HALFTONE_SHA` whenever a change is worth a credit.
 
-## Getting the rest in without credits
-The three bundles in `apply/` would cost roughly 20+ credits (round 1 cost 11.5,
-round 2 cost 5.2). Connect the project to GitHub instead (free, permanent):
+
+If Lovable ever drifts again, the cheapest path is the fetch script above; a GitHub connection in
+the Lovable editor would make it free:
 
 1. Lovable editor → project Settings → GitHub → Connect / Transfer to GitHub.
 2. Tell Claude the repository name. Claude pushes the whole `src/` tree from

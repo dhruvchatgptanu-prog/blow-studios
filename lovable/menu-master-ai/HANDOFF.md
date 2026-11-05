@@ -51,7 +51,9 @@ Halftone now works like ChatGPT. Open the app, type what you want ("Create a bol
 poster for Yiros House: …"), and the design appears in the conversation with a short note on what
 was kept and checked. Keep typing to change it, say "create the photos" for photography, attach a
 food photo to improve it, or attach a photo of your old menu to redesign it. Designs are saved in
-the sidebar on your device. The old form view is still at /studio.
+the sidebar on your device. The old form view is still at /studio. This is live in your Lovable
+preview now (the whole upgrade was pulled from GitHub for one credit); press Publish in the
+Lovable editor when you are happy with it.
 
 ## Daily runs so far
 Run 2 added a colour-contrast guard so no template can recommend unreadable text. Run 3 made the
