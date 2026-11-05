@@ -60,7 +60,9 @@ is that the text engines now write richer, more precise per-dish photo prompts
 | `src/routes/index.tsx` | **replace** (round 5) — picks up the wizard result, sends template/display/store context |
 | `src/routeTree.gen.ts` | **replace** (round 5) — adds `/setup`; the router plugin regenerates it anyway |
 | `src/lib/ai/schema.ts`, `verify.ts`, `memory.server.ts`, `providers.server.ts`, `ensemble.server.ts`, `menu.functions.ts` | **replace** (round 5) |
-| `src/routes/index.tsx` | 4 small edits, see below |
+| `src/lib/ai/intent.ts`, `src/lib/chat.ts`, `src/lib/images.ts`, `src/components/ChatComposer.tsx`, `src/components/ChatMessageView.tsx` | new (round 6) — the chat studio |
+| `src/routes/index.tsx` | **replace** (round 6) — ChatGPT-style conversation is now the home page |
+| `src/routes/studio.tsx` | new (round 6) — the previous form studio, kept at `/studio` |
 | `package.json` | add dependency `@anthropic-ai/sdk` (zod ^3.25 already satisfies its peer dep via `zod/v4`) |
 
 ### Edits to `src/routes/index.tsx`
@@ -196,6 +198,25 @@ is that the text engines now write richer, more precise per-dish photo prompts
   each). Evidence: price-ending research finds 9/90 endings read as value and round endings as
   quality, so mixing them on one menu sends both signals at once. Tests in `eval/verifier.test.mjs`
   and `eval/coach.test.mjs`.
+
+## Round 6 (chat studio)
+
+* The home page is a conversation, like ChatGPT: a sidebar of saved designs, a thread of
+  messages, and a message box with attachment and format chips. The owner types the brief in
+  plain words; Halftone replies with the finished design rendered in the thread plus a short
+  summary (what was kept, the verifier score, which engines ran); the owner refines it by typing
+  ("make the prices bigger", "swap the second offer for a kids meal $12", "turn it into a wide
+  board"), asks for photos ("create the photos") or attaches a food photo to improve. Every
+  revision folds into the running brief so exact names and prices keep being verified.
+* `src/lib/ai/intent.ts` decides deterministically whether a message is a new design, a
+  revision, a photo request or a question, and reads mode / format / style / page count from
+  the words; `src/lib/chat.ts` stores conversations in localStorage (photos stay in memory).
+* Printing works per design: the chosen sheet keeps the print class, everything else is hidden.
+* The form studio survives at `/studio`; the store wizard stays at `/setup` and its template,
+  display and venue profile feed the chat too.
+* Delivery to Lovable no longer pastes files: the agent fetches them from GitHub with
+  `apply/fetch-from-github.sh` (see `apply/README.md`).
+* Tests: `eval/intent.test.mjs`.
 
 ## Secrets (Lovable Cloud → Secrets)
 
