@@ -51,12 +51,16 @@ export type Provider = {
 };
 
 const LOVABLE_GATEWAY = "https://ai.gateway.lovable.dev/v1/responses";
+const LOVABLE_GATEWAY_CHAT = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const OPENAI_RESPONSES = "https://api.openai.com/v1/responses";
+/** Google's OpenAI-compatible endpoint (GEMINI_API_KEY). Without a key, Gemini runs through the Lovable gateway's google/* models. */
+const GEMINI_CHAT = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 
 const MODELS = {
   lovable: process.env["LOVABLE_TEXT_MODEL"] ?? "openai/gpt-6-astra",
   openai: process.env["OPENAI_MODEL"] ?? "gpt-6-astra",
   claude: process.env["ANTHROPIC_MODEL"] ?? "claude-opus-5-5",
+  gemini: process.env["GEMINI_API_KEY"] ? (process.env["GEMINI_MODEL"] ?? "gemini-3-pro") : (process.env["LOVABLE_GEMINI_MODEL"] ?? "google/gemini-3.6-flash"),
 } as const;
 
 function list(env: string | undefined, fallback: string[]) {
@@ -73,6 +77,9 @@ const FALLBACK_MODELS: Record<ProviderId, string[]> = {
   lovable: list(process.env["LOVABLE_FALLBACK_MODELS"], ["openai/gpt-6.1-sol", "openai/gpt-6-sol", "openai/gpt-6-luna", "openai/gpt-5.6-sol"]),
   openai: list(process.env["OPENAI_FALLBACK_MODELS"], ["gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.5"]),
   claude: list(process.env["ANTHROPIC_FALLBACK_MODELS"], ["claude-sonnet-5-5", "claude-opus-5"]),
+  gemini: process.env["GEMINI_API_KEY"]
+    ? list(process.env["GEMINI_FALLBACK_MODELS"], ["gemini-3-flash", "gemini-2.5-pro", "gemini-2.5-flash"])
+    : list(process.env["LOVABLE_GEMINI_FALLBACK_MODELS"], ["google/gemini-3.5-pro", "google/gemini-3-pro", "google/gemini-2.5-pro", "google/gemini-2.5-flash"]),
 };
 
 export function modelChain(id: ProviderId) {
@@ -103,6 +110,11 @@ async function withModelFallback<T>(models: string[], attempt: (model: string) =
 
 // ---------- shared prompt assembly ----------
 
+/** Every reference image for a request, single or multiple, as data URLs. */
+export function referenceImagesOf(request: MenuRequest): string[] {
+  return [...(request.referenceImage ? [request.referenceImage] : []), ...(request.referenceImages ?? [])].slice(0, 8);
+}
+
 export function buildUserMessage(request: MenuRequest) {
   return [
     `BRIEF:\n${request.brief}`,
@@ -113,7 +125,9 @@ export function buildUserMessage(request: MenuRequest) {
     request.store ? `VENUE PROFILE: ${request.store.venueName || "unnamed venue"} — ${request.store.storeType.replace("-", " ")}, ${request.store.priceTier} price point${request.store.cuisine ? `, ${request.store.cuisine}` : ""}${request.store.audience ? `, audience: ${request.store.audience}` : ""}. Copy voice: ${request.store.voice}${request.store.signatureItems?.length ? ` Signature items (keep them, give them the hero spots): ${request.store.signatureItems.join(", ")}.` : ""}` : "",
     request.template && templateById(request.template) ? describeTemplate(templateById(request.template)!) : "",
     request.cuisine?.length ? `DETECTED CUISINE: ${request.cuisine.join(" + ")}. Apply these plating cues to every photo brief:\n${cuisineCues(request.cuisine).map((line) => `- ${line}`).join("\n")}` : "",
-    request.referenceImage ? "A photo or screenshot of the existing menu is attached. Transcribe it faithfully, then redesign; the written brief wins on any conflict." : "",
+    referenceImagesOf(request).length > 1
+      ? `${referenceImagesOf(request).length} photos of the existing menu are attached (pages, boards or both sides of one menu). Transcribe EVERY item, price and section from ALL of them into one design, in the order the photos were given; never drop a page; the written brief wins on any conflict.`
+      : referenceImagesOf(request).length === 1 ? "A photo or screenshot of the existing menu is attached. Transcribe it faithfully, then redesign; the written brief wins on any conflict." : "",
     request.previous ? `PREVIOUS MENU (revise it, keep everything the new brief does not change):\n${request.previous}` : "",
     request.exemplars ? `APPROVED PAST OUTPUTS for a similar brief (match their precision and tone, never copy their content):\n${request.exemplars}` : "",
   ]
@@ -191,7 +205,7 @@ type ResponsesCall = {
   model: string;
   instructions: string;
   text: string;
-  image?: string | undefined;
+  images?: string[] | undefined;
   schemaName: string;
   schema: unknown;
   signal: AbortSignal;
@@ -209,9 +223,7 @@ async function responsesError(response: Response, fallback: string) {
 }
 
 async function callResponsesApi(call: ResponsesCall): Promise<string> {
-  const input = call.image
-    ? [{ role: "user", content: [{ type: "input_text", text: call.text }, { type: "input_image", image_url: call.image }] }]
-    : call.text;
+  const input = responsesInput(call.text, call.images);
   const response = await fetch(call.url, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...call.headers },
@@ -289,17 +301,17 @@ function responsesProvider(id: "lovable" | "openai"): Provider {
     available: () => Boolean(key()),
     generate(request, signal) {
       return withModelFallback(modelChain(id), async (model) =>
-        parseMenuJson(await callResponsesApi({ ...base(model), instructions: SYSTEM_PROMPT, text: buildUserMessage(request), image: request.referenceImage, schemaName: "menu_design", schema: MENU_JSON_SCHEMA, signal })),
+        parseMenuJson(await callResponsesApi({ ...base(model), instructions: SYSTEM_PROMPT, text: buildUserMessage(request), images: referenceImagesOf(request), schemaName: "menu_design", schema: MENU_JSON_SCHEMA, signal })),
       );
     },
     judge(input, signal) {
       return withModelFallback(modelChain(id), async (model) =>
-        parseJudgeJson(await callResponsesApi({ ...base(model), instructions: JUDGE_SYSTEM_PROMPT, text: buildJudgeMessage(input), image: input.request.referenceImage, schemaName: "menu_judgement", schema: JUDGE_JSON_SCHEMA, signal })),
+        parseJudgeJson(await callResponsesApi({ ...base(model), instructions: JUDGE_SYSTEM_PROMPT, text: buildJudgeMessage(input), images: referenceImagesOf(input.request), schemaName: "menu_judgement", schema: JUDGE_JSON_SCHEMA, signal })),
       );
     },
     repair(input, signal) {
       return withModelFallback(modelChain(id), async (model) =>
-        parseMenuJson(await callResponsesApi({ ...base(model), instructions: REPAIR_SYSTEM_PROMPT, text: buildRepairMessage(input), image: input.request.referenceImage, schemaName: "menu_design", schema: MENU_JSON_SCHEMA, signal })),
+        parseMenuJson(await callResponsesApi({ ...base(model), instructions: REPAIR_SYSTEM_PROMPT, text: buildRepairMessage(input), images: referenceImagesOf(input.request), schemaName: "menu_design", schema: MENU_JSON_SCHEMA, signal })),
       );
     },
   };
@@ -313,9 +325,9 @@ function anthropic() {
   return anthropicClient;
 }
 
-function claudeContent(text: string, image?: string): Anthropic.ContentBlockParam[] {
+function claudeContent(text: string, images: string[] = []): Anthropic.ContentBlockParam[] {
   const blocks: Anthropic.ContentBlockParam[] = [];
-  if (image) {
+  for (const image of images) {
     const { mediaType, data } = parseDataUrl(image);
     blocks.push({ type: "image", source: { type: "base64", media_type: mediaType, data } });
   }
@@ -335,7 +347,7 @@ const claudeProvider: Provider = {
           model,
           max_tokens: 16000,
           system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-          messages: [{ role: "user", content: claudeContent(buildUserMessage(request), request.referenceImage) }],
+          messages: [{ role: "user", content: claudeContent(buildUserMessage(request), referenceImagesOf(request)) }],
           output_config: { format: zodOutputFormat(menuWireSchema), effort: "medium" },
         },
         { signal },
@@ -355,7 +367,7 @@ const claudeProvider: Provider = {
           model,
           max_tokens: 16000,
           system: [{ type: "text", text: JUDGE_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-          messages: [{ role: "user", content: claudeContent(buildJudgeMessage(input), input.request.referenceImage) }],
+          messages: [{ role: "user", content: claudeContent(buildJudgeMessage(input), referenceImagesOf(input.request)) }],
           output_config: { format: zodOutputFormat(judgeWireSchema), effort: "high" },
         },
         { signal },
@@ -373,7 +385,7 @@ const claudeProvider: Provider = {
           model,
           max_tokens: 16000,
           system: [{ type: "text", text: REPAIR_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-          messages: [{ role: "user", content: claudeContent(buildRepairMessage(input), input.request.referenceImage) }],
+          messages: [{ role: "user", content: claudeContent(buildRepairMessage(input), referenceImagesOf(input.request)) }],
           output_config: { format: zodOutputFormat(menuWireSchema), effort: "low" },
         },
         { signal },
@@ -387,7 +399,73 @@ const claudeProvider: Provider = {
   },
 };
 
-export const PROVIDERS: Provider[] = [responsesProvider("lovable"), responsesProvider("openai"), claudeProvider];
+type ChatCall = { url: string; headers: Record<string, string>; model: string; instructions: string; text: string; images?: string[] | undefined; schemaName: string; schema: unknown; signal: AbortSignal };
+
+/** OpenAI-compatible chat completions with a JSON schema response (Gemini direct, or google/* models on the Lovable gateway). */
+async function callChatCompletions(call: ChatCall): Promise<string> {
+  const content: unknown[] = [{ type: "text", text: call.text }, ...(call.images ?? []).map((image) => ({ type: "image_url", image_url: { url: image } }))];
+  const response = await fetch(call.url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...call.headers },
+    signal: call.signal,
+    body: JSON.stringify({
+      model: call.model,
+      messages: [{ role: "system", content: call.instructions }, { role: "user", content }],
+      response_format: { type: "json_schema", json_schema: { name: call.schemaName, strict: true, schema: call.schema } },
+      stream: false,
+    }),
+  });
+  if (!response.ok) throw new Error(await responsesError(response, `Engine request failed (${response.status}).`));
+  const json = (await response.json()) as { choices?: { message?: { content?: string | { type: string; text?: string }[]; refusal?: string | null } }[]; error?: { message?: string } };
+  if (json.error?.message) throw new Error(json.error.message);
+  const message = json.choices?.[0]?.message;
+  if (message?.refusal) throw new Error(message.refusal);
+  const text = typeof message?.content === "string" ? message.content : (message?.content ?? []).map((part) => part.text ?? "").join("");
+  const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+  if (!cleaned) throw new Error("The engine returned an empty response.");
+  return cleaned;
+}
+
+function geminiBase(model: string) {
+  const direct = process.env["GEMINI_API_KEY"];
+  return direct
+    ? { url: GEMINI_CHAT, headers: { Authorization: `Bearer ${direct}` } as Record<string, string>, model }
+    : { url: LOVABLE_GATEWAY_CHAT, headers: { "Lovable-API-Key": process.env["LOVABLE_API_KEY"] ?? "" } as Record<string, string>, model };
+}
+
+/**
+ * Google Gemini as a fourth engine. With GEMINI_API_KEY it calls Google directly;
+ * otherwise it uses the Lovable gateway's google/* models with the existing
+ * LOVABLE_API_KEY (set HALFTONE_GATEWAY_GEMINI=off to keep gateway usage down).
+ */
+const geminiProvider: Provider = {
+  id: "gemini",
+  label: "Google Gemini",
+  model: MODELS.gemini,
+  available: () => Boolean(process.env["GEMINI_API_KEY"]) || (Boolean(process.env["LOVABLE_API_KEY"]) && process.env["HALFTONE_GATEWAY_GEMINI"] !== "off"),
+  generate(request, signal) {
+    return withModelFallback(modelChain("gemini"), async (model) =>
+      parseMenuJson(await callChatCompletions({ ...geminiBase(model), instructions: SYSTEM_PROMPT, text: buildUserMessage(request), images: referenceImagesOf(request), schemaName: "menu_design", schema: MENU_JSON_SCHEMA, signal })),
+    );
+  },
+  judge(input, signal) {
+    return withModelFallback(modelChain("gemini"), async (model) =>
+      parseJudgeJson(await callChatCompletions({ ...geminiBase(model), instructions: JUDGE_SYSTEM_PROMPT, text: buildJudgeMessage(input), images: referenceImagesOf(input.request), schemaName: "menu_judgement", schema: JUDGE_JSON_SCHEMA, signal })),
+    );
+  },
+  repair(input, signal) {
+    return withModelFallback(modelChain("gemini"), async (model) =>
+      parseMenuJson(await callChatCompletions({ ...geminiBase(model), instructions: REPAIR_SYSTEM_PROMPT, text: buildRepairMessage(input), images: referenceImagesOf(input.request), schemaName: "menu_design", schema: MENU_JSON_SCHEMA, signal })),
+    );
+  },
+};
+
+/**
+ * Processing sequence: every available engine generates in parallel (Halftone
+ * built-in, ChatGPT, Claude, Gemini) → deterministic verifier → judge (Claude,
+ * then ChatGPT, then Gemini, then built-in) merges → repair → fit → verify.
+ */
+export const PROVIDERS: Provider[] = [responsesProvider("lovable"), responsesProvider("openai"), claudeProvider, geminiProvider];
 
 export type StructuredCall = {
   system: string;
@@ -412,7 +490,7 @@ function responsesInput(text: string, images: string[] | undefined) {
  * returns the raw JSON text and which provider/model answered.
  */
 export async function structuredJson(call: StructuredCall): Promise<{ text: string; provider: ProviderId; model: string }> {
-  const order = call.order ?? ["openai", "lovable", "claude"];
+  const order = call.order ?? ["openai", "gemini", "lovable", "claude"];
   const live = availableProviders();
   const errors: string[] = [];
   for (const id of order) {
@@ -447,6 +525,12 @@ export async function structuredJson(call: StructuredCall): Promise<{ text: stri
       const isLovable = id === "lovable";
       const key = process.env[isLovable ? "LOVABLE_API_KEY" : "OPENAI_API_KEY"] ?? "";
       const headers: Record<string, string> = isLovable ? { "Lovable-API-Key": key } : { Authorization: `Bearer ${key}` };
+      if (id === "gemini") {
+        const served = await withModelFallback(modelChain("gemini"), async (model) =>
+          callChatCompletions({ ...geminiBase(model), instructions: call.system, text: call.text, images: call.images, schemaName: call.schemaName, schema: call.jsonSchema, signal: call.signal }),
+        );
+        return { text: served.value, provider: "gemini", model: served.model };
+      }
       const served = await withModelFallback(modelChain(id), async (model) => {
         const response = await fetch(isLovable ? LOVABLE_GATEWAY : OPENAI_RESPONSES, {
           method: "POST",
@@ -481,7 +565,7 @@ export function availableProviders() {
  */
 export function pickJudge(exclude: ProviderId[] = [], learned: ProviderId[] = []) {
   const preferred = process.env["HALFTONE_JUDGE"] as ProviderId | undefined;
-  const order: ProviderId[] = [...(preferred ? [preferred] : []), ...learned, "claude", "openai", "lovable"];
+  const order: ProviderId[] = [...(preferred ? [preferred] : []), ...learned, "claude", "openai", "gemini", "lovable"];
   const live = availableProviders();
   for (const id of order) {
     const provider = live.find((candidate) => candidate.id === id);

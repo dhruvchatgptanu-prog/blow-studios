@@ -25,6 +25,7 @@ const inputSchema = z.object({
   size: z.enum(["letter", "a5", "poster", "wide", "fascia-447", "fascia-180", "square"]),
   previous: z.string().max(60_000).optional(),
   referenceImage: referenceImageSchema.optional(),
+  referenceImages: z.array(referenceImageSchema).max(8).optional(),
   template: z.string().max(60).optional(),
   display: z
     .object({

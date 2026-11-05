@@ -1,4 +1,5 @@
-import { parseIntent, extendBrief, describeResult, conversationTitle, HELP_REPLY } from "./out/src/lib/ai/intent.js";
+import { parseIntent, extendBrief, describeResult, conversationTitle, HELP_REPLY, chooseLook, nextLook } from "./out/src/lib/ai/intent.js";
+import { displayFromWords } from "./out/src/lib/ai/display.js";
 
 let f = 0; const t = (l, c, d = "") => { if (!c) { f++; console.log("FAIL", l, d); } else console.log("PASS", l); };
 const fresh = { hasMenu: false, mode: "poster", size: "poster", pages: "1", style: "bold-deals" };
@@ -8,7 +9,7 @@ const withMenu = { hasMenu: true, mode: "menu", size: "letter", pages: "1", styl
 const a = parseIntent("Create a bold family deals poster for Yiros House. Yiros Meal Deal — 3 lamb yiros and large chips $49.90.", fresh);
 t("first message is a new poster", a.kind === "new" && a.mode === "poster" && a.size === "poster" && a.style === "bold-deals", JSON.stringify(a));
 const b = parseIntent("Create a one-page menu for Yiros House with sections for yiros, grill plates and sides. Use dollar prices.", fresh);
-t("menu words switch to menu mode on letter", b.kind === "new" && b.mode === "menu" && b.size === "letter" && b.style === "editorial", JSON.stringify(b));
+t("menu words switch to menu mode on letter", b.kind === "new" && b.mode === "menu" && b.size === "letter" && b.style !== "bold-deals" && b.style === b.look.style, JSON.stringify({ mode: b.mode, size: b.size, style: b.style, look: b.look.id }));
 const c = parseIntent("make the prices bigger and swap the second offer for a Kids Meal $12", withPoster);
 t("edit instruction revises", c.kind === "revise" && c.mode === "poster" && c.size === "poster", JSON.stringify(c));
 const d = parseIntent("turn it into a wide board", withPoster);
@@ -35,4 +36,34 @@ const text = describeResult(menu, { kind: "new", size: "poster" });
 t("result text names venue, count, score", text.includes("Yiros House") && text.includes("2 offers") && text.includes("100/100") && text.includes("Halftone") && text.includes("Followed: Used exact prices"), text);
 t("revision wording", describeResult(menu, { kind: "revise", size: "wide" }).startsWith("Updated the poster"));
 t("title from venue", conversationTitle("Create a poster for Yiros House with deals") === "Yiros House" && conversationTitle("hello there").length > 0);
+// ---- size from words ----
+const d1 = displayFromWords("Create a family deals board 120 x 60 cm above the counter for Yiros House");
+t("cm board parsed", d1 && d1.widthCm === 120 && d1.heightCm === 60 && d1.displayType === "wall-board" && d1.format === "custom", JSON.stringify(d1 && { w: d1.widthCm, h: d1.heightCm, t: d1.displayType, f: d1.format }));
+const d2 = displayFromWords("Menu for a 55-inch TV screen behind the counter");
+t("55-inch TV parsed as digital 16:9", d2 && d2.isDigital && Math.round(d2.widthCm) === 122 && Math.abs(d2.heightCm - 68.5) < 1 && d2.budget.maxItems <= 9, JSON.stringify(d2 && { w: d2.widthCm, h: d2.heightCm, d: d2.isDigital, items: d2.budget.maxItems }));
+const d3 = displayFromWords("A4 landscape takeaway menu");
+t("A4 landscape parsed", d3 && d3.widthCm === 29.7 && d3.heightCm === 21 && d3.displayType === "table-menu", JSON.stringify(d3 && { w: d3.widthCm, h: d3.heightCm, t: d3.displayType }));
+const d4 = displayFromWords("fascia 4.5 m by 70 cm read from 10 m");
+t("mixed units and distance", d4 && d4.widthCm === 450 && d4.heightCm === 70 && d4.viewingDistanceM === 10 && d4.displayType === "fascia", JSON.stringify(d4 && { w: d4.widthCm, h: d4.heightCm, v: d4.viewingDistanceM, t: d4.displayType }));
+t("no size → null", displayFromWords("Create a poster for Yiros House with 3 deals at $49.90") === null);
+const sized = parseIntent("Create a family deals board 120 x 60 cm above the counter for Yiros House: Yiros Meal Deal $49.90", fresh);
+t("intent carries display and custom size", sized.display && sized.display.widthCm === 120 && sized.mode === "poster" && sized.size === "wide", JSON.stringify({ size: sized.size, mode: sized.mode }));
+const paper = parseIntent("A4 one-page menu for Nook Café with coffee and breakfast sections. Flat white $5.", fresh);
+t("A4 menu intent", paper.mode === "menu" && paper.size === "letter" && paper.display?.displayType === "table-menu", JSON.stringify({ mode: paper.mode, size: paper.size }));
+const kept = parseIntent("make the prices bigger", { ...withPoster, display: sized.display, look: sized.look });
+t("revision keeps the size", kept.display?.widthCm === 120 && kept.kind === "revise");
+// ---- looks per venue ----
+const sushi = parseIntent("Menu for a 55-inch TV screen behind the counter at Umi Sushi: Salmon Nigiri $8, Tuna Roll $12.", fresh);
+const pub = parseIntent("Pub menu for The Royal Oak: Chicken Parmigiana $26, Steak Sandwich $22.", fresh);
+const bakery = parseIntent("Counter card for Flour & Co bakery: croissant $6, sourdough loaf $9.", fresh);
+t("different venues get different looks", sushi.look && pub.look && bakery.look && new Set([sushi.look.id, pub.look.id, bakery.look.id]).size === 3, JSON.stringify([sushi.look?.id, pub.look?.id, bakery.look?.id]));
+t("look matches the venue", pub.look?.id === "chalkboard-pub" && sushi.look?.id === "sushi-slate", JSON.stringify([pub.look?.id, sushi.look?.id]));
+const named = parseIntent("use the noir fine look", { ...withMenu, look: pub.look });
+t("naming a template restyles", named.kind === "restyle" && named.look?.id === "noir-fine", JSON.stringify({ kind: named.kind, look: named.look?.id }));
+const another = parseIntent("another look", { ...withMenu, look: pub.look });
+t("another look cycles without a new generation", another.kind === "restyle" && another.look && another.look.id !== pub.look.id && another.look.alternatives.length > 0, JSON.stringify({ kind: another.kind, look: another.look?.id }));
+t("nextLook cycles through alternatives", nextLook(nextLook(pub.look)).id !== pub.look.id);
+t("chooseLook honours the wizard template", chooseLook("menu for a pub", "menu", { setupTemplateId: "kraft-cafe" }).id === "kraft-cafe");
+const sizedText = describeResult(menu, { kind: "new", size: "wide", display: sized.display, look: sized.look });
+t("result text names the fitted size and look", sizedText.includes("120 × 60 cm") && sizedText.includes("Look:"), sizedText);
 console.log(f ? `FAILURES: ${f}` : "ALL PASS"); process.exit(f ? 1 : 0);

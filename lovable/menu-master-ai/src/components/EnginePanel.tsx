@@ -2,7 +2,7 @@ import { Bot, CheckCircle2, Scale, XCircle } from "lucide-react";
 
 import type { EngineReport } from "@/lib/menu.functions";
 
-const LABELS: Record<string, string> = { lovable: "Halftone built-in", openai: "ChatGPT", claude: "Claude" };
+const LABELS: Record<string, string> = { lovable: "Halftone built-in", openai: "ChatGPT", claude: "Claude", gemini: "Google Gemini" };
 
 function scoreTone(score: number) {
   if (score >= 90) return "text-herb";

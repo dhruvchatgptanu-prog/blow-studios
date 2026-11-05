@@ -402,3 +402,83 @@ export function fitMenuToDisplay(menu: GeneratedMenuCore, spec: DisplaySpec, con
   const followed = omitted.length ? [...menu.followed.filter((line) => !line.startsWith("Omitted for legibility")), `Omitted for legibility: ${omitted.join(", ")}`] : menu.followed;
   return { menu: changed ? { ...menu, sections: sections.length ? sections : menu.sections, followed } : menu, omitted, trimmedDescriptions: trimmed, changed };
 }
+
+/** Maps a display spec onto the renderer's size keys (custom shapes pick the closest layout family). */
+export function rendererSizeForDisplay(display: DisplaySpec | undefined, mode: "menu" | "poster"): OutputSize {
+  if (!display) return mode === "poster" ? "poster" : "letter";
+  if (display.format !== "custom") return display.format;
+  switch (display.orientation) {
+    case "ultra-wide": return display.aspect >= 4.5 ? "fascia-447" : "fascia-180";
+    case "landscape": return mode === "poster" ? "wide" : "letter";
+    case "square": return "square";
+    default: return mode === "poster" ? "poster" : "letter";
+  }
+}
+
+const PAPER_SIZES: Record<string, [number, number]> = { a3: [29.7, 42], a4: [21, 29.7], a5: [14.8, 21], a6: [10.5, 14.8], letter: [21.6, 27.9], legal: [21.6, 35.6], tabloid: [27.9, 43.2], dl: [9.9, 21] };
+
+function unitToCm(value: number, unit: string) {
+  const u = unit.toLowerCase();
+  if (u.startsWith("mm")) return value / 10;
+  if (u === "m" || u.startsWith("met")) return value * 100;
+  if (u === '"' || u.startsWith("in")) return value * 2.54;
+  if (u.startsWith("ft") || u.startsWith("feet") || u.startsWith("foot")) return value * 30.48;
+  return value;
+}
+
+function displayTypeFromWords(text: string, digital: boolean, paper: boolean): DisplayType {
+  if (/\b(?:fascia|shop ?front|awning)\b/i.test(text)) return "fascia";
+  if (digital || /\b(?:tv|screen|monitor|digital)\b/i.test(text)) return "digital-screen";
+  if (/\bdrive[- ]?thru\b/i.test(text)) return "drive-thru-board";
+  if (/\bwindow\b/i.test(text)) return "window";
+  if (/\b(?:a-frame|a frame|sandwich board|pavement sign)\b/i.test(text)) return "a-frame";
+  if (/\b(?:board|wall|sign|signage|banner|backlit|lightbox)\b/i.test(text)) return "wall-board";
+  if (/\b(?:counter card|counter ?top|on the counter)\b/i.test(text)) return "counter-card";
+  if (paper || /\b(?:table|handout|flyer|takeaway menu|printed menu|paper|print)\b/i.test(text)) return "table-menu";
+  return "unknown";
+}
+
+/**
+ * Reads a physical size out of plain words ("120 x 60 cm board", "A4 landscape",
+ * "55-inch TV", "1920x1080 screen", "2.4 m by 60 cm fascia read from 8 m") and
+ * turns it into a DisplaySpec, so the owner never has to pick a format.
+ * Returns null when the message names no size.
+ */
+export function displayFromWords(text: string): DisplaySpec | null {
+  let widthCm = 0, heightCm = 0, digital = false;
+  const notes: string[] = [];
+  const dims = /(\d+(?:[.,]\d+)?)\s*(cm|mm|m|in(?:ch(?:es)?)?|"|ft|feet|foot)?\s*(?:x|×|by|\*)\s*(\d+(?:[.,]\d+)?)\s*(cm|mm|m|in(?:ch(?:es)?)?|"|ft|feet|foot|px|pixels?)?(?![\d.,])/i.exec(text);
+  if (dims) {
+    const a = Number.parseFloat((dims[1] ?? "0").replace(",", "."));
+    const b = Number.parseFloat((dims[3] ?? "0").replace(",", "."));
+    const u2 = (dims[4] ?? "").toLowerCase();
+    const u1 = (dims[2] ?? u2).toLowerCase();
+    if (u2.startsWith("px") || u2.startsWith("pixel")) {
+      digital = true; widthCm = 121.7; heightCm = (121.7 * b) / a;
+      notes.push("Pixel size given; a 55-inch screen was assumed for the physical scale. Say the real diagonal or width if it differs.");
+    } else if (u1 || u2) {
+      widthCm = unitToCm(a, u1 || u2); heightCm = unitToCm(b, u2 || u1);
+    } else if (a >= 10 && b >= 10) {
+      widthCm = a; heightCm = b; notes.push("No unit given; centimetres assumed.");
+    }
+  }
+  const diagonal = /(\d{2,3})\s*(?:-|\s)?(?:inch|in|")\s*(?:tv|screen|monitor|display|digital)/i.exec(text) ?? /(?:tv|screen|monitor|display)\s*(?:of\s*)?(\d{2,3})\s*(?:-|\s)?(?:inch|in|")/i.exec(text);
+  if (!widthCm && diagonal) {
+    const inches = Number.parseFloat(diagonal[1] ?? "0");
+    widthCm = inches * 2.54 * 0.8716; heightCm = inches * 2.54 * 0.4903; digital = true;
+  }
+  const paper = /\b(a3|a4|a5|a6|letter|legal|tabloid|dl)\b(?:\s*(portrait|landscape))?/i.exec(text);
+  if (!widthCm && paper) {
+    const size = PAPER_SIZES[(paper[1] ?? "").toLowerCase()];
+    if (size) { [widthCm, heightCm] = size; }
+  }
+  if (!widthCm || !heightCm) return null;
+  if (/\blandscape\b/i.test(text) && heightCm > widthCm) [widthCm, heightCm] = [heightCm, widthCm];
+  if (/\bportrait\b/i.test(text) && widthCm > heightCm) [widthCm, heightCm] = [heightCm, widthCm];
+  const displayType = displayTypeFromWords(text, digital || /\b(?:tv|screen|monitor|digital)\b/i.test(text), Boolean(paper) && !dims && !diagonal);
+  const distance = /(?:from|at|viewed from|read from)\s*(?:about|around|roughly)?\s*(\d+(?:[.,]\d+)?)\s*(?:m|metres?|meters?)\b/i.exec(text);
+  const lighting: DisplayMeasurement["lighting"] = /\b(?:outdoor|outside|street)\b/i.test(text) ? "outdoor" : /\b(?:dim|moody|dark room)\b/i.test(text) ? "dim" : /\bbright\b/i.test(text) ? "bright" : displayType === "digital-screen" ? "backlit" : "neutral";
+  const measurement: Partial<DisplayMeasurement> = { displayType, isDigital: displayType === "digital-screen", lighting, confidence: 1, ...(notes.length ? { notes: notes.join(" ") } : {}) };
+  const spec = resolveDisplay(measurement, { widthCm: Math.round(widthCm * 10) / 10, heightCm: Math.round(heightCm * 10) / 10, ...(distance ? { viewingDistanceM: Number.parseFloat((distance[1] ?? "0").replace(",", ".")) } : {}) });
+  return spec;
+}

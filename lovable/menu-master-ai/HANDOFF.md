@@ -46,6 +46,17 @@ The studio then designs with that template, size and venue profile, and prints a
 real dimensions. Not yet applied to Lovable (no credits); ready-to-paste bundles are in
 `lovable/menu-master-ai/apply/`.
 
+## Round 7 (same day)
+You can now drop in every page of your current menu at once (or paste them), and all engines read all
+of them. Your photos and the finished food photography are saved in Lovable Cloud storage, so a design
+survives a reload. Say the size in the message ("120 x 60 cm board above the counter", "A4",
+"55-inch TV") and the design is fitted to it at the end; no size buttons. Each type of venue gets its
+own look automatically; say "another look" to cycle through the others for free. Google Gemini is a
+fourth engine, working through the built-in gateway with no key needed; add `GEMINI_API_KEY` to use
+your own Google account. ChatGPT and Claude connect through API keys (`OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY` from platform.openai.com and console.anthropic.com); a ChatGPT Plus or Claude.ai
+subscription cannot be used by an app.
+
 ## Round 6 (chat studio, 5 Nov)
 Halftone now works like ChatGPT. Open the app, type what you want ("Create a bold family deals
 poster for Yiros House: …"), and the design appears in the conversation with a short note on what

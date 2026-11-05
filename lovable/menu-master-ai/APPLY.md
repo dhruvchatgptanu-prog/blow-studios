@@ -218,6 +218,30 @@ is that the text engines now write richer, more precise per-dish photo prompts
   `apply/fetch-from-github.sh` (see `apply/README.md`).
 * Tests: `eval/intent.test.mjs`.
 
+## Round 7 (photos of the whole menu, storage, size from words, a look per venue, Gemini)
+
+* **All pages at once** — the chat accepts up to 8 photos of the current menu (button, drag-and-drop
+  or paste), shrinks them in the browser, and every engine receives all of them with an instruction
+  to transcribe every page into one design (`referenceImages` on `generateMenu`).
+* **Lovable Cloud storage** — menu photos, food photos and finished renders are stored in the
+  private bucket `halftone-uploads`, indexed in `public.halftone_assets` (both created, RLS on).
+  `src/lib/ai/assets.server.ts` + `src/lib/assets.functions.ts` (`uploadAssets`, `signAssets`); the
+  chat re-signs URLs on load, so a design and its photography survive a reload. Best-effort: storage
+  can never block a design.
+* **Size from words** — `display.ts displayFromWords` reads "120 x 60 cm board", "A4 landscape",
+  "55-inch TV", "1920x1080 screen", "4.5 m by 70 cm fascia read from 10 m" and builds a DisplaySpec
+  (type, viewing distance, lighting, legibility budget). The chat has no size chips any more; the
+  design is fitted to the stated size after the judge and printed at the real cm.
+* **A look per venue** — `intent.ts chooseLook` picks a template from the 16-template library using
+  the venue and cuisine in the words (pub → Chalkboard Pub, sushi → Sushi Slate, bakery → Patisserie
+  Blush…); the wizard's template or a template named in the message wins. "Another look" (button or
+  words) re-renders the same design in the next-best template with no engine call.
+* **Google Gemini** — fourth engine (`gemini`). With `GEMINI_API_KEY` it calls Google's
+  OpenAI-compatible endpoint directly; without it, it uses the Lovable gateway's google/* models and the
+  existing `LOVABLE_API_KEY` (`HALFTONE_GATEWAY_GEMINI=off` disables that). Sequence: all engines in
+  parallel → verifier → judge (Claude → ChatGPT → Gemini → built-in) → repair → fit → verify.
+* Tests: `eval/intent.test.mjs` (sizes, looks, restyle).
+
 ## Secrets (Lovable Cloud → Secrets)
 
 | Name | Required | Default |
@@ -225,6 +249,8 @@ is that the text engines now write richer, more precise per-dish photo prompts
 | `LOVABLE_API_KEY` | already present | — |
 | `OPENAI_API_KEY` | for ChatGPT engine | — |
 | `ANTHROPIC_API_KEY` | for Claude engine | — |
+| `GEMINI_API_KEY` | for Google Gemini direct (otherwise Gemini runs via the Lovable gateway) | — |
+| `GEMINI_MODEL` / `GEMINI_FALLBACK_MODELS` / `LOVABLE_GEMINI_MODEL` / `LOVABLE_GEMINI_FALLBACK_MODELS` / `HALFTONE_GATEWAY_GEMINI` | optional | `gemini-3-pro` / `gemini-3-flash,gemini-2.5-pro,gemini-2.5-flash` / `google/gemini-3.6-flash` / `google/gemini-3.5-pro,google/gemini-3-pro,google/gemini-2.5-pro,google/gemini-2.5-flash` / set `off` to stop using gateway Gemini |
 | `OPENAI_MODEL` | optional | `gpt-6-astra` |
 | `ANTHROPIC_MODEL` | optional | `claude-opus-5-5` |
 | `LOVABLE_TEXT_MODEL` | optional | `openai/gpt-6-astra` |

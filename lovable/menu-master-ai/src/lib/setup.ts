@@ -1,4 +1,4 @@
-import type { DisplaySpec } from "@/lib/ai/display";
+import { rendererSizeForDisplay, type DisplaySpec } from "@/lib/ai/display";
 import type { StoreProfile } from "@/lib/ai/store";
 import { STORE_TYPE_GUIDE } from "@/lib/ai/store";
 import type { Template } from "@/lib/ai/templates";
@@ -75,13 +75,6 @@ export function briefFromSetup(setup: StudioSetup): string {
 }
 
 /** Maps a display spec onto the renderer's size keys (custom shapes pick the closest layout family). */
-export function rendererSizeFor(display: DisplaySpec | undefined, mode: "menu" | "poster"): "letter" | "a5" | "poster" | "wide" | "fascia-447" | "fascia-180" | "square" {
-  if (!display) return mode === "poster" ? "poster" : "letter";
-  if (display.format !== "custom") return display.format;
-  switch (display.orientation) {
-    case "ultra-wide": return display.aspect >= 4.5 ? "fascia-447" : "fascia-180";
-    case "landscape": return mode === "poster" ? "wide" : "letter";
-    case "square": return "square";
-    default: return mode === "poster" ? "poster" : "letter";
-  }
+export function rendererSizeFor(display: DisplaySpec | undefined, mode: "menu" | "poster") {
+  return rendererSizeForDisplay(display, mode);
 }

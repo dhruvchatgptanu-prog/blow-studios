@@ -61,7 +61,7 @@ export type MenuSection = z.infer<typeof menuSectionSchema>;
 export type PhotoBrief = z.infer<typeof photoBriefSchema>;
 export type GeneratedMenuCore = z.infer<typeof generatedMenuSchema>;
 
-export type ProviderId = "lovable" | "openai" | "claude";
+export type ProviderId = "lovable" | "openai" | "claude" | "gemini";
 
 export type EngineCandidate = {
   provider: ProviderId;
@@ -114,6 +114,8 @@ export type MenuRequest = {
   previous?: string | undefined;
   /** data:image/...;base64,... */
   referenceImage?: string | undefined;
+  /** Several photos of the existing menu (pages, boards, both sides). Data URLs. */
+  referenceImages?: string[] | undefined;
   /** Set by the ensemble, never by the client: detected cuisine keys. */
   cuisine?: string[] | undefined;
   /** Set by the ensemble, never by the client: approved past outputs shown as examples. */
