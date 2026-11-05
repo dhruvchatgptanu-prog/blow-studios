@@ -317,6 +317,7 @@ export const BRIEF_COMPLIANCE_RULES = [
   "Only invent plausible menu content where no content is supplied. Never invent a phone number, address, offer deadline, service, dietary promise, award or quality claim.",
   "If descriptions or photos are forbidden by the brief, respect that completely.",
   "Every price in the brief must appear exactly once per matching item, formatted the way the brief wrote it (same currency symbol, same decimals).",
+  "If the brief gives no prices but allows invented ones ('use random prices', 'prices up to you'), choose realistic prices for the cuisine and price point, use ONE ending style for every price (.90, .50 or whole numbers; never mix) and add 'Prices are placeholders, replace before printing' to 'followed'. If the brief gives no prices and does not allow invented ones, still price every item realistically but say so in 'followed'.",
   "Quantities inside a deal (e.g. '3 lamb yiros and large chips') must be restated in the item description so the customer sees exactly what is included.",
   "'followed' lists 3-6 specific instructions you actually followed, quoting the brief. Never claim to follow something the brief did not say.",
   "'features' holds only selling points the brief supports. If none are supported return an empty array.",

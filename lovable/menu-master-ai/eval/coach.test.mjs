@@ -13,4 +13,6 @@ const typo = coachBrief("For Burger oclock name of resturant Create a burger sho
 t("venue typed with lowercase word gets an exact-print warning", typo.hints.some((h) => h.text.includes('"Burger oclock"')), JSON.stringify(typo.hints));
 const clean = coachBrief("Create a one-page menu for Yiros House with sections for yiros, grill plates and sides. Prices in dollars.", "menu");
 t("clean venue name gets no warning", !clean.hints.some((h) => h.text.includes("will print exactly")), JSON.stringify(clean.hints));
+const randomPoster = coachBrief("For Burger oclock Create a burger shop poster. You can use random prices", "poster");
+t("random prices → no price fix, placeholder tip", !randomPoster.hints.some((h) => h.level === "fix" && /price/i.test(h.text)) && randomPoster.hints.some((h) => h.text.includes("Placeholder prices")), JSON.stringify(randomPoster.hints));
 console.log(f ? `FAILURES: ${f}` : "ALL PASS"); process.exit(f ? 1 : 0);

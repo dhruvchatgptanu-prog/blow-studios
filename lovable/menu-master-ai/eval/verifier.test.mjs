@@ -1,4 +1,4 @@
-import { verifyMenu, extractBriefPrices, extractBriefNames, extractDietaryMarkers, dietaryClaims } from "./out/src/lib/ai/verify.js";
+import { verifyMenu, extractBriefPrices, extractBriefNames, extractDietaryMarkers, dietaryClaims, briefAllowsPlaceholderPrices, priceEndings } from "./out/src/lib/ai/verify.js";
 import { enrichPhotoPrompt } from "./out/src/lib/ai/cuisine.js";
 import { SYSTEM_PROMPT, JUDGE_SYSTEM_PROMPT } from "./out/src/lib/ai/knowledge.js";
 console.log("system prompt chars", SYSTEM_PROMPT.length, "judge chars", JUDGE_SYSTEM_PROMPT.length);
@@ -55,4 +55,15 @@ t("subject fallback is idempotent", enrichPhotoPrompt(withSubject, ["greek / yir
 const { enrichMenuPhotos } = await import("./out/src/lib/ai/cuisine.js");
 const fixed = verifyMenu(enrichMenuPhotos(blank, ["greek / yiros / gyros / souvlaki"]), req);
 t("menu-level enrichment fills subjects → 100", fixed.score === 100, JSON.stringify(fixed.issues));
+// ---- placeholder prices (daily run 9, from live data) ----
+t("random prices allowed", briefAllowsPlaceholderPrices("For Burger oclock Create a burger shop menu design. You can use random prices") && briefAllowsPlaceholderPrices("Prices up to you.") && briefAllowsPlaceholderPrices("add placeholder pricing"));
+t("exact-price briefs are not placeholders", !briefAllowsPlaceholderPrices(brief) && !briefAllowsPlaceholderPrices("Use the exact prices below."));
+t("endings detected", JSON.stringify(priceEndings(["$12.90", "$14.90"])) === '["90"]' && priceEndings(["$12", "$9.50"]).length === 2);
+const randomBrief = "For Burger oclock Create a burger shop menu design. You can use random prices";
+const randomReq = { brief: randomBrief, mode: "poster", style: "bold-deals", pages: "1", size: "poster" };
+const randomGood = JSON.parse(JSON.stringify(good)); randomGood.restaurantName = "Burger oclock"; randomGood.followed = ["Prices are placeholders, replace before printing"]; randomGood.sections[0].items.forEach((i, n) => { i.price = ["$14.90", "$16.90", "$29.90"][n]; });
+t("declared consistent placeholders score 100", verifyMenu(randomGood, randomReq).score === 100, JSON.stringify(verifyMenu(randomGood, randomReq).issues));
+const randomBad = JSON.parse(JSON.stringify(randomGood)); randomBad.followed = ["Used a bold style"]; randomBad.sections[0].items[1].price = "$16";
+const randomBadResult = verifyMenu(randomBad, randomReq);
+t("mixed endings and undeclared placeholders flagged", randomBadResult.score === 94 && randomBadResult.issues.some((i) => i.includes("mix endings")) && randomBadResult.issues.some((i) => i.includes("placeholders")), JSON.stringify(randomBadResult));
 console.log(f ? `FAILURES: ${f}` : "ALL PASS"); process.exit(f ? 1 : 0);

@@ -44,6 +44,16 @@ export function extractDietaryMarkers(brief: string) {
   return markers;
 }
 
+/** The brief explicitly allows invented prices ("use random prices", "prices up to you", "sample pricing"). */
+export function briefAllowsPlaceholderPrices(brief: string) {
+  return /\b(?:random|placeholder|sample|dummy|example|made[- ]up|indicative|approximate|any|your own|suggested)\s+(?:prices?|pricing)\b|\b(?:you\s+(?:can|may|could)\s+(?:use|choose|pick|invent|make up|add|set)\b[^.;\n]{0,30}\bprices?\b)|\bprices?\s+(?:up to you|tbc|tba|to be confirmed|are up to you)\b|\b(?:invent|make up|choose|pick)\s+(?:the\s+|some\s+|realistic\s+)?prices?\b/i.test(brief);
+}
+
+/** Cents endings used by the output prices ("90", "50", "00", "99"); empty for whole-number prices without decimals. */
+export function priceEndings(prices: string[]) {
+  return Array.from(new Set(prices.map((price) => /[.,](\d{2})\b/.exec(price)?.[1] ?? (/\d/.test(price) ? "whole" : "")).filter(Boolean)));
+}
+
 const COUNT_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, twelve: 12 };
 
 function normalisePrice(raw: string) {
@@ -121,6 +131,12 @@ export function verifyMenu(menu: GeneratedMenuCore, request: MenuRequest): Verif
   } else {
     checks.prices = items.every((item) => item.price.trim().length > 0) ? 40 : 25;
     if ((checks.prices ?? 0) < 40) issues.push("Some items have no price.");
+    if (briefAllowsPlaceholderPrices(brief) && items.length > 0) {
+      // Placeholder prices must look like one menu (one ending style) and be declared so nobody prints them by mistake.
+      const endings = priceEndings(items.map((item) => item.price));
+      if (endings.length > 1) { checks.prices = Math.max(0, (checks.prices ?? 0) - 3); issues.push(`Placeholder prices mix endings (${endings.join(", ")}); use one style for every price.`); }
+      if (!menu.followed.some((line) => /placeholder|random|sample|replace before print/i.test(line))) { checks.prices = Math.max(0, (checks.prices ?? 0) - 3); issues.push("The brief allowed invented prices: add 'Prices are placeholders, replace before printing' to 'followed'."); }
+    }
   }
 
   // 2. Names (weight 20)

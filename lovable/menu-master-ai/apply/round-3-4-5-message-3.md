@@ -206,7 +206,7 @@ export function rendererSizeFor(display: DisplaySpec | undefined, mode: "menu" |
 
 ===== FILE: src/lib/ai/coach.ts =====
 ```tsx
-import { extractBriefNames, extractBriefPrices } from "./verify";
+import { briefAllowsPlaceholderPrices, extractBriefNames, extractBriefPrices } from "./verify";
 
 /**
  * Brief coach: deterministic, instant hints shown under the brief before any
@@ -237,8 +237,10 @@ export function coachBrief(brief: string, mode: "menu" | "poster"): CoachReport 
   let score = 100;
   if (venueName && venueName.split(/\s+/).some((word, index) => index > 0 && /^[a-z]/.test(word))) hints.push({ level: "tip", text: `The venue will print exactly as "${venueName}". Fix capitals, spelling or apostrophes here if that is not the brand spelling.` });
   if (!hasVenue) { score -= 20; hints.push({ level: "fix", text: "Name the venue (e.g. 'for Yiros House') so the brand zone is exact." }); }
-  if (prices.length === 0) {
-    if (mode === "poster") { score -= 35; hints.push({ level: "fix", text: "Give every offer its exact price (e.g. $49.90). Posters without prices get invented ones." }); }
+  const placeholders = prices.length === 0 && briefAllowsPlaceholderPrices(text);
+  if (placeholders) hints.push({ level: "tip", text: "Placeholder prices will be invented and marked as placeholders; replace them with real prices before printing." });
+  else if (prices.length === 0) {
+    if (mode === "poster") { score -= 35; hints.push({ level: "fix", text: "Give every offer its exact price (e.g. $49.90), or say 'use placeholder prices' if you will add them later." }); }
     else if (!mentionsCurrencyWord) { score -= 15; hints.push({ level: "tip", text: "Add prices, or say which currency to use, so none are invented." }); }
   }
   if (mode === "poster" && names.length === 0 && prices.length > 0) { score -= 15; hints.push({ level: "tip", text: "Write each offer as 'Name — what's included $price' so names stay exact." }); }

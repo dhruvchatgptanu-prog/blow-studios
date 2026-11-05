@@ -188,6 +188,14 @@ is that the text engines now write richer, more precise per-dish photo prompts
   item name + description, dish photos: label, hero: venue signature dishes) and the verifier
   flags any item prompt that never names the dish. The brief coach now warns when the venue name
   will print with odd capitals ("Burger oclock") because names are reproduced exactly as typed.
+* **Placeholder prices (daily run 9)** — a brief that allows invented prices ("you can use random
+  prices", "prices up to you", "sample pricing") is now recognised: the coach stops demanding exact
+  prices and explains that placeholders will be marked; the knowledge base asks for realistic prices
+  with one consistent ending style and a 'Prices are placeholders, replace before printing' line in
+  'followed'; the verifier checks both (mixed endings or an undeclared placeholder set cost 3 points
+  each). Evidence: price-ending research finds 9/90 endings read as value and round endings as
+  quality, so mixing them on one menu sends both signals at once. Tests in `eval/verifier.test.mjs`
+  and `eval/coach.test.mjs`.
 
 ## Secrets (Lovable Cloud → Secrets)
 
