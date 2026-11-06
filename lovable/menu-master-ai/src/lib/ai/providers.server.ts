@@ -405,8 +405,8 @@ type ChatCall = { url: string; headers: Record<string, string>; model: string; i
 /** OpenAI-compatible chat completions with a JSON schema response (Gemini direct, or google/* models on the Lovable gateway). */
 async function callChatCompletions(call: ChatCall): Promise<string> {
   // The schema also travels in the text, so a gateway that ignores response_format still answers in the right shape.
-  const text = `${call.text}\n\n## OUTPUT JSON SCHEMA (answer with one JSON object of exactly this shape, no prose, no code fences)\n${JSON.stringify(call.schema)}`;
-  const content: unknown[] = [{ type: "text", text }, ...(call.images ?? []).map((image) => ({ type: "image_url", image_url: { url: image } }))];
+  const prompt = `${call.text}\n\n## OUTPUT JSON SCHEMA (answer with one JSON object of exactly this shape, no prose, no code fences)\n${JSON.stringify(call.schema)}`;
+  const content: unknown[] = [{ type: "text", text: prompt }, ...(call.images ?? []).map((image) => ({ type: "image_url", image_url: { url: image } }))];
   const response = await fetch(call.url, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...call.headers },

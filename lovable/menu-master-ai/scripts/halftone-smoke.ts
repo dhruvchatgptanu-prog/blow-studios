@@ -26,6 +26,7 @@ const started = Date.now();
 try {
   const result = await composeMenu({ brief, mode: intent.mode, style: intent.style, pages: intent.pages, size: intent.size, ...(display ? { display } : {}), ...(intent.look ? { template: intent.look.id } : {}) });
   const engine = result.engine;
+  if (!engine) throw new Error("No engine report on the result.");
   for (const candidate of engine.candidates) console.log(`CANDIDATE ${candidate.provider} ${candidate.model}: ${candidate.status} score=${candidate.score} ${candidate.ms}ms${candidate.error ? ` error=${candidate.error.slice(0, 160)}` : ""}`);
   console.log("STRATEGY:", engine.strategy, "judge:", engine.judge ? `${engine.judge.provider}/${engine.judge.model} base=${engine.judge.winner}` : "none", "repair:", engine.repair ? `${engine.repair.provider} ${engine.repair.before}->${engine.repair.after}` : "none");
   console.log("FINAL:", engine.finalScore, engine.finalIssues.length ? engine.finalIssues.join(" | ") : "no issues", "fit:", engine.fit ? `${engine.fit.format} omitted=${engine.fit.omitted.length}` : "none");
