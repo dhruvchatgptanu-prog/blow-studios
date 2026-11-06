@@ -66,4 +66,8 @@ t("declared consistent placeholders score 100", verifyMenu(randomGood, randomReq
 const randomBad = JSON.parse(JSON.stringify(randomGood)); randomBad.followed = ["Used a bold style"]; randomBad.sections[0].items[1].price = "$16";
 const randomBadResult = verifyMenu(randomBad, randomReq);
 t("mixed endings and undeclared placeholders flagged", randomBadResult.score === 94 && randomBadResult.issues.some((i) => i.includes("mix endings")) && randomBadResult.issues.some((i) => i.includes("placeholders")), JSON.stringify(randomBadResult));
+// ---- revision marker is never a dish name (live bug, 5 Nov) ----
+const revised = verifyMenu(good, { ...req, brief: `${brief}\n\nREVISION: Give me more unique design` });
+t("REVISION line is not a dish name", revised.score === 100 && !revised.issues.some((i) => i.includes("REVISION")), JSON.stringify(revised.issues));
+t("extractBriefNames ignores revision lines", !extractBriefNames("Create a burger shop menu\n\nREVISION: Include pictures and more").some((n) => /revision/i.test(n)));
 console.log(f ? `FAILURES: ${f}` : "ALL PASS"); process.exit(f ? 1 : 0);

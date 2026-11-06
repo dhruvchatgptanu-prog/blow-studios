@@ -69,7 +69,8 @@ export function extractBriefPrices(brief: string) {
 /** Dish names: segments that sit directly before a dash/colon/price, e.g. "Yiros Meal Deal — 3 lamb yiros ... $49.90". */
 export function extractBriefNames(brief: string) {
   const names = new Set<string>();
-  const cleaned = brief.replace(/\b(include|includes|including|offers?|deals?|items?)\s*:\s*/gi, ";");
+  // Revision lines are instructions, never menu content: drop them before looking for names.
+  const cleaned = brief.replace(/^\s*REVISION:.*$/gim, "").replace(/\b(include|includes|including|offers?|deals?|items?)\s*:\s*/gi, ";");
   const NAME_RE = /^([A-Z][\w'&]*(?:\s+(?:[A-Z][\w'&]*|of|and|&|the|de|la|al)){0,5})\s*(?:—|–|-|:|\(|\d+["”]|[$€£])/;
   // Segments split on list separators and sentence boundaries; commas only count when the segment ends in a price.
   const segments = cleaned.split(/[;\n•]|\.\s+(?=[A-Z])/).flatMap((part) => {
@@ -87,7 +88,7 @@ export function extractBriefNames(brief: string) {
     if (/^[A-Za-z]/.test(inner) && !/[;$€£]/.test(inner)) names.add(inner);
   }
   // Section headers, legal lines and instruction words are not dish names.
-  return Array.from(names).filter((name) => !/^(create|make|design|use|include|build|the|a|an|our|my|please|keep|add|redesign|poster|menu|sign|board|sections?|prices?|format|style|mode|note|notes|mains?|starters?|entr[ée]es?|sides?|desserts?|drinks?|beverages?|salads?|kids|specials?|extras?|allergens?|allergy|dietary|hours|contact|address|phone|footer|header|tagline)\b/i.test(name));
+  return Array.from(names).filter((name) => !/^(create|make|design|use|include|build|the|a|an|our|my|please|keep|add|redesign|poster|menu|sign|board|sections?|prices?|format|style|mode|note|notes|mains?|starters?|entr[ée]es?|sides?|desserts?|drinks?|beverages?|salads?|kids|specials?|extras?|allergens?|allergy|dietary|hours|contact|address|phone|footer|header|tagline|revision|revisions|update|changes?)\b/i.test(name));
 }
 
 function extractQuantityPhrases(brief: string) {

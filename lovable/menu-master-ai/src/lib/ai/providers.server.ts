@@ -60,7 +60,8 @@ const MODELS = {
   lovable: process.env["LOVABLE_TEXT_MODEL"] ?? "openai/gpt-6-astra",
   openai: process.env["OPENAI_MODEL"] ?? "gpt-6-astra",
   claude: process.env["ANTHROPIC_MODEL"] ?? "claude-opus-5-5",
-  gemini: process.env["GEMINI_API_KEY"] ? (process.env["GEMINI_MODEL"] ?? "gemini-3-pro") : (process.env["LOVABLE_GEMINI_MODEL"] ?? "google/gemini-3.6-flash"),
+  // Gateway ids come from Lovable's changelog (google/gemini-3.7-flash is confirmed); unknown ids fall through the chain.
+  gemini: process.env["GEMINI_API_KEY"] ? (process.env["GEMINI_MODEL"] ?? "gemini-3-pro") : (process.env["LOVABLE_GEMINI_MODEL"] ?? "google/gemini-3.7-flash"),
 } as const;
 
 function list(env: string | undefined, fallback: string[]) {
@@ -79,7 +80,7 @@ const FALLBACK_MODELS: Record<ProviderId, string[]> = {
   claude: list(process.env["ANTHROPIC_FALLBACK_MODELS"], ["claude-sonnet-5-5", "claude-opus-5"]),
   gemini: process.env["GEMINI_API_KEY"]
     ? list(process.env["GEMINI_FALLBACK_MODELS"], ["gemini-3-flash", "gemini-2.5-pro", "gemini-2.5-flash"])
-    : list(process.env["LOVABLE_GEMINI_FALLBACK_MODELS"], ["google/gemini-3.5-pro", "google/gemini-3-pro", "google/gemini-2.5-pro", "google/gemini-2.5-flash"]),
+    : list(process.env["LOVABLE_GEMINI_FALLBACK_MODELS"], ["google/gemini-3.8-flash", "google/gemini-4-argon", "google/gemini-3.6-flash", "google/gemini-3.5-flash", "google/gemini-2.5-flash"]),
 };
 
 export function modelChain(id: ProviderId) {
@@ -403,7 +404,9 @@ type ChatCall = { url: string; headers: Record<string, string>; model: string; i
 
 /** OpenAI-compatible chat completions with a JSON schema response (Gemini direct, or google/* models on the Lovable gateway). */
 async function callChatCompletions(call: ChatCall): Promise<string> {
-  const content: unknown[] = [{ type: "text", text: call.text }, ...(call.images ?? []).map((image) => ({ type: "image_url", image_url: { url: image } }))];
+  // The schema also travels in the text, so a gateway that ignores response_format still answers in the right shape.
+  const text = `${call.text}\n\n## OUTPUT JSON SCHEMA (answer with one JSON object of exactly this shape, no prose, no code fences)\n${JSON.stringify(call.schema)}`;
+  const content: unknown[] = [{ type: "text", text }, ...(call.images ?? []).map((image) => ({ type: "image_url", image_url: { url: image } }))];
   const response = await fetch(call.url, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...call.headers },

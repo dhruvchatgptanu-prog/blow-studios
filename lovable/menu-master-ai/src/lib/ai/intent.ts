@@ -44,6 +44,8 @@ export type Intent = {
   look: LookRef | undefined;
   /** The brief text the engines receive (the message itself for a new design). */
   brief: string;
+  /** The message asks for photography; the chat creates the photos right after the design. */
+  wantsPhotos: boolean;
   /** Why the parser decided what it did; shown nowhere, useful in tests. */
   reason: string;
 };
@@ -53,7 +55,9 @@ const ARTEFACT_WORDS = /\b(?:menu|menus|poster|board|sign|signage|fascia|flyer|s
 const RESTART_WORDS = /\b(?:new (?:menu|poster|board|sign|design|one)|start (?:over|again|fresh)|from scratch|another (?:menu|poster|board|design)|different (?:venue|restaurant|shop))\b/i;
 const REVISE_WORDS = /\b(?:change|swap|replace|rename|remove|delete|drop|add|put|move|make (?:it|the|them|this|that)|bigger|smaller|larger|shorter|longer|bolder|less|more|instead|rather|fix|correct|update|tweak|adjust|try|use|keep|only|without|also|and (?:also )?add|can you (?:change|make it|fix|swap|add|remove))\b/i;
 const PHOTO_WORDS = /^(?:\s*(?:please|now|ok|okay|great|yes|and)[\s,]*)*(?:create|make|generate|shoot|take|do|render|add)\s+(?:the\s+|some\s+|all\s+(?:the\s+)?)?(?:food\s+)?(?:photos?|pictures?|images?|photography|shots?)\b|^\s*photos?\s*(?:please)?\s*[.!]?\s*$/i;
-const RESTYLE_WORDS = /^(?:\s*(?:please|now|ok|okay|and|hmm)[\s,]*)*(?:(?:try|show|give me|show me|i want|let's see|lets see|do)\s+)?(?:another|a different|a new|the next|next|different)\s+(?:look|style|design|template|theme|colou?rs?|vibe|feel)\b|^\s*(?:restyle|change the (?:look|style|theme|colou?rs?)|different (?:look|style|theme))\s*[.!]?\s*$/i;
+const RESTYLE_WORDS = /^(?:\s*(?:please|now|ok|okay|and|hmm)[\s,]*)*(?:(?:try|show|give me|show me|i want|let's see|lets see|do|make it)\s+)?(?:a\s+|the\s+)?(?:more\s+)?(?:another|different|new|next|unique|fresh|other|bolder|cooler|nicer|better)\s+(?:look|style|design|template|theme|colou?rs?|vibe|feel|layout)\b|^\s*(?:restyle|change the (?:look|style|theme|colou?rs?|design)|make it look different|different (?:look|style|theme))\s*[.!]?\s*$/i;
+/** The message asks for photography as part of the design ("include pictures", "with photos of each dish"). */
+const WANTS_PHOTOS = /\b(?:include|with|add|put|show|insert|want|need|generate|create|make)\s+(?:the\s+|some\s+|more\s+|real\s+|food\s+|nice\s+|good\s+)*(?:pictures?|photos?|images?|photography|pics)\b|\b(?:pictures?|photos?|images?)\s+(?:of|for)\s+(?:each|every|the|all)\b/i;
 const HELP_WORDS = /^\s*(?:hi|hello|hey|yo|help|what can you do|what do you do|how does this work|how do i|\?+)\s*[.!?]*\s*$/i;
 
 function sizeFrom(text: string, mode: ChatMode, current: ChatSize, changedMode: boolean): ChatSize {
@@ -139,7 +143,8 @@ export function nextLook(current: LookRef): LookRef {
 export function parseIntent(message: string, context: IntentContext): Intent {
   const text = message.trim();
   const pages = pagesFrom(text, context.pages);
-  const keep = { mode: context.mode, size: context.size, style: context.style, display: context.display, look: context.look, pages, brief: text };
+  const wantsPhotos = WANTS_PHOTOS.test(text);
+  const keep = { mode: context.mode, size: context.size, style: context.style, display: context.display, look: context.look, pages, brief: text, wantsPhotos };
   if (!text || HELP_WORDS.test(text)) return { kind: "help", ...keep, reason: "greeting or question" };
   if (context.hasMenu && PHOTO_WORDS.test(text)) return { kind: "photos", ...keep, reason: "asks for photos" };
   if (context.hasMenu && (RESTYLE_WORDS.test(text) || (templateFromWords(text) && text.length < 80 && !NEW_WORDS.test(text)))) {
@@ -166,7 +171,7 @@ export function parseIntent(message: string, context: IntentContext): Intent {
   const look = chooseLook(text, mode, context, kind === "new" && RESTART_WORDS.test(text));
   const explicitStyle = styleWords(text);
   const style: ChatStyle = mode === "poster" ? "bold-deals" : explicitStyle ?? (look.style === "bold-deals" ? "editorial" : look.style);
-  return { kind, mode, size, pages, style, display, look, brief: text, reason };
+  return { kind, mode, size, pages, style, display, look, brief: text, wantsPhotos, reason };
 }
 
 /** Folds a revision request into the running brief so the verifier still enforces the original exact names and prices. */
@@ -184,7 +189,7 @@ export function describeDisplay(display: DisplaySpec) {
 }
 
 /** The assistant's reply text for a finished design. Deterministic; no credits. */
-export function describeResult(menu: GeneratedMenuCore & { engine?: EngineReport }, intent: Pick<Intent, "kind" | "size"> & { display?: DisplaySpec | undefined; look?: LookRef | undefined }): string {
+export function describeResult(menu: GeneratedMenuCore & { engine?: EngineReport }, intent: Pick<Intent, "kind" | "size"> & { display?: DisplaySpec | undefined; look?: LookRef | undefined; wantsPhotos?: boolean | undefined }): string {
   const items = menu.sections.flatMap((section) => section.items);
   const what = menu.mode === "poster" ? "poster" : "menu";
   const lines: string[] = [];
@@ -201,7 +206,7 @@ export function describeResult(menu: GeneratedMenuCore & { engine?: EngineReport
   }
   if (!intent.display) lines.push("Tell me the real size any time (\"120 × 60 cm board\", \"A4 landscape\", \"55-inch TV\") and I will refit it.");
   if (menu.followed.length) lines.push(`Followed: ${menu.followed.slice(0, 4).join("; ")}.`);
-  lines.push("Tell me what to change, or say \"create the photos\".");
+  lines.push(intent.wantsPhotos ? "Creating the photos now." : "Tell me what to change, or say \"create the photos\".");
   return lines.join("\n");
 }
 

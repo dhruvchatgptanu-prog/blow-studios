@@ -220,7 +220,9 @@ function ChatStudio() {
         ...(setup ? { store: storeContext(setup.profile), ...(setup.storeId ? { storeId: setup.storeId } : {}), ...(setup.displayId ? { displayId: setup.displayId } : {}) } : {}),
       } });
       const render: RenderSettings = { mode: settings.mode, style: settings.style, size: settings.size, pages: settings.pages, display: intent.display, look: intent.look };
-      replaceMessage(conversationId, pendingId, { text: describeResult(result, intent), menu: result, render, status: "done" });
+      const wantsPhotos = intent.wantsPhotos || (intent.kind === "new" && settings.autoPhotos !== false);
+      replaceMessage(conversationId, pendingId, { text: describeResult(result, { ...intent, wantsPhotos }), menu: result, render, status: "done" });
+      if (wantsPhotos) { setBusy(false); await shootPhotos(conversationId, pendingId, result); }
     } catch (failure) {
       replaceMessage(conversationId, pendingId, { text: `That did not work: ${(failure as Error).message}`, status: "error" });
     } finally {

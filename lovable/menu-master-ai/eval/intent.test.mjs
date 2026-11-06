@@ -66,4 +66,11 @@ t("nextLook cycles through alternatives", nextLook(nextLook(pub.look)).id !== pu
 t("chooseLook honours the wizard template", chooseLook("menu for a pub", "menu", { setupTemplateId: "kraft-cafe" }).id === "kraft-cafe");
 const sizedText = describeResult(menu, { kind: "new", size: "wide", display: sized.display, look: sized.look });
 t("result text names the fitted size and look", sizedText.includes("120 × 60 cm") && sizedText.includes("Look:"), sizedText);
+// ---- what the first real chat user typed (5 Nov) ----
+const unique = parseIntent("Give me more unique design", { ...withMenu, look: pub.look });
+t("'more unique design' restyles", unique.kind === "restyle" && unique.look?.id !== pub.look.id, JSON.stringify({ kind: unique.kind, look: unique.look?.id }));
+const pics = parseIntent("Include pictures and more", withMenu);
+t("'include pictures' revises and wants photos", pics.kind === "revise" && pics.wantsPhotos === true, JSON.stringify({ kind: pics.kind, wantsPhotos: pics.wantsPhotos }));
+t("plain brief does not want photos unless asked", parseIntent("Create a burger shop menu", fresh).wantsPhotos === false);
+t("'with photos of each dish' wants photos", parseIntent("Create a burger shop menu with photos of each dish", fresh).wantsPhotos === true);
 console.log(f ? `FAILURES: ${f}` : "ALL PASS"); process.exit(f ? 1 : 0);

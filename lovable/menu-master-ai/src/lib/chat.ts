@@ -28,7 +28,7 @@ export type ChatMessage = {
   status?: "thinking" | "done" | "error" | undefined;
 };
 
-export type ChatSettings = { mode: ChatMode; style: ChatStyle; size: ChatSize; pages: ChatPages; display?: DisplaySpec | undefined; look?: LookRef | undefined };
+export type ChatSettings = { mode: ChatMode; style: ChatStyle; size: ChatSize; pages: ChatPages; display?: DisplaySpec | undefined; look?: LookRef | undefined; /** Create the food photos automatically after every new design (default on). */ autoPhotos?: boolean | undefined };
 
 export type Conversation = {
   id: string;

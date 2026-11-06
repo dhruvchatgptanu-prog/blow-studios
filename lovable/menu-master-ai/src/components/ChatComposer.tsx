@@ -76,6 +76,7 @@ export function ChatComposer({ value, onChange, onSend, busy, attachments, onAtt
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
         <Chip active={settings.mode === "poster"} onClick={() => onSettings({ mode: "poster", style: "bold-deals", size: "poster" })}>Bold deals</Chip>
         <Chip active={settings.mode === "menu"} onClick={() => onSettings({ mode: "menu", style: "editorial", size: "letter" })}>Classic menu</Chip>
+        <Chip active={settings.autoPhotos !== false} onClick={() => onSettings({ autoPhotos: settings.autoPhotos === false })} title="Create the food photos automatically after every new design">Auto photos {settings.autoPhotos !== false ? "on" : "off"}</Chip>
         <span className="mx-1 h-4 w-px bg-line" />
         {setup ? (
           <span className="inline-flex items-center gap-1 rounded-full border border-herb bg-card px-3 py-1 font-mono text-[10px] font-bold uppercase text-herb">

@@ -250,7 +250,7 @@ is that the text engines now write richer, more precise per-dish photo prompts
 | `OPENAI_API_KEY` | for ChatGPT engine | — |
 | `ANTHROPIC_API_KEY` | for Claude engine | — |
 | `GEMINI_API_KEY` | for Google Gemini direct (otherwise Gemini runs via the Lovable gateway) | — |
-| `GEMINI_MODEL` / `GEMINI_FALLBACK_MODELS` / `LOVABLE_GEMINI_MODEL` / `LOVABLE_GEMINI_FALLBACK_MODELS` / `HALFTONE_GATEWAY_GEMINI` | optional | `gemini-3-pro` / `gemini-3-flash,gemini-2.5-pro,gemini-2.5-flash` / `google/gemini-3.6-flash` / `google/gemini-3.5-pro,google/gemini-3-pro,google/gemini-2.5-pro,google/gemini-2.5-flash` / set `off` to stop using gateway Gemini |
+| `GEMINI_MODEL` / `GEMINI_FALLBACK_MODELS` / `LOVABLE_GEMINI_MODEL` / `LOVABLE_GEMINI_FALLBACK_MODELS` / `HALFTONE_GATEWAY_GEMINI` | optional | `gemini-3-pro` / `gemini-3-flash,gemini-2.5-pro,gemini-2.5-flash` / `google/gemini-3.7-flash` / `google/gemini-3.8-flash,google/gemini-4-argon,google/gemini-3.6-flash,google/gemini-3.5-flash,google/gemini-2.5-flash` / set `off` to stop using gateway Gemini |
 | `OPENAI_MODEL` | optional | `gpt-6-astra` |
 | `ANTHROPIC_MODEL` | optional | `claude-opus-5-5` |
 | `LOVABLE_TEXT_MODEL` | optional | `openai/gpt-6-astra` |
