@@ -1,6 +1,6 @@
 # Recovery status
 
-**Lovable is at parity with GitHub commit `5375405` (5 Nov 2026, round 7).** The whole upgrade (rounds
+**Lovable is at parity with GitHub commit `4fd2297` (6 Nov 2026).** Blocker on the live app: the Lovable AI gateway reports "Not enough credits"; the owner's own API keys (GEMINI_API_KEY free, OPENAI_API_KEY, ANTHROPIC_API_KEY) bypass it. The whole upgrade (rounds
 3-6, including the chat home page) was pulled into Lovable with one message that ran
 `apply/fetch-from-github.sh` (1 credit; typecheck clean). Future daily runs can use the same
 script with a newer `HALFTONE_SHA` whenever a change is worth a credit.

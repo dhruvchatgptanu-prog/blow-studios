@@ -46,6 +46,22 @@ The studio then designs with that template, size and venue profile, and prints a
 real dimensions. Not yet applied to Lovable (no credits); ready-to-paste bundles are in
 `lovable/menu-master-ai/apply/`.
 
+## 6 Nov: what actually failed, and what is needed from you
+A real end-to-end test inside Lovable's sandbox showed the cause of "all systems failed": the Lovable
+AI gateway answers "Not enough credits" for every model (your Lovable AI usage is used up), so the
+built-in engine and the gateway route to Gemini both fail. Storage, the design fitting and the chat
+itself passed. Two bugs found by the test and by your first three chat messages are fixed (a phantom
+dish called "REVISION" cost every revision 20 points; a 120 × 60 cm board was budgeted for one offer).
+
+To make it work you add your own keys in the Lovable editor (Cloud → Secrets), which bypass the
+gateway entirely. The Lovable agent has opened the secure form for them:
+- `GEMINI_API_KEY` — free: aistudio.google.com → Get API key. This alone makes designs work again.
+- `OPENAI_API_KEY` — platform.openai.com → API keys (needs API billing; a ChatGPT Plus login cannot
+  be used by an app, and I must never be given your password).
+- `ANTHROPIC_API_KEY` — console.anthropic.com → API keys (same note for Claude.ai).
+Or top up Lovable AI credits in the workspace to bring the built-in engine back.
+`scripts/halftone-smoke.ts` (run by the Lovable agent) proves the whole chain with real engines.
+
 ## Round 7 (same day)
 You can now drop in every page of your current menu at once (or paste them), and all engines read all
 of them. Your photos and the finished food photography are saved in Lovable Cloud storage, so a design
