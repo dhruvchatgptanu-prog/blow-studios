@@ -56,6 +56,8 @@ t("no data → 16:9 default with note", nothing.format === "wide" && nothing.not
 const small = contentBudget(21, 29.7, 0.5, "portrait", false), big = contentBudget(180, 60, 3, "landscape", false), fascia = contentBudget(447, 71.5, 12, "ultra-wide", false);
 t("A4 table menu holds many items", small.maxItems >= 20, JSON.stringify(small));
 t("board holds fewer than table menu", big.maxItems < small.maxItems && big.maxOffers >= 2, JSON.stringify(big));
+const counterBoard = contentBudget(120, 60, 3.5, "landscape", false);
+t("120 x 60 board above the counter fits 3-4 offers and 6+ items", counterBoard.maxOffers >= 3 && counterBoard.maxItems >= 6, JSON.stringify(counterBoard));
 t("fascia holds few offers", fascia.maxOffers <= 6 && fascia.maxItems <= 12, JSON.stringify(fascia));
 
 // ---- fit ----

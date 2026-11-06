@@ -188,16 +188,18 @@ export function contentBudget(widthCm: number, heightCm: number, viewingDistance
   const rows = Math.max(1, Math.floor(usableHeight / lineCm));
   const charsPerLine = Math.max(10, Math.floor(widthCm / (letter * 0.6)));
   // How many text columns the width supports at this letter size.
+  // A text column needs about 18 cap-heights of width (a 2-3 word name, dotted leader, price) on boards read from a distance.
   const textColumns = orientation === "ultra-wide"
     ? Math.min(6, Math.max(2, Math.floor(widthCm / (letter * 12))))
     : orientation === "landscape"
-      ? Math.min(3, Math.max(1, Math.floor(widthCm / (letter * 26))))
+      ? Math.min(4, Math.max(1, Math.floor(widthCm / (letter * 18))))
       : charsPerLine >= 70 ? 2 : 1;
   // Lines per item: name plus a short description, less on ultra-wide where descriptions are rare.
   const linesPerItem = orientation === "ultra-wide" ? 1.2 : 1.6;
-  const linesPerOffer = orientation === "ultra-wide" ? 2.5 : 5; // photo-led offer row
+  const linesPerOffer = orientation === "ultra-wide" ? 2.5 : orientation === "landscape" ? 4 : 5; // photo-led offer row
   const maxItemsBySpace = Math.max(2, Math.min(40, Math.floor(rows / linesPerItem) * textColumns));
-  const offerColumns = orientation === "ultra-wide" ? Math.min(5, Math.max(2, Math.floor(widthCm / (letter * 14)))) : orientation === "landscape" ? Math.min(3, Math.max(1, Math.floor(widthCm / (letter * 30)))) : 1;
+  // A photo-led offer column needs about 10 cap-heights of width (round photo + name + price stacked).
+  const offerColumns = orientation === "ultra-wide" ? Math.min(5, Math.max(2, Math.floor(widthCm / (letter * 14)))) : orientation === "landscape" ? Math.min(4, Math.max(1, Math.floor(widthCm / (letter * 10)))) : 1;
   const maxOffers = Math.max(1, Math.min(6, Math.max(1, Math.floor(rows / linesPerOffer)) * offerColumns));
   const maxNameWords = Math.max(2, Math.min(6, Math.floor(charsPerLine / (textColumns * 9))));
   const maxDescriptionWords = orientation === "ultra-wide" ? Math.min(8, Math.max(0, Math.floor(charsPerLine / (textColumns * 7)))) : Math.min(14, Math.max(4, Math.floor(charsPerLine / (textColumns * 6))));
