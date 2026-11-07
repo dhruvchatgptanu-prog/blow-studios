@@ -3,6 +3,7 @@ import { ArrowUp, ImagePlus, LoaderCircle, Paperclip, Store, UtensilsCrossed, X 
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from "react";
 
 import type { ChatSettings } from "@/lib/chat";
+import type { EngineStatus } from "@/lib/engines.functions";
 import { imagesFromTransfer } from "@/lib/images";
 import type { StudioSetup } from "@/lib/setup";
 
@@ -22,7 +23,7 @@ function Chip({ active, onClick, children, title }: { active?: boolean; onClick?
  * menu (several at once, by button, drag-and-drop or paste), one food photo to
  * improve, and two chips. Size, style and template come from the words.
  */
-export function ChatComposer({ value, onChange, onSend, busy, attachments, onAttach, onRemove, settings, onSettings, setup, onClearSetup, error }: {
+export function ChatComposer({ value, onChange, onSend, busy, attachments, onAttach, onRemove, settings, onSettings, setup, onClearSetup, error, engines }: {
   value: string;
   onChange: (next: string) => void;
   onSend: () => void;
@@ -35,6 +36,7 @@ export function ChatComposer({ value, onChange, onSend, busy, attachments, onAtt
   setup: StudioSetup | null;
   onClearSetup: () => void;
   error: string | null;
+  engines: EngineStatus[];
 }) {
   const [attachOpen, setAttachOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -141,6 +143,16 @@ export function ChatComposer({ value, onChange, onSend, busy, attachments, onAtt
         </button>
       </div>
       {error ? <p role="alert" className="mt-2 text-xs font-semibold text-destructive">{error}</p> : null}
+      {engines.length ? (
+        <p className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-mono text-[9px] uppercase text-muted">
+          <span>Engines</span>
+          {engines.map((engine) => (
+            <span key={engine.id} title={`${engine.model} · ${engine.hint}`} className={engine.configured ? "text-ink" : "text-muted/70 line-through"}>
+              {engine.configured ? "●" : "○"} {engine.label}{engine.configured && engine.route === "gateway" ? " (gateway)" : ""}
+            </span>
+          ))}
+        </p>
+      ) : null}
       <p className="mt-2 text-center font-mono text-[9px] uppercase text-muted">Drop or paste menu photos · say the size in words and it is fitted at the end · Enter to send</p>
     </div>
   );

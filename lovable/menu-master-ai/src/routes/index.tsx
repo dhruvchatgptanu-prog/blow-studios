@@ -9,6 +9,7 @@ import type { Shot } from "@/components/MenuSheet";
 import { chooseLook, conversationTitle, describeResult, extendBrief, HELP_REPLY, nextLook, parseIntent, STARTERS, type Intent, type LookRef } from "@/lib/ai/intent";
 import { signAssets, uploadAssets, type AssetRef } from "@/lib/assets.functions";
 import { assetPaths, DEFAULT_SETTINGS, latestDesign, loadConversations, newConversation, saveConversations, uid, withSignedUrls, type ChatMessage, type ChatSettings, type Conversation, type RenderSettings } from "@/lib/chat";
+import { getEngineStatus, type EngineStatus } from "@/lib/engines.functions";
 import { downscaleImage, validateImage } from "@/lib/images";
 import { generateMenu, stripEngine, type GeneratedMenu } from "@/lib/menu.functions";
 import { clearSetup, loadSetup, rendererSizeFor, storeContext, type StudioSetup } from "@/lib/setup";
@@ -46,7 +47,9 @@ function ChatStudio() {
   const [setup, setSetup] = useState<StudioSetup | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [engines, setEngines] = useState<EngineStatus[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
+  const engineStatusFn = useServerFn(getEngineStatus);
   const run = useServerFn(generateMenu);
   const upload = useServerFn(uploadAssets);
   const sign = useServerFn(signAssets);
@@ -77,6 +80,11 @@ function ChatStudio() {
   useEffect(() => {
     if (hydrated) saveConversations(conversations);
   }, [conversations, hydrated]);
+
+  // Which engines are configured (no credits used); refreshed after every design so a newly added key shows up.
+  useEffect(() => {
+    engineStatusFn().then(setEngines).catch(() => setEngines([]));
+  }, [engineStatusFn, busy]);
 
   const active = useMemo(() => conversations.find((conversation) => conversation.id === activeId) ?? conversations[0], [conversations, activeId]);
 
@@ -352,7 +360,7 @@ function ChatStudio() {
         </section>
 
         {active ? (
-          <ChatComposer value={draft} onChange={setDraft} onSend={() => void send()} busy={busy} attachments={attachments} onAttach={(kind, files) => void attach(kind, files)} onRemove={removeAttachment} settings={active.settings} onSettings={(next) => patchConversation(active.id, (conversation) => ({ ...conversation, settings: { ...conversation.settings, ...next } }))} setup={setup} onClearSetup={dropSetup} error={error} />
+          <ChatComposer value={draft} onChange={setDraft} onSend={() => void send()} busy={busy} attachments={attachments} onAttach={(kind, files) => void attach(kind, files)} onRemove={removeAttachment} settings={active.settings} onSettings={(next) => patchConversation(active.id, (conversation) => ({ ...conversation, settings: { ...conversation.settings, ...next } }))} setup={setup} onClearSetup={dropSetup} error={error} engines={engines} />
         ) : null}
       </main>
     </div>

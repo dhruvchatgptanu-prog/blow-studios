@@ -46,6 +46,12 @@ The studio then designs with that template, size and venue profile, and prints a
 real dimensions. Not yet applied to Lovable (no credits); ready-to-paste bundles are in
 `lovable/menu-master-ai/apply/`.
 
+## 7 Nov
+Under the message box the chat now shows which engines are switched on, so you can see your key
+being picked up the moment you add it. If every engine is out of credit, the reply says so and names
+the secret to add instead of a technical dump. A free Google AI Studio key now starts on Flash, which
+has the most free daily quota.
+
 ## 6 Nov: what actually failed, and what is needed from you
 A real end-to-end test inside Lovable's sandbox showed the cause of "all systems failed": the Lovable
 AI gateway answers "Not enough credits" for every model (your Lovable AI usage is used up), so the

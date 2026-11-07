@@ -1,7 +1,7 @@
 import { detectCuisine, enrichMenuPhotos } from "./cuisine";
 import { fitMenuToDisplay } from "./display";
 import { loadMemory, recordGeneration } from "./memory.server";
-import { availableProviders, pickJudge, type Provider } from "./providers.server";
+import { availableProviders, engineStatus, isCreditError, pickJudge, type Provider } from "./providers.server";
 import type { EngineCandidate, EngineReport, GeneratedMenu, GeneratedMenuCore, MenuRequest } from "./schema";
 import { verifyMenu } from "./verify";
 
@@ -68,7 +68,13 @@ export async function composeMenu(input: MenuRequest): Promise<GeneratedMenu> {
   const candidates = attempts.map((attempt) => attempt.candidate);
   if (successes.length === 0) {
     const reasons = attempts.map((attempt) => `${attempt.provider.label}: ${attempt.candidate.error ?? "failed"}`).join(" · ");
-    throw new Error(`Every engine failed. ${reasons}`);
+    const allCredit = attempts.every((attempt) => isCreditError(attempt.candidate.error ?? ""));
+    const missing = engineStatus().filter((engine) => !engine.configured && engine.route === "direct").map((engine) => engine.hint.replace(/^Add /, "")).join("; ");
+    throw new Error(
+      allCredit
+        ? `No engine has credit left (${reasons}). The built-in engine uses Lovable AI credits, which are used up. Add your own key in Lovable Cloud → Secrets and try again: ${missing || "GEMINI_API_KEY, OPENAI_API_KEY or ANTHROPIC_API_KEY"}. A free Google AI Studio key is enough.`
+        : `Every engine failed. ${reasons}`,
+    );
   }
   successes.sort((a, b) => b.candidate.score - a.candidate.score || a.candidate.ms - b.candidate.ms);
   const best = successes[0]!;

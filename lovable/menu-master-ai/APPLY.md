@@ -242,6 +242,20 @@ is that the text engines now write richer, more precise per-dish photo prompts
   parallel → verifier → judge (Claude → ChatGPT → Gemini → built-in) → repair → fit → verify.
 * Tests: `eval/intent.test.mjs` (sizes, looks, restyle).
 
+## Daily run 7 Nov (engine status, credit-aware errors, free-tier Gemini order)
+
+* The chat shows which engines are configured (filled dot = key present) under the message box,
+  refreshed after every design, so a newly added key is visible without guessing. Server function
+  `getEngineStatus` in `src/lib/engines.functions.ts`; no model call, no credits.
+* When every engine fails for lack of credit (the Lovable gateway's "Not enough credits", OpenAI's
+  "insufficient_quota"), the chat says so plainly and names the secrets to add, instead of a raw
+  engine dump. A per-model quota or rate limit (Gemini free tier meters each model separately) now
+  moves to the next model in the chain; a spent account does not.
+* Direct Gemini defaults to `gemini-3-flash` with Flash and Flash-Lite fallbacks before Pro, because
+  the free tier gives Flash the most daily headroom and Pro the least (sources disagree on exact
+  numbers; the chain adapts).
+* `scripts/halftone-smoke.ts` (6 Nov) runs the real chain inside the Lovable sandbox.
+
 ## Secrets (Lovable Cloud → Secrets)
 
 | Name | Required | Default |
@@ -250,7 +264,7 @@ is that the text engines now write richer, more precise per-dish photo prompts
 | `OPENAI_API_KEY` | for ChatGPT engine | — |
 | `ANTHROPIC_API_KEY` | for Claude engine | — |
 | `GEMINI_API_KEY` | for Google Gemini direct (otherwise Gemini runs via the Lovable gateway) | — |
-| `GEMINI_MODEL` / `GEMINI_FALLBACK_MODELS` / `LOVABLE_GEMINI_MODEL` / `LOVABLE_GEMINI_FALLBACK_MODELS` / `HALFTONE_GATEWAY_GEMINI` | optional | `gemini-3-pro` / `gemini-3-flash,gemini-2.5-pro,gemini-2.5-flash` / `google/gemini-3.7-flash` / `google/gemini-3.8-flash,google/gemini-4-argon,google/gemini-3.6-flash,google/gemini-3.5-flash,google/gemini-2.5-flash` / set `off` to stop using gateway Gemini |
+| `GEMINI_MODEL` / `GEMINI_FALLBACK_MODELS` / `LOVABLE_GEMINI_MODEL` / `LOVABLE_GEMINI_FALLBACK_MODELS` / `HALFTONE_GATEWAY_GEMINI` | optional | `gemini-3-flash` / `gemini-2.5-flash,gemini-3-flash-lite,gemini-2.5-flash-lite,gemini-3-pro` / `google/gemini-3.7-flash` / `google/gemini-3.8-flash,google/gemini-4-argon,google/gemini-3.6-flash,google/gemini-3.5-flash,google/gemini-2.5-flash` / set `off` to stop using gateway Gemini |
 | `OPENAI_MODEL` | optional | `gpt-6-astra` |
 | `ANTHROPIC_MODEL` | optional | `claude-opus-5-5` |
 | `LOVABLE_TEXT_MODEL` | optional | `openai/gpt-6-astra` |

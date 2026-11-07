@@ -61,7 +61,7 @@ const MODELS = {
   openai: process.env["OPENAI_MODEL"] ?? "gpt-6-astra",
   claude: process.env["ANTHROPIC_MODEL"] ?? "claude-opus-5-5",
   // Gateway ids come from Lovable's changelog (google/gemini-3.7-flash is confirmed); unknown ids fall through the chain.
-  gemini: process.env["GEMINI_API_KEY"] ? (process.env["GEMINI_MODEL"] ?? "gemini-3-pro") : (process.env["LOVABLE_GEMINI_MODEL"] ?? "google/gemini-3.7-flash"),
+  gemini: process.env["GEMINI_API_KEY"] ? (process.env["GEMINI_MODEL"] ?? "gemini-3-flash") : (process.env["LOVABLE_GEMINI_MODEL"] ?? "google/gemini-3.7-flash"),
 } as const;
 
 function list(env: string | undefined, fallback: string[]) {
@@ -79,7 +79,7 @@ const FALLBACK_MODELS: Record<ProviderId, string[]> = {
   openai: list(process.env["OPENAI_FALLBACK_MODELS"], ["gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.5"]),
   claude: list(process.env["ANTHROPIC_FALLBACK_MODELS"], ["claude-sonnet-5-5", "claude-opus-5"]),
   gemini: process.env["GEMINI_API_KEY"]
-    ? list(process.env["GEMINI_FALLBACK_MODELS"], ["gemini-3-flash", "gemini-2.5-pro", "gemini-2.5-flash"])
+    ? list(process.env["GEMINI_FALLBACK_MODELS"], ["gemini-2.5-flash", "gemini-3-flash-lite", "gemini-2.5-flash-lite", "gemini-3-pro"])
     : list(process.env["LOVABLE_GEMINI_FALLBACK_MODELS"], ["google/gemini-3.8-flash", "google/gemini-4-argon", "google/gemini-3.6-flash", "google/gemini-3.5-flash", "google/gemini-2.5-flash"]),
 };
 
@@ -91,7 +91,28 @@ export function modelChain(id: ProviderId) {
 export function isModelError(message: string) {
   const lower = message.toLowerCase();
   if (/abort|timed out|timeout/.test(lower)) return false;
+  // A per-model quota (free tiers meter each model separately) is worth trying the next model for; a spent account is not.
+  if (/resource_exhausted|rate limit|too many requests|\b429\b|quota exceeded|per[- ]day|per[- ]minute/.test(lower) && !/insufficient_quota|billing|not enough credits|payment/.test(lower)) return true;
   return /model/.test(lower) && /not[ _](found|exist|available|supported)|does not exist|unknown|invalid|deprecat|retired|decommission|shut ?down|no longer|permission|access|\b404\b/.test(lower);
+}
+
+/** An engine failed because the account behind it has no credit, not because of the brief. */
+export function isCreditError(message: string) {
+  return /not enough credits|insufficient_quota|insufficient credits|exceeded your current quota|billing|payment required|\b402\b|credit balance/i.test(message);
+}
+
+export type EngineStatus = { id: ProviderId; label: string; model: string; route: "direct" | "gateway"; configured: boolean; hint: string };
+
+/** Which engines are configured right now, without calling any of them (shown in the chat so the owner can see keys being picked up). */
+export function engineStatus(): EngineStatus[] {
+  const lovableKey = Boolean(process.env["LOVABLE_API_KEY"]);
+  const gemini = Boolean(process.env["GEMINI_API_KEY"]);
+  return [
+    { id: "lovable", label: "Halftone built-in", model: MODELS.lovable, route: "gateway", configured: lovableKey, hint: lovableKey ? "Uses Lovable AI credits." : "LOVABLE_API_KEY missing." },
+    { id: "openai", label: "ChatGPT", model: MODELS.openai, route: "direct", configured: Boolean(process.env["OPENAI_API_KEY"]), hint: process.env["OPENAI_API_KEY"] ? "Your OpenAI account." : "Add OPENAI_API_KEY (platform.openai.com) in Lovable Cloud secrets." },
+    { id: "claude", label: "Claude", model: MODELS.claude, route: "direct", configured: Boolean(process.env["ANTHROPIC_API_KEY"]), hint: process.env["ANTHROPIC_API_KEY"] ? "Your Anthropic account." : "Add ANTHROPIC_API_KEY (console.anthropic.com) in Lovable Cloud secrets." },
+    { id: "gemini", label: "Google Gemini", model: MODELS.gemini, route: gemini ? "direct" : "gateway", configured: gemini || (lovableKey && process.env["HALFTONE_GATEWAY_GEMINI"] !== "off"), hint: gemini ? "Your Google account (free tier works)." : lovableKey ? "Via the Lovable gateway (uses Lovable AI credits); add GEMINI_API_KEY for a free direct key." : "Add GEMINI_API_KEY (aistudio.google.com)." },
+  ];
 }
 
 /** Runs `attempt` for each model in the chain until one succeeds or a non-model error occurs. */
