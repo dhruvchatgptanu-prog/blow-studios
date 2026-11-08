@@ -1,0 +1,18 @@
+import { coachBrief } from "./out/src/lib/ai/coach.js";
+import { enrichPhotoPrompt } from "./out/src/lib/ai/cuisine.js";
+let f = 0; const t = (l, c, d="") => { if (!c) { f++; console.log("FAIL", l, d); } else console.log("PASS", l); };
+const full = coachBrief("Create a bold family deals poster for Yiros House. Include: Yiros Meal Deal — 3 lamb yiros and large chips $49.90; Seafood Family Pack — 3 fish, calamari, prawns and chips $59.90; Big Family Yiros — 5 chicken yiros and family chips $69.90. Use the exact names and prices.", "poster");
+t("full brief scores high", full.score >= 90, String(full.score));
+const vague = coachBrief("make me a poster with some deals", "poster");
+t("vague brief flagged", vague.score < 60 && vague.hints.some((h) => h.level === "fix"), JSON.stringify(vague));
+const menu = coachBrief("A5 menu for Nook Cafe with coffee, breakfast and toasties. Prices in dollars.", "menu");
+t("menu brief ok without prices when currency given", menu.score >= 70, JSON.stringify(menu));
+const once = enrichPhotoPrompt("Three lamb yiros and chips.", ["greek / yiros / gyros / souvlaki"]);
+t("enrichment idempotent", enrichPhotoPrompt(once, ["greek / yiros / gyros / souvlaki"]) === once);
+const typo = coachBrief("For Burger oclock name of resturant Create a burger shop menu design. You can use random prices", "menu");
+t("venue typed with lowercase word gets an exact-print warning", typo.hints.some((h) => h.text.includes('"Burger oclock"')), JSON.stringify(typo.hints));
+const clean = coachBrief("Create a one-page menu for Yiros House with sections for yiros, grill plates and sides. Prices in dollars.", "menu");
+t("clean venue name gets no warning", !clean.hints.some((h) => h.text.includes("will print exactly")), JSON.stringify(clean.hints));
+const randomPoster = coachBrief("For Burger oclock Create a burger shop poster. You can use random prices", "poster");
+t("random prices → no price fix, placeholder tip", !randomPoster.hints.some((h) => h.level === "fix" && /price/i.test(h.text)) && randomPoster.hints.some((h) => h.text.includes("Placeholder prices")), JSON.stringify(randomPoster.hints));
+console.log(f ? `FAILURES: ${f}` : "ALL PASS"); process.exit(f ? 1 : 0);
