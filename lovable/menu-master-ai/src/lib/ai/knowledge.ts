@@ -34,6 +34,7 @@ export const MENU_MODE_RULES = [
   "Descriptions: 6-14 words, ingredient-led, sensory but honest. No exclamation marks. No 'delicious', 'amazing', 'best'.",
   "Keep the chosen editorial, modern or rustic treatment; do not impose the poster aesthetic on a classic menu.",
   "Section notes are optional one-liners (e.g. 'Wrapped fresh to order'). Use null when there is nothing worth saying.",
+  "Printed table menus are read at arm's length, often in dim light and by older guests: body text never below 12 pt, section headers 18 pt or larger, medium or heavier weights (no light or thin faces for descriptions), line spacing 140-160%. Keep item counts to what fits at that size rather than shrinking the type.",
 ] as const;
 
 export const POSTER_MODE_RULES = [

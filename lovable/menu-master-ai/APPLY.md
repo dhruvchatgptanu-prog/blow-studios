@@ -256,6 +256,19 @@ is that the text engines now write richer, more precise per-dish photo prompts
   numbers; the chain adapts).
 * `scripts/halftone-smoke.ts` (6 Nov) runs the real chain inside the Lovable sandbox.
 
+## Daily run 8 Nov (Gemini route hardening, print legibility rule)
+
+* Chat-completions engines (direct Gemini, gateway google/* models) retry the same model without a
+  strict JSON schema when the endpoint rejects `response_format` (Google's OpenAI-compatible endpoint
+  does not document it); the schema still travels in the prompt, and prefixed or fenced JSON is
+  parsed. A free Google AI Studio key therefore works whatever the endpoint accepts.
+  `eval/gemini.test.mjs` mocks both outcomes.
+* Knowledge: printed table menus keep body text at 12 pt or larger, headers 18 pt+, medium weights
+  and 140-160% line spacing (consistent rule of thumb across print and bar-menu guidance; no
+  controlled study found), and shorten the item list rather than the type.
+* Research also confirmed Claude 5.x models reject `temperature` and forced tool choice; the Claude
+  provider sends neither, so no change.
+
 ## Secrets (Lovable Cloud → Secrets)
 
 | Name | Required | Default |

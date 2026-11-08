@@ -424,8 +424,13 @@ const claudeProvider: Provider = {
 type ChatCall = { url: string; headers: Record<string, string>; model: string; instructions: string; text: string; images?: string[] | undefined; schemaName: string; schema: unknown; signal: AbortSignal };
 
 /** OpenAI-compatible chat completions with a JSON schema response (Gemini direct, or google/* models on the Lovable gateway). */
-async function callChatCompletions(call: ChatCall): Promise<string> {
-  // The schema also travels in the text, so a gateway that ignores response_format still answers in the right shape.
+/** The endpoint rejected the structured-output request itself (not the model, not the account): retry without it. */
+export function isSchemaFormatError(status: number, message: string) {
+  return status === 400 && /response_format|json_schema|additionalProperties|strict|unknown (?:field|parameter|name)|unsupported|invalid argument/i.test(message);
+}
+
+async function callChatCompletions(call: ChatCall, withSchema = true): Promise<string> {
+  // The schema also travels in the text, so an endpoint that ignores (or rejects) response_format still answers in the right shape.
   const prompt = `${call.text}\n\n## OUTPUT JSON SCHEMA (answer with one JSON object of exactly this shape, no prose, no code fences)\n${JSON.stringify(call.schema)}`;
   const content: unknown[] = [{ type: "text", text: prompt }, ...(call.images ?? []).map((image) => ({ type: "image_url", image_url: { url: image } }))];
   const response = await fetch(call.url, {
@@ -435,17 +440,23 @@ async function callChatCompletions(call: ChatCall): Promise<string> {
     body: JSON.stringify({
       model: call.model,
       messages: [{ role: "system", content: call.instructions }, { role: "user", content }],
-      response_format: { type: "json_schema", json_schema: { name: call.schemaName, strict: true, schema: call.schema } },
+      ...(withSchema ? { response_format: { type: "json_schema", json_schema: { name: call.schemaName, strict: true, schema: call.schema } } } : { response_format: { type: "json_object" } }),
       stream: false,
     }),
   });
-  if (!response.ok) throw new Error(await responsesError(response, `Engine request failed (${response.status}).`));
+  if (!response.ok) {
+    const message = await responsesError(response, `Engine request failed (${response.status}).`);
+    if (withSchema && isSchemaFormatError(response.status, message)) return callChatCompletions(call, false);
+    throw new Error(message);
+  }
   const json = (await response.json()) as { choices?: { message?: { content?: string | { type: string; text?: string }[]; refusal?: string | null } }[]; error?: { message?: string } };
   if (json.error?.message) throw new Error(json.error.message);
   const message = json.choices?.[0]?.message;
   if (message?.refusal) throw new Error(message.refusal);
   const text = typeof message?.content === "string" ? message.content : (message?.content ?? []).map((part) => part.text ?? "").join("");
-  const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+  const stripped = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+  const start = stripped.indexOf("{"), end = stripped.lastIndexOf("}");
+  const cleaned = start >= 0 && end > start ? stripped.slice(start, end + 1) : stripped;
   if (!cleaned) throw new Error("The engine returned an empty response.");
   return cleaned;
 }

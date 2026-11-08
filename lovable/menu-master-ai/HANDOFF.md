@@ -46,6 +46,11 @@ The studio then designs with that template, size and venue profile, and prints a
 real dimensions. Not yet applied to Lovable (no credits); ready-to-paste bundles are in
 `lovable/menu-master-ai/apply/`.
 
+## 8 Nov
+A free Google key now works even if Google's endpoint refuses strict JSON schemas: the app retries
+in plain JSON mode and checks the result itself. Printed menus are told to keep body text at 12 pt
+or larger.
+
 ## 7 Nov
 Under the message box the chat now shows which engines are switched on, so you can see your key
 being picked up the moment you add it. If every engine is out of credit, the reply says so and names
